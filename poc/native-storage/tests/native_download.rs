@@ -1,6 +1,6 @@
 mod receive_support;
 use receive_support::*;
-use rockets_native_storage_probe::crypto::{
+use rocket_native_storage_probe::crypto::{
     contract::{DownloadRecord, DownloadRequest, Fault},
     model::Envelope,
     Client, Reply,

@@ -76,10 +76,9 @@ def write_report(path, report):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    release = ROOT / "dist/crypto-probes/target/openmls/release"
     for option, name in (("binary", "state-lab"), ("helper", "rollback-anchor"),
                          ("permission-verifier", "permission-verify"), ("receipt-signer", "relay-receipt")):
-        parser.add_argument("--" + option, type=Path, default=release / ("openmls-" + name))
+        parser.add_argument("--" + option, type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
     parser.add_argument("--case", action="append", choices=[c[0] for c in CASES])
     parser.add_argument("--output", type=Path, default=ROOT / "dist/anchor-rebuild")
     args = parser.parse_args()

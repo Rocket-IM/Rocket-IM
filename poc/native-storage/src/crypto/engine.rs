@@ -229,7 +229,7 @@ fn encoded_fields(domain: &[u8], fields: &[&str]) -> Vec<u8> {
 
 fn credential(identity: &Identity) -> Credential {
     BasicCredential::new(encoded_fields(
-        b"Rockets-IM/native-crypto/identity/v1\0",
+        b"Rocket-IM/native-crypto/identity/v1\0",
         &[&identity.service, &identity.account, &identity.device],
     ))
     .into()
@@ -244,7 +244,7 @@ fn credential_with_key(identity: &Identity) -> Result<CredentialWithKey, ApiErro
 
 fn group_id(service: &str, conversation: &str) -> Vec<u8> {
     encoded_fields(
-        b"Rockets-IM/native-crypto/group/v1\0",
+        b"Rocket-IM/native-crypto/group/v1\0",
         &[service, conversation],
     )
 }

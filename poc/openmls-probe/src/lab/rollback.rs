@@ -12,8 +12,8 @@ use std::path::Path;
 
 const GATE: &str = "anchor-gate.enc";
 const JOURNAL: &str = "anchor-journal.enc";
-const GATE_DOMAIN: &str = "Rockets-IM/POC/anchor-gate/v1";
-const JOURNAL_DOMAIN: &str = "Rockets-IM/POC/anchor-result/v1";
+const GATE_DOMAIN: &str = "Rocket-IM/POC/anchor-gate/v1";
+const JOURNAL_DOMAIN: &str = "Rocket-IM/POC/anchor-result/v1";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

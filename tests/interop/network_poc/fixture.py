@@ -29,6 +29,12 @@ def check(condition, message):
         raise AssertionError(message)
 
 
+def require_current_namespace(binary, domain=b"Rocket-IM/state-lab/v1"):
+    """拒绝历史命名域产物；此检查不证明产物由当前源码构建。"""
+    check(domain in Path(binary).read_bytes(),
+          f"程序缺少当前 Rocket-IM 命名域，请显式指定本轮构建产物: {binary}")
+
+
 def identity(device):
     return {"account_id": (ACCOUNTS | JOIN_CANDIDATES | DEVICE_CANDIDATES)[device], "device_id": device}
 
@@ -37,6 +43,7 @@ class NetworkLab:
     def __init__(self, binary, directory, permission_verifier=None, receipt_signer=None, *,
                  service=SERVICE, relay_entrypoint=None, relay_args=()):
         self.binary, self.directory = Path(binary), Path(directory)
+        self.public_fixture_directory = self.directory / "public-fixtures"
         self.service = service
         self.relay_entrypoint = Path(relay_entrypoint) if relay_entrypoint is not None else ROOT / "poc/network-relay/server.py"
         self.relay_args = tuple(relay_args)
@@ -94,6 +101,11 @@ class NetworkLab:
 
     def initialize(self, pending_limit=1000, *, permissions=False, owner_account_id="alice",
                    join_candidate=False, device_candidates=False):
+        require_current_namespace(self.binary)
+        if self.permission_verifier is not None:
+            require_current_namespace(self.permission_verifier, b"Rocket-IM/POC/permission-change/v1")
+        if self.receipt_signer is not None:
+            require_current_namespace(self.receipt_signer, b"Rocket-IM/POC/permission-receipt/v1")
         for device in ACCOUNTS:
             self.public[device] = self.rust(device, "init")
         self.authorize_fixture_peer("a1", "a2")

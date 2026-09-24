@@ -55,6 +55,8 @@ fn real_openmls_initialization_join_and_bidirectional_messages() {
 fn provider_restore_preserves_identity_and_next_message_state() {
     let initial = Engine::new(&scope("alice")).expect("创建身份");
     let initial_snapshot = initial.export().expect("导出未入群状态");
+    let saved: Value = serde_json::from_slice(&initial_snapshot).expect("解析当前快照");
+    assert_eq!(saved["format"], "Rocket-IM/native-crypto/state/v1");
     let restored = Engine::restore(&initial_snapshot, &scope("alice")).expect("恢复身份");
     assert_eq!(initial.identity(), restored.identity());
     assert!(restored.conversation().is_none());
@@ -99,8 +101,10 @@ fn restore_rejects_foreign_or_unknown_snapshot_versions() {
     let engine = Engine::new(&scope("alice")).expect("创建身份");
     let snapshot = engine.export().expect("导出状态");
     for (field, value) in [
-        ("format", "Rockets-IM/browser-crypto/state/v1"),
-        ("format", "Rockets-IM/native-crypto/state/v2"),
+        // 旧工程名仅作为拒绝回归输入保留，不能重新接受旧密码状态。
+        ("format", "Rockets-IM/native-crypto/state/v1"),
+        ("format", "Rocket-IM/browser-crypto/state/v1"),
+        ("format", "Rocket-IM/native-crypto/state/v2"),
         ("openmls_version", "0.0.0"),
         ("provider_version", "0.0.0"),
     ] {

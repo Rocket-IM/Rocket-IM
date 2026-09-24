@@ -18,7 +18,7 @@ impl Fixture {
         let directory = std::env::temp_dir()
             .canonicalize()
             .unwrap()
-            .join(format!("rockets-snapshot-test-{suffix}"));
+            .join(format!("rocket-snapshot-test-{suffix}"));
         fs::DirBuilder::new()
             .mode(0o700)
             .create(&directory)

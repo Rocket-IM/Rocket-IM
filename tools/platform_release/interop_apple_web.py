@@ -16,7 +16,52 @@ if str(ROOT) not in sys.path:
 from tools.platform_release import apple, web
 
 ACCEPTED = ROOT / "dist/platform-interop/accepted-packages.json"
+OUTPUT = ROOT / "dist/platform-interop"
 VERSION = "0.1.0-stage0.1"
+
+
+def configure(accepted_path=None, output=None):
+    """显式选择本轮验收清单和输出；不改写历史清单或放宽逐包摘要检查。"""
+    global ACCEPTED, OUTPUT
+    for value in (accepted_path, output):
+        if value is not None and not Path(value).resolve().is_relative_to((ROOT / "dist").resolve()):
+            raise ValueError("互通输入和输出必须位于项目dist内")
+    if accepted_path is not None:
+        ACCEPTED = Path(accepted_path).resolve()
+    if output is not None:
+        OUTPUT = Path(output).resolve()
+
+
+def accepted_entries(platforms=None):
+    """默认验完整四端；单端/配对消费只依赖明确选择的已验收包。"""
+    entries = json.loads(ACCEPTED.read_text())
+    all_platforms = {"swift", "browser", "kotlin", "flutter"}
+    required = all_platforms if platforms is None else set(platforms)
+    if not required or not required <= all_platforms:
+        raise ValueError("invalid_accepted_platform_selection")
+    if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+        raise RuntimeError("invalid_accepted_package_set")
+    selected = [entry for entry in entries if isinstance(entry.get("platform"), str) and entry["platform"] in required]
+    if (len(selected) != len(required) or {entry["platform"] for entry in selected} != required
+            or platforms is None and len(entries) != len(required)):
+        raise RuntimeError("invalid_accepted_package_set")
+    for entry in selected:
+        artifact = (ROOT / entry["artifact"]).resolve()
+        if not artifact.is_relative_to((ROOT / "dist").resolve()) or sha(artifact) != entry["sha256"]:
+            raise RuntimeError("accepted_package_changed")
+        if ACCEPTED != ROOT / "dist/platform-interop/accepted-packages.json" and "report_sha256" not in entry:
+            raise RuntimeError("explicit_acceptance_report_digest_required")
+        if "report_sha256" in entry:
+            report = (ROOT / entry["report"]).resolve()
+            if not report.is_relative_to((ROOT / "dist").resolve()) or sha(report) != entry["report_sha256"]:
+                raise RuntimeError("accepted_report_changed")
+            result = json.loads(report.read_text())
+            key = {"swift": "archive_sha256", "browser": "archive_sha256", "kotlin": "aar_sha256",
+                   "flutter": "package_sha256"}[entry["platform"]]
+            if (result.get("status") not in {"PASS", "passed"} or result.get("run_id") != entry["run_id"]
+                    or result.get(key) != entry["sha256"]):
+                raise RuntimeError("accepted_package_not_verified")
+    return selected
 
 
 def sha(path: Path) -> str:
@@ -37,18 +82,18 @@ def inputs(platform: str) -> dict[str, str]:
 
 
 def accepted(platform: str) -> tuple[Path, dict]:
-    entries = json.loads(ACCEPTED.read_text())
+    entries = accepted_entries({platform})
     entry = next(item for item in entries if item["platform"] == platform)
     archive = (ROOT / entry["artifact"]).resolve()
-    if not archive.is_relative_to(ROOT / "dist/platform-release") or sha(archive) != entry["sha256"]:
+    if not archive.is_relative_to(ROOT / "dist") or sha(archive) != entry["sha256"]:
         raise RuntimeError("已验收归档缺失、越界或摘要改变；不重新打包作为回退")
     return archive, entry
 
 
 def start(work: Path, platform: str) -> tuple[Path, Path, dict]:
     work = work.resolve()
-    if not work.is_relative_to(ROOT / "dist/platform-interop"):
-        raise RuntimeError("互通消费构建输出仅允许dist/platform-interop下的独立目录")
+    if not work.is_relative_to(OUTPUT):
+        raise RuntimeError("互通消费构建输出必须位于显式选择的独立输出目录")
     work.mkdir(parents=True, exist_ok=True)
     directory = work / "consumer"
     archive, acceptance = accepted(platform)
@@ -101,9 +146,9 @@ def prepare_swift(work: Path) -> dict:
     try:
         vendor = directory / "Vendor"; vendor.mkdir()
         apple.extract(archive, vendor)
-        package = vendor / "RocketsIMStage0"
+        package = vendor / "RocketIMStage0"
         before = verify_package(package)
-        bundle_id = "dev.rocketsim.stage0.interop.r" + report["build_id"].replace("-", "")[:16]
+        bundle_id = "dev.rocketim.stage0.interop.r" + report["build_id"].replace("-", "")[:16]
         derived = work / "DerivedData"
         apple.command(["xcodebuild", "-project", directory / "Stage0Consumer.xcodeproj", "-scheme", "Stage0Consumer",
                        "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
@@ -115,7 +160,7 @@ def prepare_swift(work: Path) -> dict:
             raise RuntimeError("Xcode未输出预期应用二进制")
         report.update(app=str(app), bundle_id=bundle_id, app_sha256=hashes(app),
                       binary_sha256=sha(app / "Stage0Consumer"), configuration="Release", architecture="arm64",
-                      runtime="NOT_STARTED", launch_environment=["ROCKETS_INTEROP_URL", "ROCKETS_INTEROP_RUN_ID", "ROCKETS_INTEROP_ENDPOINT_ID"])
+                      runtime="NOT_STARTED", launch_environment=["ROCKET_INTEROP_URL", "ROCKET_INTEROP_RUN_ID", "ROCKET_INTEROP_ENDPOINT_ID"])
         return finish(work, report, archive, package, before)
     except Exception as error:
         failed(work, report, error)
@@ -129,7 +174,7 @@ def prepare_browser(work: Path) -> dict:
     try:
         web.command(["npm", "install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", archive],
                     directory, work / "npm-install.log")
-        package = directory / "node_modules/@rockets-im/stage0"
+        package = directory / "node_modules/@rocket-im/stage0"
         before = verify_package(package)
         compiler = json.loads((directory / "node_modules/typescript/package.json").read_text())
         if compiler["version"] != "5.9.3":
@@ -149,7 +194,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("platform", choices=("swift", "browser"))
     parser.add_argument("--work", required=True, type=Path)
+    parser.add_argument("--accepted-packages", type=Path)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    configure(args.accepted_packages, args.output)
     result = prepare_swift(args.work) if args.platform == "swift" else prepare_browser(args.work)
     print(json.dumps({key: result.get(key) for key in ("status", "build_id", "directory", "app", "bundle_id", "archive_sha256")}, ensure_ascii=False))
 

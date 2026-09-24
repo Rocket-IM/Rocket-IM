@@ -1,4 +1,4 @@
-use rockets_native_storage_probe::crypto::contract::{Action, Request};
+use rocket_native_storage_probe::crypto::contract::{Action, Request};
 use serde_json::json;
 
 #[test]

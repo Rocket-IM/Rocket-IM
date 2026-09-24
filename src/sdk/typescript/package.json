@@ -1,5 +1,5 @@
 {
-  "name": "@rockets-im/stage0",
+  "name": "@rocket-im/stage0",
   "version": "0.1.0-stage0.1",
   "private": true,
   "description": "Stage 0 browser package: isolated in-memory MLS devices, not a complete IM SDK.",

@@ -169,7 +169,7 @@ pub fn fixture() -> (Trust, Registration) {
 pub fn anchor_response(value: &rebuild::Response) -> anchor::Signed {
     let record = signed(
         value,
-        b"Rockets-IM/POC/anchor-rebuild-response/v1\0",
+        b"Rocket-IM/POC/anchor-rebuild-response/v1\0",
         &ANCHOR,
     );
     anchor::Signed {

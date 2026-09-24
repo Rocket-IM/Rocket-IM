@@ -84,7 +84,7 @@ class RelayServer(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
-    server_version = "Rockets-IM-POC"
+    server_version = "Rocket-IM-POC"
     sys_version = ""
 
     def setup(self):

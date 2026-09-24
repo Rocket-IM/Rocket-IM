@@ -6,7 +6,7 @@ use crate::permission::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const SIGNING_DOMAIN: &[u8] = b"Rockets-IM/POC/message-acceptance/v1\0";
+pub const SIGNING_DOMAIN: &[u8] = b"Rocket-IM/POC/message-acceptance/v1\0";
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MessageAcceptanceStatement {
@@ -37,7 +37,7 @@ impl MessageAcceptanceStatement {
 }
 pub fn envelope_digest(header: &[u8], payload: &[u8]) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"Rockets-IM/POC/message-envelope/v1\0");
+    digest.update(b"Rocket-IM/POC/message-envelope/v1\0");
     for bytes in [header, payload] {
         digest.update((bytes.len() as u64).to_be_bytes());
         digest.update(bytes);

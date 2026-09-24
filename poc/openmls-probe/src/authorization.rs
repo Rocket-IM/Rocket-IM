@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-const SIGNING_DOMAIN: &[u8] = b"Rockets-IM/POC/device-authorization/v1\0";
+const SIGNING_DOMAIN: &[u8] = b"Rocket-IM/POC/device-authorization/v1\0";
 const MAX_VALIDITY_SECONDS: u64 = 300;
 const MAX_DEVICES: usize = 64;
 const MAX_CONSUMED_NONCES: usize = 4096;

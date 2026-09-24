@@ -35,7 +35,7 @@ impl Engine {
     }
 
     fn checkpoint_for_group(&self, group: &MlsGroup) -> Result<Value, ApiError> {
-        let mut bytes = b"Rockets-IM/native-rebuild/MLS-GroupContext/v1\0".to_vec();
+        let mut bytes = b"Rocket-IM/native-rebuild/MLS-GroupContext/v1\0".to_vec();
         bytes.extend(failed(
             group
                 .public_group()

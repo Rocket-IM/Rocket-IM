@@ -2,7 +2,6 @@
 library;
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'src/rust/api.dart' as native;
 import 'src/rust/frb_generated.dart';
@@ -24,7 +23,7 @@ Future<void> initialize({String expectedVersion = packageVersion}) {
 Future<void> _load(String expectedVersion) async {
   final ExternalLibrary library;
   if (Platform.isAndroid) {
-    library = ExternalLibrary.open('librockets_stage0_flutter.so');
+    library = ExternalLibrary.open('librocket_stage0_flutter.so');
   } else if (Platform.isIOS) {
     // 静态XCFramework通过podspec链接；不尝试其他库或路径。
     library = ExternalLibrary.process(iKnowHowToUseIt: true);

@@ -29,6 +29,7 @@ pub mod message_closure;
 #[cfg(unix)]
 pub mod message_rejection;
 
+#[cfg(unix)]
 pub mod consistency;
 #[cfg(unix)]
 pub mod consistency_exchange;

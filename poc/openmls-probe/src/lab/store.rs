@@ -140,7 +140,7 @@ impl LockedDevice {
         }
         let encoded_context = checked(
             "context_encoding",
-            serde_json::to_vec(&("Rockets-IM/state-lab/v1", context)),
+            serde_json::to_vec(&("Rocket-IM/state-lab/v1", context)),
         )?;
         let plaintext = checked(
             "snapshot_load",
@@ -170,7 +170,7 @@ impl LockedDevice {
         let plaintext = checked("state_encoding", serde_json::to_vec(state))?;
         let context = checked(
             "context_encoding",
-            serde_json::to_vec(&("Rockets-IM/state-lab/v1", &state.context)),
+            serde_json::to_vec(&("Rocket-IM/state-lab/v1", &state.context)),
         )?;
         if matches!(point, CrashPoint::BeforeSave) {
             std::process::exit(83);

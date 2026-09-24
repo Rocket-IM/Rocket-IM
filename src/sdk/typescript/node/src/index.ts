@@ -1,8 +1,8 @@
 /** Node宿主的阶段0薄接口；密码状态仅由包内预编译Rust核心持有。 */
-import type { Stage0Device as WasmDevice } from "./generated/rockets_stage0_wasm.js";
+import type { Stage0Device as WasmDevice } from "./generated/rocket_stage0_wasm.js";
 
 export const SDK_VERSION = "0.1.0-stage0.1";
-type Binding = typeof import("./generated/rockets_stage0_wasm.js");
+type Binding = typeof import("./generated/rocket_stage0_wasm.js");
 let binding: Binding | undefined;
 let initialization: Promise<void> | undefined;
 
@@ -12,7 +12,7 @@ export function initialize(): Promise<void> {
     initialization = (async () => {
       let loaded: Binding;
       try {
-        loaded = await import("./generated/rockets_stage0_wasm.js");
+        loaded = await import("./generated/rocket_stage0_wasm.js");
       } catch (cause) {
         throw new Error("node_initialization_failed: cannot load packaged Rust runtime", { cause });
       }

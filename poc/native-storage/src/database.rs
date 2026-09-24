@@ -123,7 +123,7 @@ impl Store {
                 let snapshot = read_snapshot(tx, &self.scope, self.schema_version)?;
                 if fault == Fault::ReadAfterSnapshot {
                     tx.query_row(
-                        "SELECT value FROM rockets_probe_missing_read_table",
+                        "SELECT value FROM rocket_probe_missing_read_table",
                         [],
                         |row| row.get::<_, i64>(0),
                     )
@@ -213,7 +213,7 @@ impl Store {
 
 fn sql_fault(tx: &Transaction<'_>) -> Result<()> {
     tx.execute(
-        "INSERT INTO rockets_probe_missing_table (value) VALUES (1)",
+        "INSERT INTO rocket_probe_missing_table (value) VALUES (1)",
         [],
     )
     .map(|_| ())

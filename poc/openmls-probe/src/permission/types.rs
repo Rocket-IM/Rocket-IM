@@ -5,7 +5,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-pub const SIGNING_DOMAIN: &[u8] = b"Rockets-IM/POC/permission-change/v1\0";
+pub const SIGNING_DOMAIN: &[u8] = b"Rocket-IM/POC/permission-change/v1\0";
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

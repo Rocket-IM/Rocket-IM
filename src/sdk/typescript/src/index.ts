@@ -1,5 +1,5 @@
 /** 阶段0公开浏览器入口；业务密码状态仅由本次加载的预编译WASM持有。 */
-import initWasm, { Stage0Device as WasmDevice, sdkVersion } from "./generated/rockets_stage0_wasm.js";
+import initWasm, { Stage0Device as WasmDevice, sdkVersion } from "./generated/rocket_stage0_wasm.js";
 
 export const SDK_VERSION = "0.1.0-stage0.1";
 let initialized = false;
@@ -10,7 +10,7 @@ export function initialize(wasmUrl?: string | URL): Promise<void> {
   if (!initialization) {
     initialization = (async () => {
       try {
-        await initWasm({ module_or_path: wasmUrl ?? new URL("./generated/rockets_stage0_wasm_bg.wasm", import.meta.url) });
+        await initWasm({ module_or_path: wasmUrl ?? new URL("./generated/rocket_stage0_wasm_bg.wasm", import.meta.url) });
       } catch (error) {
         throw new Error(`wasm_initialization_failed: ${error}`);
       }

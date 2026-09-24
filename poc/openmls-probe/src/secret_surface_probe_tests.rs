@@ -63,7 +63,7 @@ impl Fixture {
         openmls_probe::snapshot::save(
             &directory.join("state.enc"),
             &key,
-            &serde_json::to_vec(&("Rockets-IM/state-lab/v1", &context)).unwrap(),
+            &serde_json::to_vec(&("Rocket-IM/state-lab/v1", &context)).unwrap(),
             &serde_json::to_vec(&state).unwrap(),
             openmls_probe::snapshot::Failpoint::None,
         )
@@ -246,7 +246,7 @@ fn missing_private_samples_and_excessive_decoding_cannot_pass() {
     openmls_probe::snapshot::save(
         &directory.join("state.enc"),
         &[7u8; 32],
-        &serde_json::to_vec(&("Rockets-IM/state-lab/v1", &context)).unwrap(),
+        &serde_json::to_vec(&("Rocket-IM/state-lab/v1", &context)).unwrap(),
         &serde_json::to_vec(&json!({"version":1,"context":context,"provider_entries":[]})).unwrap(),
         openmls_probe::snapshot::Failpoint::None,
     )

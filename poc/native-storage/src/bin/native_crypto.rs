@@ -1,5 +1,5 @@
 //! 原生密码收发持久化 JSONL 验收装置，不向接入方发布；内存 peer 只作测试。
-use rockets_native_storage_probe::{
+use rocket_native_storage_probe::{
     crypto::{
         contract::{DownloadRequest, Fault, Request, Scope},
         model::{Envelope, Identity},

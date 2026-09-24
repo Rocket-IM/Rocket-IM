@@ -1,5 +1,5 @@
 {
-  "name": "@rockets-im/stage0-node",
+  "name": "@rocket-im/stage0-node",
   "version": "0.1.0-stage0.1",
   "private": true,
   "description": "Stage 0 Node host package for desktop SDK consumption: precompiled Rust in-memory MLS core, JS and TypeScript declarations.",

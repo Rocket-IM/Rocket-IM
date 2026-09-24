@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 
-from .fixture import NetworkLab, SERVICE, check, identity
+from .fixture import NetworkLab, SERVICE, check, identity, require_current_namespace
 
 
 def sha256(path):
@@ -36,6 +36,7 @@ class AnchorLab(NetworkLab):
         pass
 
     def initialize(self, *, permissions=False, **options):
+        require_current_namespace(self.helper, b"Rocket-IM/POC/rollback-anchor-request/v1")
         super().initialize(permissions=permissions, **options)
 
     def command(self, device, operation, **fields):

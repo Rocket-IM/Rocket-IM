@@ -1,4 +1,4 @@
-# Rockets-IM
+# Rocket-IM
 
 可自托管、接入现有业务的 E2EE 即时通讯解决方案。
 
@@ -15,6 +15,8 @@ A self-hosted E2EE instant messaging solution for integration into existing prod
 `dist/`、依赖安装目录、构建缓存和本机状态不纳入 Git。历史验证文档中的 `dist/` 相对链接定位验证机器上的报告、失败轮、源码快照和发布包，在纯源码克隆中不可访问；这些本地材料继续保留，本次入库尚未建立在线证据归档。维护者复现前需准备固定工具链、生成器和依赖缓存，部分脚本仍有本机路径配置，详见[端侧代码生成](docs/端侧代码生成.md#51-生成入口)。源码入库不代表已完成全新机器重建或正式发布验收。
 
 ### 当前状态
+
+**2026-09-24 工程名称统一：** 当前源码、包名、模块名和密码协议域已按 `Rocket-IM` 命名迁移。下文既往运行成绩属于改名前版本，不自动证明新包可用；旧实验状态及包不能与新代码混用。名称映射、两轮实际验证、发现的问题及剩余限制见[工程名称统一](docs/工程名称统一.md)。历史逐轮报告、归档产物及链接目标保留原样；可变 fixture 输出隔离问题另列于该记录。
 
 **2026-09-15 定位纠正：四端 SDK 指 Flutter、Swift、Kotlin、TypeScript 四种语言交付。TypeScript 主要用于 macOS、Windows 桌面客户端，浏览器是次要目标。** 交付可调用的 JS 接口、TypeScript 类型声明及匹配的预编译运行产物，IM 核心仍由 Rust 实现。当前最小桌面交付路线为独立 Node 目标 npm 包，复用 Rust 核心生成 Node.js 绑定；具体产物与验收见[Node 目标最小产物](docs/四端最小发布验证.md#typescript-node-目标最小产物)。最终桌面应用宿主与原生存储绑定尚未确定，旧 Chrome 结果不计作桌面验收。 已打出可独立安装的Node包，macOS ARM64 / Node v26.5.0的104项公开检查及缺库/错版本负例通过；Windows尚未实测。同包的[Windows离线验收材料](docs/四端最小发布验证.md#windows-便携验收材料)已准备。 随后与Swift iOS模拟器的[24项限定互通](docs/四端互通验证.md#macos-node-与-swift-限定互通)通过；随后与Kotlin及Flutter iOS/Android的[72项限定互通](docs/四端互通验证.md#macos-node-与-kotlin-及-flutter-限定互通)也通过，首轮Kotlin控制超时保留为原因未确认的失败记录。
 
@@ -47,7 +49,7 @@ Q05/Q02 进一步验证了完整快照的独立锚：在加载密码状态前先
 
 ### 项目定位
 
-Rockets-IM 希望让第三方部署独立 IM Service、安装 SDK，并通过公开接口接入已有账号、后台与客户端 UI，正常集成无需 fork、修改方案源码或直接读写 IM 数据表。
+Rocket-IM 希望让第三方部署独立 IM Service、安装 SDK，并通过公开接口接入已有账号、后台与客户端 UI，正常集成无需 fork、修改方案源码或直接读写 IM 数据表。
 
 首期采用中心化、单租户、单实例部署。前端 Demo 用于演示和验收；SDK 不包含 UI。Service 独立运行、部署和升级，内部优先采用模块化单体。
 
@@ -129,6 +131,8 @@ The source repository is [Rocket-IM/rocket-im](https://github.com/Rocket-IM/rock
 
 ### Current status
 
+**2026-09-24 project rename:** The current source, package names, modules, and cryptographic domains have been migrated to `Rocket-IM`. Historical results below apply to the pre-rename revision and do not establish acceptance of the renamed packages. Do not mix old experimental state or packages with the new code. See the [rename record](docs/工程名称统一.md) for mappings, both validation rounds, discovered issues, and remaining limits. Historical per-run reports, archived artifacts, and link destinations are preserved unchanged; the mutable fixture output isolation issue is documented separately in that record.
+
 **Scope correction on 2026-09-15: the four SDK deliveries are Flutter, Swift, Kotlin and TypeScript. TypeScript primarily targets macOS and Windows desktop clients; browsers are secondary.** The deliverable provides callable JavaScript APIs, TypeScript declarations and matching precompiled runtime artifacts, while the IM core remains implemented in Rust. The current minimal desktop delivery path is a separate Node-targeted npm package with Node.js bindings generated from the shared Rust core; artifacts and acceptance are recorded in [Minimal Node-targeted Artifacts](docs/四端最小发布验证.md#typescript-node-目标最小产物). The final desktop application host and native storage bindings remain undecided. Earlier Chrome results do not count as desktop acceptance. The independently installable Node package passed 104 public API checks plus missing-runtime and version-mismatch cases on macOS ARM64 / Node v26.5.0; Windows execution remains untested. An [offline Windows acceptance kit](docs/四端最小发布验证.md#windows-便携验收材料) for the same package is ready. A subsequent [24-case interoperability check with Swift on the iOS simulator](docs/四端互通验证.md#macos-node-与-swift-限定互通) passed; A subsequent [72-case check with Kotlin and Flutter on iOS/Android](docs/四端互通验证.md#macos-node-与-kotlin-及-flutter-限定互通) also passed; the first-run Kotlin control timeout remains recorded with its cause unconfirmed.
 
 **This project is in stage 0 validation. No formal IM business implementation, publicly released SDK or Service is available.** Isolated cryptographic probes, synthetic OpenMLS device authorization and recovery experiments now exist, along with an independent in-memory cryptographic core and experimental precompiled platform packages under `src/sdk/`. Probe evidence is recorded in [Cryptographic Candidate Validation](docs/密码方案验证.md); package integration, tested environments and limits are in [Minimal Four-Platform Package Validation](docs/四端最小发布验证.md). The capabilities below remain planned deliverables, not a completed product, full acceptance or a security audit.
@@ -160,7 +164,7 @@ The subsequent [signing access and upgrade recovery validation](docs/端侧存�
 
 ### Purpose
 
-Rockets-IM aims to let integrators deploy an independent IM Service, install SDKs and connect their existing accounts, backend and client UI through public interfaces. Normal integration should require no fork, source changes or direct access to IM database tables.
+Rocket-IM aims to let integrators deploy an independent IM Service, install SDKs and connect their existing accounts, backend and client UI through public interfaces. Normal integration should require no fork, source changes or direct access to IM database tables.
 
 The first phase targets centralized, single-tenant, single-instance deployments. Client demos support demonstration and acceptance testing; SDKs contain no UI. The Service runs, deploys and upgrades independently, initially as a modular monolith.
 

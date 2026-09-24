@@ -29,7 +29,7 @@ def main():
         run(["npm", "install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", args.archive.resolve()],
             consumer, output / "install.log")
         run(["node", COMPILER, "-p", consumer / "tsconfig.json"], consumer, output / "consumer-typescript.log")
-        installed = consumer / "node_modules/@rockets-im/browser-storage-probe"
+        installed = consumer / "node_modules/@rocket-im/browser-storage-probe"
         artifact = json.loads((installed / "artifact.json").read_text())
         mismatched = [p for p, expected in artifact["files_sha256"].items() if sha(installed / p) != expected]
         if mismatched:

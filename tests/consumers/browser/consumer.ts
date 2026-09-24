@@ -1,4 +1,4 @@
-import { initialize, SDK_VERSION, Stage0Device } from "@rockets-im/stage0";
+import { initialize, SDK_VERSION, Stage0Device } from "@rocket-im/stage0";
 
 interface Result { status: "PASS" | "FAIL"; checks: string[]; version?: string; browser: string; error?: string; }
 declare global { interface Window { __stage0Result?: Result; } }

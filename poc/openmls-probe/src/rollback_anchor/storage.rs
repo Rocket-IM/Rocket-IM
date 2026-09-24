@@ -12,7 +12,7 @@ use std::{
 };
 
 const STATE_LIMIT: usize = 16 * 1024;
-const CONTEXT: &[u8] = b"Rockets-IM/POC/synthetic-local-rollback-anchor/v1";
+const CONTEXT: &[u8] = b"Rocket-IM/POC/synthetic-local-rollback-anchor/v1";
 
 fn io_error() -> AnchorError {
     AnchorError::new("anchor_io", "独立锚存储不可用、权限错误或完整性验证失败")

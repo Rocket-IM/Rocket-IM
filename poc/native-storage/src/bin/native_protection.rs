@@ -1,5 +1,5 @@
 //! 合成秘密保护控制器：命令与密码仅从标准输入读取，输出不包含输入原文。
-use rockets_native_storage_probe::model::{Error, Result};
+use rocket_native_storage_probe::model::{Error, Result};
 use serde_json::{json, Value};
 use std::io::{self, Write};
 
@@ -37,7 +37,7 @@ fn run() -> Result<Value> {
     }
     let value =
         serde_json::from_slice(&input).map_err(|_| Error::new("protected_control_input", true))?;
-    rockets_native_storage_probe::protection::control::run(value)
+    rocket_native_storage_probe::protection::control::run(value)
 }
 
 #[cfg(not(feature = "protected-storage"))]

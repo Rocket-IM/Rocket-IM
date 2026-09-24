@@ -345,7 +345,7 @@ mod platform {
         let description = owned(unsafe {
             ffi::CFStringCreateWithCString(
                 ptr::null(),
-                c"Rockets-IM isolated native protection".as_ptr(),
+                c"Rocket-IM isolated native protection".as_ptr(),
                 0x08000100,
             )
         })?;

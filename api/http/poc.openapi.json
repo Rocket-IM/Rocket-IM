@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "Rockets-IM 阶段 0 HTTP Relay POC",
+    "title": "Rocket-IM 阶段 0 HTTP Relay POC",
     "version": "rim-poc-1",
     "description": "仅用于本机合成设备与候选 MLS 的协议验证；不是公开发布 API。HTTP 凭证与密码身份分开：Bearer 绑定单个 service/account/device，可信公钥由测试装置带外提供。正文严格 UTF-8 JSON，禁止重复键和未定义字段。请求上限 1 MiB，超时与重试预算见消息协议草案；本实验不声明 TLS/WSS 验证。 签名权限增量支持remove_member/revoke_device及仅from_join的新账号单设备add_member和同账号新设备add_device；bootstrap仍依赖可信合成检查点，生产身份恢复与Q02分叉/新鲜度尚未闭合。启用权限检查点后，测试set_state/revoke_device/add_control不可覆盖该链。 Service恢复凭证公钥只能由新空库固定，重启不得缺失或换钥；Service自有签名seed与用户E2EE解密私钥分离。 历史迁移只支持本群同账号当前设备的显式已验证接收或已验证接受的发送副本，独立定向加密；公开请求由实验调度器搬运，不包含附件、备份或产品发现/通知。 一致性head只签署当前Service所见完整权限CP并绑定调用设备challenge，不证明全局最新或独立视图之间不存在分叉。"
   },

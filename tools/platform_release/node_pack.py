@@ -14,15 +14,15 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = "0.1.0-stage0.1"
-NAME = "@rockets-im/stage0-node"
+NAME = "@rocket-im/stage0-node"
 PACKAGE = ROOT / "src/sdk/typescript/node"
 TEMPLATE = ROOT / "tests/consumers/node"
 OUTPUT = ROOT / "dist/platform-release/node"
-NPM_CACHE = ROOT / "dist/platform-release/npm-cache"
+NPM_CACHE = Path(os.environ.get("ROCKET_IM_NPM_CACHE", ROOT / "dist/platform-release/npm-cache")).resolve()
 COMPILER = ROOT / "src/sdk/typescript/node_modules/typescript/bin/tsc"
-WASM_NAME = "rockets_stage0_wasm_bg.wasm"
-GENERATED_FILES = ("rockets_stage0_wasm.js", "rockets_stage0_wasm.d.ts", WASM_NAME,
-                   "rockets_stage0_wasm_bg.wasm.d.ts")
+WASM_NAME = "rocket_stage0_wasm_bg.wasm"
+GENERATED_FILES = ("rocket_stage0_wasm.js", "rocket_stage0_wasm.d.ts", WASM_NAME,
+                   "rocket_stage0_wasm_bg.wasm.d.ts")
 
 
 def now():
@@ -69,8 +69,8 @@ def source_hashes():
 
 def start(output, phase):
     output = output.resolve()
-    if not output.is_relative_to(OUTPUT.resolve()):
-        raise RuntimeError("Node输出只允许dist/platform-release/node及其子目录")
+    if not output.is_relative_to((ROOT / "dist").resolve()):
+        raise RuntimeError("Node输出只允许项目dist及其子目录")
     run_id = str(uuid.uuid4())
     run = output / "runs" / run_id
     run.mkdir(parents=True)
@@ -179,7 +179,11 @@ def build_provenance(generated, build_report):
         if not path.is_relative_to(ROOT / "src/sdk/rust") or sha(path) != digest:
             raise RuntimeError("当前Rust源码与构建证据不同：" + name)
     outputs = report.get("outputs", {})
-    raw_wasm = ROOT / "dist/platform-release/target/wasm32-unknown-unknown/release/rockets_stage0_wasm.wasm"
+    raw_candidates = [(ROOT / name).resolve() for name in outputs
+                      if name.endswith("/target/wasm32-unknown-unknown/release/rocket_stage0_wasm.wasm")]
+    if len(raw_candidates) != 1 or not raw_candidates[0].is_relative_to((ROOT / "dist").resolve()):
+        raise RuntimeError("构建报告未唯一标识本项目dist内的Release WASM")
+    raw_wasm = raw_candidates[0]
     if not raw_wasm.is_file() or outputs.get(raw_wasm.relative_to(ROOT).as_posix()) != sha(raw_wasm):
         raise RuntimeError("同次Release WASM编译输出缺失或摘要不符")
     for name in GENERATED_FILES:
@@ -239,7 +243,7 @@ def pack(args):
         write_json(destination / "package.json", {"type": "commonjs"})
         command([node_binary(), COMPILER, "-p", stage / "tsconfig.json"], stage, run / "typescript-build.log")
         shutil.copytree(destination, stage / "dist/generated")
-        shutil.copytree(ROOT / "dist/platform-release/licenses", stage / "licenses")
+        shutil.copytree(args.licenses, stage / "licenses")
         license_directory = stage / "licenses/typescript-5.9.3"
         license_directory.mkdir()
         shutil.copy2(COMPILER.parent.parent / "LICENSE.txt", license_directory / "LICENSE.txt")

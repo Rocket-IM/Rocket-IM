@@ -1,5 +1,5 @@
 mod support;
-use rockets_native_storage_probe::{
+use rocket_native_storage_probe::{
     model::{Fault, OpenOptions, Put},
     Engine,
 };

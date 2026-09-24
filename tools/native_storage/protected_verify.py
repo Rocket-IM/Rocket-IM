@@ -13,16 +13,16 @@ from protected_cases import CASE_NAMES as BASIC_NAMES, Cases as BasicCases
 from protected_recovery_cases import CASE_NAMES as RECOVERY_NAMES, Cases as RecoveryCases
 from protected_support import redact
 from rebuild_verify import package_hashes
-from support import CRATE, ROOT, require, run_command, sha, utc_now, write_json
+from support import CRATE, OUTPUT as STORAGE_OUTPUT, ROOT, require, run_command, sha, utc_now, write_json
 
-OUTPUT = ROOT / "dist/native-storage/protected"
+OUTPUT = STORAGE_OUTPUT / "protected"
 CASE_NAMES = (*BASIC_NAMES, *RECOVERY_NAMES)
 
 
 def binaries():
     target = OUTPUT / "target/release"
     return (target / "native_anchored", target / "native_crypto",
-            ROOT / "dist/native-storage/anchor/helper-target/release/openmls-rollback-anchor",
+            STORAGE_OUTPUT / "anchor/helper-target/release/openmls-rollback-anchor",
             target / "native_rebuild", target / "native_protection")
 
 

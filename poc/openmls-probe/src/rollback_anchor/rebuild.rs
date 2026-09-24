@@ -6,9 +6,9 @@ mod state;
 pub(super) use state::{apply, validate_link, Link};
 
 pub const PROTOCOL: &str = "rim-anchor-rebuild-1";
-pub const APPROVAL_DOMAIN: &[u8] = b"Rockets-IM/POC/anchor-rebuild-approval/v1\0";
-const CLIENT_DOMAIN: &[u8] = b"Rockets-IM/POC/anchor-rebuild-client/v1\0";
-const RESULT_DOMAIN: &[u8] = b"Rockets-IM/POC/anchor-rebuild-response/v1\0";
+pub const APPROVAL_DOMAIN: &[u8] = b"Rocket-IM/POC/anchor-rebuild-approval/v1\0";
+const CLIENT_DOMAIN: &[u8] = b"Rocket-IM/POC/anchor-rebuild-client/v1\0";
+const RESULT_DOMAIN: &[u8] = b"Rocket-IM/POC/anchor-rebuild-response/v1\0";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

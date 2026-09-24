@@ -17,6 +17,8 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests/interop"))
+from network_poc.fixture import require_current_namespace
 OUTPUT = ROOT / "dist/crypto-probes"
 TOOLCHAIN = tomllib.loads((ROOT / "poc/rust-toolchain.toml").read_text())["toolchain"]["channel"]
 
@@ -218,10 +220,12 @@ class Lab:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, help="使用已构建的原生实验二进制，跳过构建")
+    parser.add_argument("--output", type=Path, default=OUTPUT, help="本轮独立构建、报告及临时状态目录")
     args = parser.parse_args()
-    logs = OUTPUT / "logs"
+    output_directory = args.output.resolve()
+    logs = output_directory / "logs"
     logs.mkdir(parents=True, exist_ok=True)
-    binary = args.binary or OUTPUT / "target/openmls/release/openmls-state-lab"
+    binary = args.binary or output_directory / "target/openmls/release/openmls-state-lab"
     report = {"status": "RUNNING", "run_id": str(uuid.uuid4()),
               "executed_at": datetime.now(timezone.utc).isoformat(),
               "scope": "synthetic native processes; stdio relay; controlled interruption",
@@ -236,10 +240,11 @@ def main():
                        "--bin", "openmls-state-lab"]
             with (logs / "state-lab-build.log").open("w") as output:
                 build = subprocess.run(command, cwd=ROOT / "poc",
-                                       env={**os.environ, "CARGO_TARGET_DIR": str(OUTPUT / "target/openmls")},
+                                       env={**os.environ, "CARGO_TARGET_DIR": str(output_directory / "target/openmls")},
                                        stdout=output, stderr=subprocess.STDOUT)
             check(build.returncode == 0, "原生实验构建失败，查看 state-lab-build.log")
-        with tempfile.TemporaryDirectory(prefix="state-lab-", dir=OUTPUT) as directory:
+        require_current_namespace(binary)
+        with tempfile.TemporaryDirectory(prefix="state-lab-", dir=output_directory) as directory:
             lab = Lab(binary.resolve(), Path(directory))
             lab.run()
             report.update(status="PASS", cases=lab.passed, process_count=lab.processes,

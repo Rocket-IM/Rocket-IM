@@ -529,7 +529,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rockets-vodozemac-probe"
+name = "rocket-vodozemac-probe"
 version = "0.1.0"
 dependencies = [
  "getrandom",

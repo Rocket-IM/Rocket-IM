@@ -13,7 +13,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/interop"))
 from interop import reuse_build, shutdown_endpoints, source_hashes
-from interop_apple_web import accepted, prepare_swift
+from interop_apple_web import accepted, accepted_entries, prepare_swift
 from interop_node_build import COMPILER, PACK_REPORT, audit, prepare
 from node_pack import command, json_output, node_binary, sha, write_json
 from platform_release import artifacts
@@ -68,23 +68,39 @@ def stop_node(process, work, report):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/platform-interop")
+    parser.add_argument("--accepted-packages", type=Path)
+    parser.add_argument("--release-root", type=Path, default=ROOT / "dist/platform-release")
+    parser.add_argument("--swift-simulator", default=SWIFT_SIMULATOR)
+    parser.add_argument("--flutter-simulator")
     parser.add_argument("--node-pack-report", type=Path, default=PACK_REPORT)
+    parser.add_argument("--node-timeout-seconds", type=int, default=180,
+                        help="Node Worker 总运行预算，10–3600秒；单次控制请求仍限20秒")
     parser.add_argument("--typescript-archive", type=Path, default=COMPILER)
     parser.add_argument("--peers", choices=("swift", "mobile"), default="swift", help="mobile覆盖Kotlin及Flutter iOS/Android三组配对")
     parser.add_argument("--swift-build-report", type=Path, help="复用已核对的Swift独立应用，省略则重新构建消费应用")
     parser.add_argument("--kotlin-build-report", type=Path, help="mobile模式复用摘要匹配的Kotlin独立构建")
     args = parser.parse_args()
+    if not 10 <= args.node_timeout_seconds <= 3600:
+        parser.error("--node-timeout-seconds must be between 10 and 3600")
+    import interop
+    from interop_apple_web import configure
+    configure(args.accepted_packages, args.output)
+    interop.OUTPUT = args.output.resolve()
+    from platform_release.runtime import FLUTTER_SIMULATOR
+    flutter_simulator = args.flutter_simulator or FLUTTER_SIMULATOR
     if (args.peers == "mobile" and args.swift_build_report) or (args.peers == "swift" and args.kotlin_build_report):
         parser.error("构建报告必须对应选定的运行端组")
     peers = ["swift-ios"] if args.peers == "swift" else ["kotlin-android", "flutter-ios", "flutter-android"]
     endpoints = ["node-macos", *peers]
     expected_cases = 24 * len(peers)
     run_id = str(uuid.uuid4())
-    work = ROOT / "dist/platform-interop/node/runs" / run_id
+    work = args.output.resolve() / "node/runs" / run_id
     work.mkdir(parents=True)
     report = {"run_id": run_id, "status": "RUNNING", "started_at": now(), "cases": [],
               "scope": "macOS Node with " + ", ".join(peers) + " pairs only", "endpoints": endpoints,
               "peer_group": args.peers, "expected_cases": expected_cases,
+              "node_timeout_seconds": args.node_timeout_seconds,
               "source_before": source_hashes(), "builds": {}, "host": {
                   "system": platform.system(), "release": platform.release(), "machine": platform.machine()},
               "windows_runtime": "NOT_TESTED", "physical_device_runtime": "NOT_TESTED",
@@ -98,7 +114,7 @@ def main():
         temporary.replace(path)
 
     broker, process = None, None
-    runtime = Runtime(ROOT, work)
+    runtime = Runtime(ROOT, work, release_root=args.release_root, interop_root=args.output)
     phase = "environment"
     try:
         save()
@@ -116,7 +132,7 @@ def main():
         phase = "prepare_" + args.peers
         save()
         if args.peers == "swift":
-            report["builds"]["swift"] = (reuse_build("swift", args.swift_build_report) if args.swift_build_report
+            report["builds"]["swift"] = (reuse_build("swift", args.swift_build_report, accepted_entries({"swift"})) if args.swift_build_report
                                            else prepare_swift(work / "swift"))
         else:
             from interop_node_mobile import prepare as prepare_mobile
@@ -127,14 +143,15 @@ def main():
         phase = "launch_" + args.peers
         if args.peers == "swift":
             swift = report["builds"]["swift"]
-            runtime.ios(SWIFT_SIMULATOR, swift["app"], swift["bundle_id"], "swift-ios", broker.url, run_id)
+            runtime.ios(args.swift_simulator, swift["app"], swift["bundle_id"], "swift-ios", broker.url, run_id)
         else:
             from interop_node_mobile import launch
-            launch(runtime, report["builds"], broker.url, run_id)
+            launch(runtime, report["builds"], broker.url, run_id, flutter_simulator)
         phase = "launch_node"
         environment = {key: value for key, value in os.environ.items() if key not in {"NODE_OPTIONS", "NODE_PATH"}}
-        environment.update(ROCKETS_INTEROP_URL=broker.url, ROCKETS_INTEROP_RUN_ID=run_id,
-                           ROCKETS_INTEROP_ENDPOINT_ID="node-macos")
+        environment.update(ROCKET_INTEROP_URL=broker.url, ROCKET_INTEROP_RUN_ID=run_id,
+                           ROCKET_INTEROP_ENDPOINT_ID="node-macos",
+                           ROCKET_INTEROP_TIMEOUT_SECONDS=str(args.node_timeout_seconds))
         directory = Path(report["builds"]["node"]["directory"])
         with (work / "node-runtime.log").open("w") as log:
             process = subprocess.Popen([node_binary(), "interop.mjs"], cwd=directory, env=environment,
@@ -178,10 +195,10 @@ def main():
         try:
             if args.peers == "mobile" and runtime.ios_apps:
                 from interop_node_mobile import audit_installed
-                report["installed_mobile_audit"] = audit_installed(runtime, report["builds"])
+                report["installed_mobile_audit"] = audit_installed(runtime, report["builds"], flutter_simulator)
                 report["installed_runtime_unchanged"] = True
             elif runtime.ios_apps:
-                installed = runtime.command(["xcrun", "simctl", "get_app_container", SWIFT_SIMULATOR,
+                installed = runtime.command(["xcrun", "simctl", "get_app_container", args.swift_simulator,
                                              report["builds"]["swift"]["bundle_id"], "app"]).strip()
                 report["installed_swift_unchanged"] = (tree_hashes(installed)
                     == runtime.metadata["swift-ios"]["installed_app_sha256"])

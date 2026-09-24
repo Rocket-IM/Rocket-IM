@@ -1,4 +1,4 @@
-use rockets_native_storage_probe::crypto::{
+use rocket_native_storage_probe::crypto::{
     contract::{Action, Fault, Request, Scope},
     model::{Envelope, Identity},
     Client, MemoryPeer, Reply,

@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 
 from interop import ROOT, reuse_build, verify_build_package
-from interop_mobile import FLUTTER_SHA256, KOTLIN_SHA256, prepare_flutter, prepare_kotlin
+from interop_mobile import prepare_flutter, prepare_kotlin
+import interop_apple_web as acceptance
 from platform_release import artifacts
 from platform_release.runtime import FLUTTER_SIMULATOR
 
@@ -14,20 +15,20 @@ PEERS = ["kotlin-android", "flutter-ios", "flutter-android"]
 def accepted_mobile_packages(entries=None):
     """复用同一验收清单，只要求本项实际消费的 Kotlin 和 Flutter 原包。"""
     if entries is None:
-        entries = json.loads((ROOT / "dist/platform-interop/accepted-packages.json").read_text())
+        entries = acceptance.accepted_entries({"kotlin", "flutter"})
     artifacts.require(isinstance(entries, list) and all(isinstance(entry, dict) for entry in entries),
                       "invalid_mobile_accepted_package_manifest")
-    expected = {"kotlin": KOTLIN_SHA256, "flutter": FLUTTER_SHA256}
+    expected = {"kotlin", "flutter"}
     selected = [entry for entry in entries
                 if isinstance(entry.get("platform"), str) and entry["platform"] in expected]
     artifacts.require(len(selected) == 2 and {entry["platform"] for entry in selected} == set(expected),
                       "invalid_mobile_accepted_package_set")
     for entry in selected:
         artifacts.require(isinstance(entry.get("artifact"), str) and bool(entry["artifact"])
-                          and entry.get("sha256") == expected[entry["platform"]],
+                          and isinstance(entry.get("sha256"), str) and len(entry["sha256"]) == 64,
                           "mobile_accepted_package_metadata_mismatch:" + entry["platform"])
         archive = (ROOT / entry["artifact"]).resolve()
-        artifacts.require(archive.is_relative_to(ROOT / "dist/platform-release") and archive.is_file(),
+        artifacts.require(archive.is_relative_to(ROOT / "dist") and archive.is_file(),
                           "mobile_accepted_archive_missing_or_outside:" + entry["platform"])
         artifacts.require(artifacts.sha(archive) == entry["sha256"],
                           "mobile_accepted_archive_changed:" + entry["platform"])
@@ -52,7 +53,7 @@ def audit(builds):
                       "node_mobile_artifact_platform_set_mismatch")
     accepted = {entry["platform"]: entry for entry in accepted_mobile_packages()}
     result = {"status": "PASS", "acceptance_sha256": artifacts.sha(
-        ROOT / "dist/platform-interop/accepted-packages.json"), "packages": {}, "runtime_files": {}}
+        acceptance.ACCEPTED), "packages": {}, "runtime_files": {}}
     for platform in ("kotlin", "flutter"):
         entry, build = accepted[platform], builds[platform]
         verify_build_package(platform, build, list(accepted.values()))
@@ -69,23 +70,23 @@ def audit(builds):
     return result
 
 
-def launch(runtime, builds, url, run_id):
+def launch(runtime, builds, url, run_id, simulator=FLUTTER_SIMULATOR):
     """先完成移动端启动；父入口最后启动有总时限的 Node 控制端。"""
     flutter = builds["flutter"]
     artifacts.require(flutter["run_id"] == run_id, "flutter_build_run_mismatch")
-    runtime.ios(FLUTTER_SIMULATOR, flutter["ios_app"], flutter["ios_bundle_id"],
+    runtime.ios(simulator, flutter["ios_app"], flutter["ios_bundle_id"],
                 "flutter-ios", url, run_id)
     runtime.android(builds["kotlin"], flutter, url, run_id)
 
 
-def audit_installed(runtime, builds):
+def audit_installed(runtime, builds, simulator=FLUTTER_SIMULATOR):
     """卸载前复核目标内完整 App/APK，不能只核对主机上的构建副本。"""
     result = {"status": "PASS", "runtime_files": {}}
     flutter = builds["flutter"]
     initial_ios = runtime.metadata["flutter-ios"]
-    artifacts.require(initial_ios["device"]["udid"] == FLUTTER_SIMULATOR,
+    artifacts.require(initial_ios["device"]["udid"] == simulator,
                       "installed_flutter_simulator_changed")
-    installed = runtime.command(["xcrun", "simctl", "get_app_container", FLUTTER_SIMULATOR,
+    installed = runtime.command(["xcrun", "simctl", "get_app_container", simulator,
                                  flutter["ios_bundle_id"], "app"]).strip()
     actual = artifacts.tree(installed)
     artifacts.require(actual == artifacts.tree(flutter["ios_app"]),

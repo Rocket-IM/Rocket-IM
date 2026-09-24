@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Rockets-IM rim-poc-1 消息契约",
+  "title": "Rocket-IM rim-poc-1 消息契约",
   "description": "阶段 0 的本机实验协议源，未发布。JSON Schema 验证形状；重复 JSON 键、严格 UTF-8、原始头认证、解码字节限额、目标排序及权限/状态对应关系须由相应边界另外校验。",
   "oneOf": [
     {
@@ -29,7 +29,7 @@
       "maxLength": 64,
       "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
       "description": "Rust 探针的公共群检查点摘要：SHA-256(固定域字节 || GroupContext TLS 序列化字节)，输出 64 位小写十六进制。公共结构含协议版本、套件、群标识、epoch、树哈希、已确认 transcript 和扩展；不导出私有状态。",
-      "x-hash-domain-utf8": "Rockets-IM/rim-poc-1/MLS-GroupContext\u0000",
+      "x-hash-domain-utf8": "Rocket-IM/rim-poc-1/MLS-GroupContext\u0000",
       "x-context-encoding": "OpenMLS GroupContext.tls_serialize_detached()"
     },
     "HeaderBytes": {
@@ -1478,7 +1478,7 @@
         "crypto_state_ref"
       ],
       "additionalProperties": false,
-      "description": "Service固定公钥签名的终态。accepted绑定原Proof后继检查点；closed绑定封口时Service当前业务版本/状态，仅给恢复floor，不证明端侧已验证MLS。Proof摘要=SHA256(domain Rockets-IM/POC/permission-proof/v1加NUL + 按statement/signature/commit顺序各decoded字节前置u64BE长度)。"
+      "description": "Service固定公钥签名的终态。accepted绑定原Proof后继检查点；closed绑定封口时Service当前业务版本/状态，仅给恢复floor，不证明端侧已验证MLS。Proof摘要=SHA256(domain Rocket-IM/POC/permission-proof/v1加NUL + 按statement/signature/commit顺序各decoded字节前置u64BE长度)。"
     },
     "PermissionRecord": {
       "type": "object",
@@ -1635,7 +1635,7 @@
         "crypto_state_ref"
       ],
       "additionalProperties": false,
-      "description": "envelope_sha256=SHA256(domain Rockets-IM/POC/message-envelope/v1加NUL + 原始decoded header/payload依次前置u64BE长度)。原header绑定sender、logical/attempt ID及原targets。Ed25519签名输入为独立domain Rockets-IM/POC/message-acceptance/v1加NUL + 原statement_bytes。绑定业务接受，不包含可信全局时钟或R0水位；不证明端侧MLS已解密，也不解决Q02的Service分叉/回滚。"
+      "description": "envelope_sha256=SHA256(domain Rocket-IM/POC/message-envelope/v1加NUL + 原始decoded header/payload依次前置u64BE长度)。原header绑定sender、logical/attempt ID及原targets。Ed25519签名输入为独立domain Rocket-IM/POC/message-acceptance/v1加NUL + 原statement_bytes。绑定业务接受，不包含可信全局时钟或R0水位；不证明端侧MLS已解密，也不解决Q02的Service分叉/回滚。"
     },
     "JoinMaterial": {
       "type": "object",
@@ -1807,7 +1807,7 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "原不可变HistoryRequestStatement UTF8字节与目标签名。签名域Rockets-IM/POC/history-request/v1\\0。"
+      "description": "原不可变HistoryRequestStatement UTF8字节与目标签名。签名域Rocket-IM/POC/history-request/v1\\0。"
     },
     "HistoryPackageStatement": {
       "type": "object",
@@ -1930,7 +1930,7 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "原HistoryReceiptStatement及Service签名；独立域Rockets-IM/POC/history-receipt/v1\\0。"
+      "description": "原HistoryReceiptStatement及Service签名；独立域Rocket-IM/POC/history-receipt/v1\\0。"
     },
     "HistoryTransferRequest": {
       "type": "object",
@@ -2090,7 +2090,7 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "原始UTF-8 JSON ConsistencyHeadStatement与64字节Ed25519签名；独立域Rockets-IM/POC/consistency-head/v1后接一个NUL字节，再接原statement_bytes解码字节。客户端须用已固定Service公钥独立验签及核对本机待验证challenge/actor/上下文。不得把此签名CP直接当作已验证MLS状态或替代权限链。",
+      "description": "原始UTF-8 JSON ConsistencyHeadStatement与64字节Ed25519签名；独立域Rocket-IM/POC/consistency-head/v1后接一个NUL字节，再接原statement_bytes解码字节。客户端须用已固定Service公钥独立验签及核对本机待验证challenge/actor/上下文。不得把此签名CP直接当作已验证MLS状态或替代权限链。",
       "x-decoded-statement-schema": {
         "$ref": "#/$defs/ConsistencyHeadStatement"
       }
@@ -2196,7 +2196,7 @@
       "x-statement-schema": {
         "$ref": "#/$defs/ConsistencyExchangeRequestStatement"
       },
-      "x-signing-domain-utf8": "Rockets-IM/POC/consistency-exchange-request/v1\u0000"
+      "x-signing-domain-utf8": "Rocket-IM/POC/consistency-exchange-request/v1\u0000"
     },
     "ConsistencyExchangePackageStatement": {
       "type": "object",
@@ -2271,7 +2271,7 @@
       "x-statement-schema": {
         "$ref": "#/$defs/ConsistencyExchangePackageStatement"
       },
-      "x-signing-domain-utf8": "Rockets-IM/POC/consistency-exchange-package/v1\u0000"
+      "x-signing-domain-utf8": "Rocket-IM/POC/consistency-exchange-package/v1\u0000"
     },
     "ConsistencyExchangeBeginOperation": {
       "type": "object",
@@ -2588,7 +2588,7 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。"
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rocket-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。"
     },
     "RebuildStreamRequestStatement": {
       "type": "object",
@@ -2916,12 +2916,12 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rocket-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
       "x-statement-schema": {
         "$ref": "#/$defs/RebuildStreamRequestStatement"
       },
-      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-request/v1\u0000",
-      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+      "x-signing-domain-utf8": "Rocket-IM/POC/rebuild-stream-request/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rocket-IM/POC/rebuild-stream-signed-digest/v1\u0000"
     },
     "SignedRebuildStreamBinding": {
       "type": "object",
@@ -2938,12 +2938,12 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rocket-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
       "x-statement-schema": {
         "$ref": "#/$defs/RebuildStreamBindingStatement"
       },
-      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-binding/v1\u0000",
-      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+      "x-signing-domain-utf8": "Rocket-IM/POC/rebuild-stream-binding/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rocket-IM/POC/rebuild-stream-signed-digest/v1\u0000"
     },
     "SignedRebuildStreamPull": {
       "type": "object",
@@ -2960,12 +2960,12 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rocket-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
       "x-statement-schema": {
         "$ref": "#/$defs/RebuildStreamPullStatement"
       },
-      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-pull/v1\u0000",
-      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+      "x-signing-domain-utf8": "Rocket-IM/POC/rebuild-stream-pull/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rocket-IM/POC/rebuild-stream-signed-digest/v1\u0000"
     },
     "SignedRebuildStreamPage": {
       "type": "object",
@@ -2982,12 +2982,12 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rocket-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
       "x-statement-schema": {
         "$ref": "#/$defs/RebuildStreamPageStatement"
       },
-      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-page/v1\u0000",
-      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+      "x-signing-domain-utf8": "Rocket-IM/POC/rebuild-stream-page/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rocket-IM/POC/rebuild-stream-signed-digest/v1\u0000"
     },
     "SignedAnchorRebuild": {
       "type": "object",
@@ -3074,7 +3074,7 @@
       "x-statement-schema": {
         "$ref": "#/$defs/StreamPageStatement"
       },
-      "x-signing-domain-utf8": "Rockets-IM/POC/stream-page/v1\u0000"
+      "x-signing-domain-utf8": "Rocket-IM/POC/stream-page/v1\u0000"
     },
     "StreamPageResult": {
       "type": "object",
@@ -3132,7 +3132,7 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "Service签名消息封口原字节；声明必须按MessageClosureStatement解析，接收端以预先固定的Service公钥验签。签名输入为独立domain Rockets-IM/POC/message-closure/v1加NUL再拼原statement_bytes；与权限终态/消息接受域互不通用。"
+      "description": "Service签名消息封口原字节；声明必须按MessageClosureStatement解析，接收端以预先固定的Service公钥验签。签名输入为独立domain Rocket-IM/POC/message-closure/v1加NUL再拼原statement_bytes；与权限终态/消息接受域互不通用。"
     },
     "MessageClosureStatement": {
       "type": "object",
@@ -3238,7 +3238,7 @@
         "signature_bytes"
       ],
       "additionalProperties": false,
-      "description": "Service签名state_stale拒绝原字节；声明按MessageRejectionStatement解析，以固定Service公钥验签。输入为独立domain Rockets-IM/POC/message-rejection/v1加NUL再拼原statement_bytes；与其他签名域不可混用。首次submit的409、精确重试409及get/close的原终态保留相同证明；不能把错误包装本身当作已验证的业务终态。"
+      "description": "Service签名state_stale拒绝原字节；声明按MessageRejectionStatement解析，以固定Service公钥验签。输入为独立domain Rocket-IM/POC/message-rejection/v1加NUL再拼原statement_bytes；与其他签名域不可混用。首次submit的409、精确重试409及get/close的原终态保留相同证明；不能把错误包装本身当作已验证的业务终态。"
     },
     "MessageRejectionStatement": {
       "type": "object",

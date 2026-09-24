@@ -18,7 +18,7 @@ def accepted_node(pack_report):
     if report.get("status") != "PASS" or not report.get("source_stable"):
         raise RuntimeError("node_package_not_accepted")
     archive = Path(report["archive"]).resolve()
-    if not archive.is_relative_to(ROOT / "dist/platform-release/node") or sha(archive) != report["archive_sha256"]:
+    if not archive.is_relative_to(ROOT / "dist") or sha(archive) != report["archive_sha256"]:
         raise RuntimeError("accepted_node_archive_changed")
     if tar_files(archive, "package/") != report["package_files_sha256"]:
         raise RuntimeError("node_archive_inventory_mismatch")
@@ -54,7 +54,7 @@ def prepare(work, pack_report, compiler):
         command(npm_command() + ["install", "--offline", "--ignore-scripts", "--include=dev", "--no-bin-links",
                                 "--no-audit", "--no-fund", build["archive"], str(compiler)],
                 directory, work / "npm-install.log")
-        package = directory / "node_modules/@rockets-im/stage0-node"
+        package = directory / "node_modules/@rocket-im/stage0-node"
         validate_package(package)
         installed_archive(package, tar_files(Path(build["archive"]), "package/"), "node")
         if json.loads((directory / "node_modules/typescript/package.json").read_text())["version"] != "5.9.3":
@@ -78,7 +78,7 @@ def audit(build):
         raise RuntimeError("node_build_archive_changed")
     if accepted_node(Path(build["pack_report"]))["pack_report_sha256"] != build["pack_report_sha256"]:
         raise RuntimeError("node_build_acceptance_changed")
-    package = directory / "node_modules/@rockets-im/stage0-node"
+    package = directory / "node_modules/@rocket-im/stage0-node"
     installed_archive(package, tar_files(Path(build["archive"]), "package/"), "node")
     actual = all_hashes(directory)
     if actual != build["files_sha256"]:

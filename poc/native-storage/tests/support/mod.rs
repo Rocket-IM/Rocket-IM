@@ -1,4 +1,4 @@
-use rockets_native_storage_probe::{
+use rocket_native_storage_probe::{
     model::{Fault, OpenOptions, Put, Scope, Snapshot},
     Engine, Reply,
 };
@@ -14,7 +14,7 @@ pub struct Files(pub PathBuf);
 impl Files {
     pub fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
-            "rockets-native-{}-{}",
+            "rocket-native-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));

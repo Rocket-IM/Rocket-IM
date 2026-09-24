@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 VERSION = "0.1.0-stage0.1"
 SDK = Path.home() / "Library/Android/sdk"
 GRADLE = Path.home() / ".gradle/wrapper/dists/gradle-8.14-bin/38aieal9i53h9rfe7vjup95b9/gradle-8.14/bin/gradle"
-AVD_NAME = "RocketsIM_Stage0_16k"
+AVD_NAME = "RocketIM_Stage0_16k"
 SERIAL = "emulator-5580"
 
 
@@ -121,7 +121,7 @@ def native_alignment(apk, android_sdk, directory, log, env):
     return results
 
 
-def run_consumer(apk, package, activity, run_id, output, android_sdk, log, env, marker="RocketsStage0", scenario="public-api"):
+def run_consumer(apk, package, activity, run_id, output, android_sdk, log, env, marker="RocketStage0", scenario="public-api"):
     # 两种消费者共享专用AVD，启动、安装、读取本次结果与关闭必须串行。
     with (output / "android-consumer.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -158,7 +158,7 @@ def _run_consumer(apk, package, activity, run_id, output, android_sdk, log, env,
 def package_and_run(args, work, log, env, run_id):
     sdk = work / "sdk"
     shutil.copytree(ROOT / "src/sdk/kotlin", sdk)
-    licenses = sdk / "src/main/assets/rockets-stage0-licenses"
+    licenses = sdk / "src/main/assets/rocket-stage0-licenses"
     copy_rust_licenses(args.output, licenses)
     jna = args.output / "dependencies" / f"jna-{args.jna_version}.aar"
     if args.jna_version != "5.17.0":
@@ -189,15 +189,15 @@ def package_and_run(args, work, log, env, run_id):
     for abi, library in (("arm64-v8a", args.arm64_lib), ("x86_64", args.x64_lib)):
         destination = sdk / "src/main/jniLibs" / abi
         destination.mkdir(parents=True)
-        shutil.copy2(library, destination / "librockets_stage0_uniffi.so")
+        shutil.copy2(library, destination / "librocket_stage0_uniffi.so")
     (sdk / "local.properties").write_text(f"sdk.dir={args.android_sdk}\n")
     repository = args.output / "packages/maven"
     repository.mkdir(parents=True, exist_ok=True)
     gradle(sdk, ["publishReleasePublicationToMavenRepository", f"-PjnaVersion={args.jna_version}", f"-PreleaseRepository={repository}"], args, env, log)
-    artifact = repository / f"io/rocketsim/rockets-stage0/{VERSION}/rockets-stage0-{VERSION}.aar"
+    artifact = repository / f"io/rocketim/rocket-stage0/{VERSION}/rocket-stage0-{VERSION}.aar"
     with zipfile.ZipFile(artifact) as archive:
         for abi in ("arm64-v8a", "x86_64"):
-            if f"jni/{abi}/librockets_stage0_uniffi.so" not in archive.namelist():
+            if f"jni/{abi}/librocket_stage0_uniffi.so" not in archive.namelist():
                 raise RuntimeError("AAR缺少要求的预编译ABI")
     snapshot = work / "release" / artifact.name
     snapshot.parent.mkdir()
@@ -211,7 +211,7 @@ def package_and_run(args, work, log, env, run_id):
     result = {"aar": str(snapshot), "maven_aar": str(artifact), "aar_sha256": digest(snapshot), "apk": str(apk), "apk_sha256": digest(apk),
               "jna_version": args.jna_version, "jna_aar_sha256": digest(jna), "native": native}
     if not args.no_run:
-        result["runtime"] = run_consumer(apk, "io.rocketsim.consumer.kotlin", ".MainActivity", run_id, args.output, args.android_sdk, log, env)
+        result["runtime"] = run_consumer(apk, "io.rocketim.consumer.kotlin", ".MainActivity", run_id, args.output, args.android_sdk, log, env)
         result["version_rejected"] = verify_rejected_version(args, work, sdk, consumer, log, env, run_id)
     return result
 
@@ -221,7 +221,7 @@ def verify_rejected_version(args, work, sdk, consumer, log, env, run_id):
     negative_sdk, negative_consumer = work / "negative-sdk", work / "negative-consumer"
     ignored = shutil.ignore_patterns("build", ".gradle")
     shutil.copytree(sdk, negative_sdk, ignore=ignored)
-    wrapper = negative_sdk / "src/main/java/io/rocketsim/stage0/Stage0Device.kt"
+    wrapper = negative_sdk / "src/main/java/io/rocketim/stage0/Stage0Device.kt"
     original = wrapper.read_text()
     replaced = original.replace(f'private const val SDK_VERSION = "{VERSION}"', 'private const val SDK_VERSION = "deliberately-incompatible"')
     if replaced == original:
@@ -232,7 +232,7 @@ def verify_rejected_version(args, work, sdk, consumer, log, env, run_id):
     shutil.copytree(consumer, negative_consumer, ignore=ignored)
     gradle(negative_consumer, [":app:assembleDebug", "--refresh-dependencies", f"-PreleaseRepository={repository}"], args, env, log)
     apk = negative_consumer / "app/build/outputs/apk/debug/app-debug.apk"
-    result = run_consumer(apk, "io.rocketsim.consumer.kotlin", ".MainActivity", f"{run_id}-version", args.output,
+    result = run_consumer(apk, "io.rocketim.consumer.kotlin", ".MainActivity", f"{run_id}-version", args.output,
                           args.android_sdk, log, env, scenario="version-rejected")
     return {"runtime": result, "apk_sha256": digest(apk), "modified_sdk_constant_only": True}
 

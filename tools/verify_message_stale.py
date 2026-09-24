@@ -15,7 +15,6 @@ import traceback
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_BINARIES = ROOT / "dist/network-relay/message-stale/artifacts/default"
 OLD_BINARY = ROOT / "dist/network-relay/message-closure/artifacts/default/openmls-state-lab"
 sys.path.insert(0, str(ROOT / "tests/interop"))
 from network_poc.stale_cases import CASES as MAIN_CASES
@@ -47,9 +46,9 @@ def write(path, value):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=DEFAULT_BINARIES / "openmls-state-lab")
-    parser.add_argument("--permission-verifier", type=Path, default=DEFAULT_BINARIES / "openmls-permission-verify")
-    parser.add_argument("--receipt-signer", type=Path, default=DEFAULT_BINARIES / "openmls-relay-receipt")
+    parser.add_argument("--binary", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
+    parser.add_argument("--permission-verifier", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
+    parser.add_argument("--receipt-signer", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
     parser.add_argument("--old-binary", type=Path, default=OLD_BINARY)
     parser.add_argument("--output", type=Path, default=ROOT / "dist/network-relay/message-stale")
     parser.add_argument("--case", action="append", choices=[ident for ident, _ in CASES])

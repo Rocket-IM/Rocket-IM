@@ -6,7 +6,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const RUNS = path.join(ROOT, "dist/browser-storage/runs");
+const OUTPUT = path.resolve(process.env.ROCKET_IM_BROWSER_STORAGE_OUTPUT ?? path.join(ROOT, "dist/browser-storage"));
+const RUNS = path.join(OUTPUT, "runs");
 const MAX_FILES = 100000;
 const MAX_BYTES = 4 * 1024 * 1024 * 1024;
 function ensure(ok, message) { if (!ok) throw new Error("profile_fixture: " + message); }
@@ -90,6 +91,8 @@ async function copyInventory(source, destination, manifest) {
 export class ProfileFixture {
   constructor(output) {
     this.output = path.resolve(output);
+    const outputRelative = path.relative(path.join(ROOT, "dist"), OUTPUT);
+    ensure(outputRelative && !outputRelative.startsWith("..") && !path.isAbsolute(outputRelative), "验证输出必须位于本项目 dist 的独立子目录。");
     const relative = path.relative(RUNS, this.output);
     ensure(relative && !relative.startsWith("..") && !path.isAbsolute(relative) && !relative.includes(path.sep), "只允许本项目 runs 下的专用验证目录。");
     this.profile = path.join(this.output, "profile"); this.backups = path.join(this.output, "profile-backups");

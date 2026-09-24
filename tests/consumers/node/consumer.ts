@@ -1,5 +1,5 @@
 // 只使用安装包的公开 API；Node 调度在 run.mjs，DOM lib 仅提供字节及编码器类型。
-import { initialize, SDK_VERSION, Stage0Device } from "@rockets-im/stage0-node";
+import { initialize, SDK_VERSION, Stage0Device } from "@rocket-im/stage0-node";
 
 export interface ConsumerResult {
   status: "PASS";

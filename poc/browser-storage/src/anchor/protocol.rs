@@ -9,8 +9,8 @@ use crate::protocol::{validate_id, ApiError};
 pub(super) const PROTOCOL: &str = "rim-rollback-anchor-1";
 pub(super) const INPUT_LIMIT: usize = 32 * 1024;
 const STATEMENT_LIMIT: usize = 8 * 1024;
-const REQUEST_DOMAIN: &[u8] = b"Rockets-IM/POC/rollback-anchor-request/v1\0";
-const RESPONSE_DOMAIN: &[u8] = b"Rockets-IM/POC/rollback-anchor-response/v1\0";
+const REQUEST_DOMAIN: &[u8] = b"Rocket-IM/POC/rollback-anchor-request/v1\0";
+const RESPONSE_DOMAIN: &[u8] = b"Rocket-IM/POC/rollback-anchor-response/v1\0";
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -7,7 +7,7 @@ from permission_contract import validate_proof
 from receipt_contract import signed_statement, validate_receipt
 from rebuild_stream_storage import scope, validate_trust
 
-SIGNED_DOMAIN = b"Rockets-IM/POC/rebuild-stream-signed-digest/v1\0"
+SIGNED_DOMAIN = b"Rocket-IM/POC/rebuild-stream-signed-digest/v1\0"
 MAX_PAGE_BYTES = 740 * 1024
 
 

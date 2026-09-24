@@ -49,7 +49,7 @@ pub(crate) fn head(tx: &Transaction<'_>, omit_pending: bool) -> Result<String> {
         hash: Sha256::new(),
         bytes: 0,
     };
-    state.add(b'D', b"Rockets-IM/native-anchor/logical-head/v1")?;
+    state.add(b'D', b"Rocket-IM/native-anchor/logical-head/v1")?;
     state.add(b'V', &schema::version(tx)?.to_be_bytes())?;
     // 精确 schema 由 validate 验证；控制表单独签名，不进入承诺以避免自引用。
     let mut schema_query = tx.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE tbl_name!='anchor_control' ORDER BY type,name LIMIT 17").map_err(Error::database)?;

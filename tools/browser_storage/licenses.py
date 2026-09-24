@@ -145,7 +145,7 @@ def write_reports(output, report):
                              json.dumps(item["collection_issues"], ensure_ascii=False),
                              json.dumps(item["licensing_notes"], ensure_ascii=False)))
     (output / "PROJECT-LICENSE-STATUS.txt").write_text(
-        "Rockets-IM Stage 0 browser storage experiment.\n"
+        "Rocket-IM Stage 0 browser storage experiment.\n"
         "Project licensing and public distribution are not approved by this report.\n"
         "Cargo declarations and exact cached archive texts are recorded separately.\n"
         "This is conservative attribution for every locked third-party dependency,\n"

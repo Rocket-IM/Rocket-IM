@@ -104,13 +104,13 @@ def accepted_native(current_apk, original_report, platform, libraries):
 
 def swift(build, archive, root):
     consumer, app = Path(build["directory"]), Path(build["app"])
-    package = consumer / "Vendor/RocketsIMStage0"
-    inventory = installed_archive(package, zip_files(archive, "RocketsIMStage0/"), "swift")
-    selected = simulator_library(package / "Artifacts/RocketsIMStage0FFI.xcframework")
+    package = consumer / "Vendor/RocketIMStage0"
+    inventory = installed_archive(package, zip_files(archive, "RocketIMStage0/"), "swift")
+    selected = simulator_library(package / "Artifacts/RocketIMStage0FFI.xcframework")
     linked = app.parent / selected.name
     require(sha(selected) == sha(linked), "swift_linked_library_mismatch")
     project = (consumer / "Stage0Consumer.xcodeproj/project.pbxproj").read_text()
-    require("Vendor/RocketsIMStage0" in project and "PBXShellScriptBuildPhase" not in project,
+    require("Vendor/RocketIMStage0" in project and "PBXShellScriptBuildPhase" not in project,
             "swift_consumer_package_reference_changed")
     app_inventory = tree(app)
     require(app_inventory["files_sha256"] == build["app_sha256"], "swift_app_changed_since_build")
@@ -121,7 +121,7 @@ def swift(build, archive, root):
 
 def browser(build, archive, root):
     consumer = Path(build["directory"])
-    package = consumer / "node_modules/@rockets-im/stage0"
+    package = consumer / "node_modules/@rocket-im/stage0"
     inventory = installed_archive(package, tar_files(archive, "package/"), "browser")
     compiled = tree(consumer / "dist")
     require(compiled["files_sha256"] == build["compiled_sha256"], "browser_compiled_files_changed")
@@ -129,7 +129,7 @@ def browser(build, archive, root):
             "browser_served_entry_changed")
     files = {"index.html": sha(consumer / "index.html")}
     files.update({"dist/" + name: value for name, value in compiled["files_sha256"].items()})
-    files.update({"node_modules/@rockets-im/stage0/" + name: value for name, value in inventory["files_sha256"].items()})
+    files.update({"node_modules/@rocket-im/stage0/" + name: value for name, value in inventory["files_sha256"].items()})
     return {"installed_package": str(package), "installed": inventory}, {"path": str(consumer), "files_sha256": files, "symlinks": {}}
 
 
@@ -141,10 +141,10 @@ def kotlin(build, archive, original_report, root):
     native = apk_native(apk)
     matches = {}
     for abi in ("arm64-v8a", "x86_64"):
-        key = abi + "/librockets_stage0_uniffi.so"
+        key = abi + "/librocket_stage0_uniffi.so"
         require(key in jni and native.get("lib/" + key) == jni[key], "kotlin_aar_to_apk_mismatch:" + abi)
         matches[key] = jni[key]
-    baseline = accepted_native(apk, original_report, "kotlin", ["librockets_stage0_uniffi.so", "libjnidispatch.so"])
+    baseline = accepted_native(apk, original_report, "kotlin", ["librocket_stage0_uniffi.so", "libjnidispatch.so"])
     return {"installed_maven_aar": str(copied_aar), "installed_maven_sha256": sha(copied_aar),
             "aar_to_apk_sha256": matches, "native": baseline}, {"path": str(apk), "sha256": sha(apk)}
 
@@ -156,28 +156,28 @@ def flutter(build, archive, original_report, root):
     inventory = installed_archive(package, tar_files(archive), "flutter")
     config_path = consumer / ".dart_tool/package_config.json"
     config = json.loads(config_path.read_text())
-    entries = [item for item in config["packages"] if item["name"] == "rockets_im_stage0"]
+    entries = [item for item in config["packages"] if item["name"] == "rocket_im_stage0"]
     require(len(entries) == 1, "flutter_package_resolution_ambiguous")
     uri = entries[0]["rootUri"]
     parsed = urlparse(uri)
     require(parsed.scheme in ("", "file"), "flutter_package_resolution_scheme")
     resolved = Path(unquote(parsed.path)).resolve() if parsed.scheme else (config_path.parent / unquote(uri)).resolve()
     require(resolved == package, "flutter_dart_package_resolution_mismatch")
-    plugin = consumer / "ios/.symlinks/plugins/rockets_im_stage0"
+    plugin = consumer / "ios/.symlinks/plugins/rocket_im_stage0"
     require(plugin.resolve() == package, "flutter_ios_plugin_resolution_mismatch")
-    podspec = consumer / "ios/Pods/Local Podspecs/rockets_im_stage0.podspec.json"
+    podspec = consumer / "ios/Pods/Local Podspecs/rocket_im_stage0.podspec.json"
     pod = json.loads(podspec.read_text())
-    require(pod["vendored_frameworks"] == "Frameworks/RocketsStage0Flutter.xcframework" and pod["static_framework"] is True,
+    require(pod["vendored_frameworks"] == "Frameworks/RocketStage0Flutter.xcframework" and pod["static_framework"] is True,
             "flutter_ios_framework_contract_changed")
-    selected = simulator_library(package / "ios/Frameworks/RocketsStage0Flutter.xcframework")
-    linked = consumer / "build/ios/Debug-iphonesimulator/XCFrameworkIntermediates/rockets_im_stage0" / selected.name
+    selected = simulator_library(package / "ios/Frameworks/RocketStage0Flutter.xcframework")
+    linked = consumer / "build/ios/Debug-iphonesimulator/XCFrameworkIntermediates/rocket_im_stage0" / selected.name
     require(tree(selected) == tree(linked), "flutter_ios_selected_framework_mismatch")
     apk, app = Path(build["android_apk"]), Path(build["ios_app"])
     require(sha(apk) == build["android_apk_sha256"], "flutter_apk_changed_since_build")
     require(sha(app / "Runner") == build["ios_binary_sha256"], "flutter_runner_changed_since_build")
     require((app / "Runner.debug.dylib").is_file(), "flutter_debug_application_binary_missing")
     require((app / "Frameworks/App.framework/flutter_assets/kernel_blob.bin").is_file(), "flutter_debug_dart_kernel_missing")
-    baseline = accepted_native(apk, original_report, "flutter", ["librockets_stage0_flutter.so", "libflutter.so"])
+    baseline = accepted_native(apk, original_report, "flutter", ["librocket_stage0_flutter.so", "libflutter.so"])
     return {"installed_package": str(package), "installed": inventory, "dart_package_resolution": str(resolved),
             "ios_plugin_resolution": str(plugin.resolve()), "ios_selected_framework": str(selected),
             "ios_linked_framework": str(linked), "ios_linked_files": tree(linked), "native": baseline}, {
@@ -190,8 +190,9 @@ def audit_artifacts(builds, root):
     builds为总runner的四项构建结果。异常表示来源链断裂，不能把运行结果记为通过。
     """
     root = Path(root).resolve()
-    acceptance_path = root / "dist/platform-interop/accepted-packages.json"
-    accepted = {item["platform"]: item for item in json.loads(acceptance_path.read_text())}
+    from interop_apple_web import ACCEPTED, accepted_entries
+    acceptance_path = ACCEPTED
+    accepted = {item["platform"]: item for item in accepted_entries()}
     require(set(builds) == set(accepted) == {"swift", "browser", "kotlin", "flutter"}, "artifact_platform_set_mismatch")
     result = {"status": "PASS", "acceptance_sha256": sha(acceptance_path), "packages": {}, "runtime_files": {}}
     for platform in ("swift", "browser", "kotlin", "flutter"):

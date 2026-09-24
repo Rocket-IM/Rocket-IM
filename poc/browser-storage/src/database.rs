@@ -139,7 +139,7 @@ pub fn read_fault(connection: &mut Connection, scope: &Scope) -> Result<Snapshot
             // 仅测试命令可达：先完成真实读取，再由不存在的固定表触发 SQL 错误。
             // 不改表或伪造失败结果，交由统一事务入口回滚，快照不得提前交付。
             tx.query_row(
-                "SELECT value FROM __rockets_probe_missing_read_table",
+                "SELECT value FROM __rocket_probe_missing_read_table",
                 [],
                 |row| row.get::<_, String>(0),
             )

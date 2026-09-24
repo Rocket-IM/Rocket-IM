@@ -13,9 +13,9 @@ const META: &str = "CREATE TABLE crypto_meta (singleton INTEGER NOT NULL PRIMARY
 const INBOX: &str = "CREATE TABLE crypto_inbox (message_key TEXT NOT NULL PRIMARY KEY, first_sequence TEXT NOT NULL UNIQUE, message_id TEXT NOT NULL, sender_account TEXT NOT NULL, sender_device TEXT NOT NULL, envelope_hash TEXT NOT NULL, ciphertext_hash TEXT NOT NULL, text_hash TEXT NOT NULL, envelope_json TEXT NOT NULL, plaintext_json TEXT NOT NULL)";
 const RECEIPTS: &str = "CREATE TABLE crypto_receipts (sequence TEXT NOT NULL PRIMARY KEY, message_key TEXT NOT NULL, request_id TEXT NOT NULL UNIQUE, input_hash TEXT NOT NULL)";
 const DOWNLOADS: &str = "CREATE TABLE crypto_downloads (sequence TEXT NOT NULL PRIMARY KEY, envelope_hash TEXT NOT NULL, ciphertext_hash TEXT NOT NULL, envelope_json TEXT NOT NULL)";
-pub(super) const FORMAT: &str = "Rockets-IM/native-crypto/sqlite/v3";
-pub(super) const ANCHOR_FORMAT: &str = "Rockets-IM/native-crypto/sqlite/v4";
-pub(super) const REBUILD_FORMAT: &str = "Rockets-IM/native-crypto/sqlite/v5";
+pub(super) const FORMAT: &str = "Rocket-IM/native-crypto/sqlite/v3";
+pub(super) const ANCHOR_FORMAT: &str = "Rocket-IM/native-crypto/sqlite/v4";
+pub(super) const REBUILD_FORMAT: &str = "Rocket-IM/native-crypto/sqlite/v5";
 pub(super) const ANCHOR_CONTROL: &str = "CREATE TABLE anchor_control (singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL, gate_json TEXT, journal_json TEXT)";
 pub(super) const REBUILD_CONTROL: &str = "CREATE TABLE rebuild_control (singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton=1), state_json TEXT NOT NULL)";
 
@@ -174,7 +174,7 @@ pub(super) fn validate(tx: &Transaction<'_>) -> Result<()> {
         return Err(corrupt());
     }
     if version < 3 {
-        let format = format!("Rockets-IM/native-crypto/sqlite/v{version}");
+        let format = format!("Rocket-IM/native-crypto/sqlite/v{version}");
         let valid: i64 = tx
             .query_row(
                 "SELECT count(*) FROM crypto_meta WHERE singleton=1 AND format=?1",

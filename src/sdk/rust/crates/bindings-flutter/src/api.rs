@@ -1,6 +1,6 @@
 //! Flutter公开边界，不执行网络或持久化操作。
 use flutter_rust_bridge::frb;
-use rockets_im_sdk::Device;
+use rocket_im_sdk::Device;
 
 #[frb(sync)]
 pub fn sdk_version() -> String {

@@ -158,6 +158,15 @@ def write_report(path, report):
         temporary.replace(destination)
 
 
+def needs_permissions(ident):
+    return ident == "M11" or ident.startswith(("P", "R", "H", "J", "D", "X", "S", "F", "E"))
+
+
+def needs_signed_pages(ident):
+    # 生命周期声明必须来自本次验证的签名页，不能用无签名的普通收发装置。
+    return ident == "M11" or ident.startswith(("R", "H", "J", "D", "X", "S", "F", "E"))
+
+
 def build(binary, output):
     cargo = shutil.which("cargo")
     if cargo is None:
@@ -187,7 +196,7 @@ def main():
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     report_path = output / "results.json"
-    binary = (args.binary or ROOT / "dist/crypto-probes/target/openmls/release/openmls-state-lab").resolve()
+    binary = (args.binary or output / "target/openmls/release/openmls-state-lab").resolve()
     verifier = (args.permission_verifier or binary.with_name("openmls-permission-verify")).resolve()
     signer = (args.receipt_signer or binary.with_name("openmls-relay-receipt")).resolve()
     report = {"status": "RUNNING", "run_id": str(uuid.uuid4()),
@@ -203,14 +212,16 @@ def main():
                             "生产容量和完整安全模型T用例"],
               "process_count_scope": "客户端CLI、测试Service钥操作与Relay启动；不含Relay内部验证/签名子进程",
               "cases": [], "process_count": 0, "http_request_count": 0}
+    public_fixtures = output / "runs" / report["run_id"] / "public-fixtures"
+    report["public_fixture_directory"] = str(public_fixtures)
     write_report(report_path, report)
     try:
         if args.binary is None:
             build(binary, output)
         report["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
-        if args.case is None or any(ident.startswith(("P", "R", "H", "J", "D", "X", "S", "F", "E")) for ident in args.case):
+        if args.case is None or any(needs_permissions(ident) for ident in args.case):
             report["permission_verifier_sha256"] = hashlib.sha256(verifier.read_bytes()).hexdigest()
-        if args.case is None or any(ident.startswith(("R", "H", "J", "D", "X", "S", "F", "E")) for ident in args.case):
+        if args.case is None or any(needs_signed_pages(ident) for ident in args.case):
             report["receipt_signer_sha256"] = hashlib.sha256(signer.read_bytes()).hexdigest()
         report["lock_sha256"] = hashlib.sha256((ROOT / "poc/openmls-probe/Cargo.lock").read_bytes()).hexdigest()
         sources = [ROOT / "tools/verify_network_relay.py", ROOT / "poc/openmls-probe/Cargo.toml",
@@ -227,9 +238,10 @@ def main():
             report["cases"].append(record)
             write_report(report_path, report)
             with tempfile.TemporaryDirectory(prefix=ident + "-", dir=output) as temporary:
-                permissions = ident.startswith(("P", "R", "H", "J", "D", "X", "S", "F", "E"))
+                permissions = needs_permissions(ident)
                 lab = NetworkLab(binary, Path(temporary).resolve(), verifier if permissions else None,
-                                 signer if ident.startswith(("R", "H", "J", "D", "X", "S", "F", "E")) else None)
+                                 signer if needs_signed_pages(ident) else None)
+                lab.public_fixture_directory = public_fixtures
                 try:
                     lab.initialize(pending_limit=1 if ident == "P04" else 1000, permissions=permissions,
                                    owner_account_id="bob" if ident in ("P09", "R10") else "alice",

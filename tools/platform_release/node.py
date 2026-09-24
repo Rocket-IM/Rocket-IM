@@ -101,7 +101,7 @@ def verify(args):
         report["npm_version"] = (run / "npm-version.log").read_text(encoding="utf-8").strip()
         command(npm_command() + ["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", str(archive)],
                 consumer, run / "npm-install.log")
-        installed = consumer / "node_modules/@rockets-im/stage0-node"
+        installed = consumer / "node_modules/@rocket-im/stage0-node"
         original_package = validate_package(installed)
         manifest = json.loads((installed / "artifact.json").read_text(encoding="utf-8"))
         report["package_source_matches_current"] = manifest.get("source_sha256") == report["source_sha256_before"]
@@ -204,6 +204,7 @@ def main():
     package = operations.add_parser("pack")
     package.add_argument("--generated", type=Path, required=True)
     package.add_argument("--build-report", type=Path, required=True)
+    package.add_argument("--licenses", type=Path, default=Path(__file__).resolve().parents[2] / "dist/platform-release/licenses")
     package.add_argument("--output", type=Path, default=OUTPUT)
     test = operations.add_parser("verify")
     test.add_argument("--archive", type=Path, required=True)

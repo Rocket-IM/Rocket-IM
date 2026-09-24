@@ -16,7 +16,7 @@ from urllib.parse import unquote, urlparse
 from android import ROOT, SDK, VERSION, command, copy_rust_licenses, digest, environment, native_alignment, run_consumer
 
 FLUTTER = Path.home() / "fvm/versions/3.41.0/bin/flutter"
-ANDROID_ID = "io.rocketsim.consumer.rockets_stage0_consumer"
+ANDROID_ID = "io.rocketim.consumer.rocket_stage0_consumer"
 
 
 def package(args, work, log, env):
@@ -27,13 +27,13 @@ def package(args, work, log, env):
     for abi, library in (("arm64-v8a", args.arm64_lib), ("x86_64", args.x64_lib)):
         destination = staged / "android/src/main/jniLibs" / abi
         destination.mkdir(parents=True)
-        shutil.copy2(library, destination / "librockets_stage0_flutter.so")
-    framework = staged / "ios/Frameworks/RocketsStage0Flutter.xcframework"
+        shutil.copy2(library, destination / "librocket_stage0_flutter.so")
+    framework = staged / "ios/Frameworks/RocketStage0Flutter.xcframework"
     shutil.copytree(args.ios_xcframework, framework)
     info = plistlib.loads((framework / "Info.plist").read_bytes())
     libraries = info["AvailableLibraries"]
     paths = {entry["LibraryPath"] for entry in libraries}
-    if paths != {"RocketsStage0Flutter.framework"}:
+    if paths != {"RocketStage0Flutter.framework"}:
         raise RuntimeError("Flutter iOS包只接受明确的静态Framework XCFramework")
     architectures = {(entry.get("SupportedPlatformVariant", "device"), architecture)
                      for entry in libraries for architecture in entry["SupportedArchitectures"]}
@@ -42,17 +42,17 @@ def package(args, work, log, env):
     for entry in libraries:
         slice_framework = framework / entry["LibraryIdentifier"] / entry["LibraryPath"]
         metadata = plistlib.loads((slice_framework / "Info.plist").read_bytes())
-        if metadata["CFBundleExecutable"] != "RocketsStage0Flutter":
+        if metadata["CFBundleExecutable"] != "RocketStage0Flutter":
             raise RuntimeError("Flutter静态Framework二进制名称不匹配")
-        if not (slice_framework / "RocketsStage0Flutter").is_file():
+        if not (slice_framework / "RocketStage0Flutter").is_file():
             raise RuntimeError("Flutter静态Framework缺少二进制")
-    spec = staged / "ios/rockets_im_stage0.podspec"
+    spec = staged / "ios/rocket_im_stage0.podspec"
     copy_rust_licenses(args.output, staged / "licenses")
     command([args.flutter, "pub", "get"], staged, log, env, timeout=600)
     configuration = json.loads((staged / ".dart_tool/package_config.json").read_text())
     symbol_sources = [staged / "lib/src/rust/frb_generated.io.dart"]
     for dependency in configuration["packages"]:
-        if dependency["name"] == "rockets_im_stage0":
+        if dependency["name"] == "rocket_im_stage0":
             continue
         uri = dependency["rootUri"]
         source = Path(unquote(urlparse(uri).path)) if uri.startswith("file:") else (staged / ".dart_tool" / uri).resolve()
@@ -73,10 +73,10 @@ def package(args, work, log, env):
     if len(exports) != 17 or any(not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name) for name in exports):
         raise RuntimeError("固定FRB 2.11.1原生符号集合与预期不一致")
     flags = " ".join(f"-Wl,-u,_{name}" for name in sorted(exports))
-    spec.write_text(spec.read_text().replace("@ROCKETS_IOS_RETAIN_SYMBOLS@", flags))
+    spec.write_text(spec.read_text().replace("@ROCKET_IOS_RETAIN_SYMBOLS@", flags))
     (staged / "ios/ffi-exports.json").write_text(json.dumps({"symbols": sorted(exports), "flutter_rust_bridge": "2.11.1"}, indent=2) + "\n")
     shutil.rmtree(staged / ".dart_tool")
-    target = work / "release" / f"rockets_im_stage0-{VERSION}.tar.gz"
+    target = work / "release" / f"rocket_im_stage0-{VERSION}.tar.gz"
     target.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(target, "w:gz") as output:
         for path in sorted(staged.iterdir()):
@@ -91,8 +91,8 @@ def package(args, work, log, env):
 
 def prepare_consumer(args, work, log, env):
     consumer = work / "consumer"
-    command([args.flutter, "create", "--platforms=android,ios", "--org", "io.rocketsim.consumer", "--project-name",
-             "rockets_stage0_consumer", "--no-pub", consumer], work, log, env, timeout=300)
+    command([args.flutter, "create", "--platforms=android,ios", "--org", "io.rocketim.consumer", "--project-name",
+             "rocket_stage0_consumer", "--no-pub", consumer], work, log, env, timeout=300)
     template = ROOT / "tests/consumers/flutter"
     shutil.copy2(template / "pubspec.yaml", consumer / "pubspec.yaml")
     shutil.copy2(template / ".fvmrc", consumer / ".fvmrc")
@@ -104,7 +104,7 @@ def prepare_consumer(args, work, log, env):
     command([args.flutter, "pub", "get"], consumer, log, env, timeout=600)
     # 消费锁文件和解析后的包路径记录留在独立consumer目录，不触碰SDK源码。
     configuration = json.loads((consumer / ".dart_tool/package_config.json").read_text())
-    sdk = next(entry for entry in configuration["packages"] if entry["name"] == "rockets_im_stage0")
+    sdk = next(entry for entry in configuration["packages"] if entry["name"] == "rocket_im_stage0")
     resolved = ((consumer / ".dart_tool") / sdk["rootUri"]).resolve() if not sdk["rootUri"].startswith("file:") else Path(sdk["rootUri"].removeprefix("file://")).resolve()
     if resolved != (work / "installed-package").resolve():
         raise RuntimeError("消费者没有解析到已解压的Release包")
@@ -133,7 +133,7 @@ def android(args, consumer, work, run_id, log, env):
 def simulator_result(simulator, bundle, run_id, consumer, log, env):
     # iOS上的Flutter日志进入Unified Logging，simctl --console不会稳定转发Dart输出。
     command(["xcrun", "simctl", "launch", "--terminate-running-process", simulator, bundle], consumer, log, env, timeout=30)
-    predicate = f'process == "Runner" AND eventMessage CONTAINS "ROCKETS_STAGE0_RESULT:" AND eventMessage CONTAINS "{run_id}"'
+    predicate = f'process == "Runner" AND eventMessage CONTAINS "ROCKET_STAGE0_RESULT:" AND eventMessage CONTAINS "{run_id}"'
     expected_scenario = "version-rejected" if run_id.endswith("-version") else "public-api"
     expected_checks = 2 if expected_scenario == "version-rejected" else 8
     deadline = time.monotonic() + 120
@@ -142,9 +142,9 @@ def simulator_result(simulator, bundle, run_id, consumer, log, env):
             data, _ = command(["xcrun", "simctl", "spawn", simulator, "log", "show", "--style", "compact", "--last", "3m",
                                "--info", "--debug", "--predicate", predicate], consumer, log, env, timeout=30)
             for line in data.splitlines():
-                if "ROCKETS_STAGE0_RESULT:" not in line or "{" not in line:
+                if "ROCKET_STAGE0_RESULT:" not in line or "{" not in line:
                     continue
-                result = json.loads(line.split("ROCKETS_STAGE0_RESULT:", 1)[1])
+                result = json.loads(line.split("ROCKET_STAGE0_RESULT:", 1)[1])
                 if result.get("run_id") != run_id:
                     continue
                 if (result.get("scenario"), result.get("checks"), result.get("package_version"), result.get("platform")) != (expected_scenario, expected_checks, VERSION, "flutter"):

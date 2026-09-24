@@ -51,7 +51,7 @@ async function acquire(options: TransportOptions): Promise<Lease> {
   const { service, account } = options;
   const namespace = options.mode === "rebuild" ? options.rebuild?.options.storageNamespace : undefined;
   if (options.mode === "rebuild" && namespace === undefined) throw new StorageError("INVALID_ARGUMENT", "Missing rebuild storage namespace.");
-  const key = `rockets-q05:${service}:${account}` + (namespace === undefined ? "" : `-rebuild-${namespace}`);
+  const key = `rocket-q05:${service}:${account}` + (namespace === undefined ? "" : `-rebuild-${namespace}`);
   let releaseLock: () => void = () => {};
   const lifetime = new Promise<void>(resolve => { releaseLock = resolve; });
   let grant: (lease: Lease) => void = () => {};
@@ -96,7 +96,7 @@ export class Transport<Q, S, P extends Phase> {
     const lease = await acquire(options);
     let client: Transport<Q, S, P> | undefined;
     try {
-      const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module", name: "rockets-q05-storage" });
+      const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module", name: "rocket-q05-storage" });
       client = new Transport(options, codec, worker, lease);
       codec.validateInitial(await client.enqueue("open", undefined, undefined, options));
       return client;

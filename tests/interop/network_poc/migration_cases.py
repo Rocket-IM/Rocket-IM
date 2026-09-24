@@ -7,7 +7,7 @@ import json
 import sqlite3
 
 from .device_join_cases import join_device, no_old_history, prepare_device, setup
-from .fixture import ACCOUNTS, CONVERSATION, ROOT, SERVICE, check, identity
+from .fixture import ACCOUNTS, CONVERSATION, SERVICE, check, identity
 from .history_cases import publish, receive_record
 from .join_cases import accept_add, mutate_bytes
 from .permission_cases import reject_unchanged
@@ -89,7 +89,8 @@ def selected_copies(lab):
         persisted = json.dumps(db.execute("SELECT request,package,receipt FROM history_transfers").fetchall())
     check("synthetic-history-migration_old" not in persisted, "Service 迁移记录包含明文")
     checkpoint = lab.rust("b1", "permission_inspect")["checkpoint"]
-    (ROOT / "dist/network-relay/history-transfer-public-fixture.json").write_text(json.dumps(
+    lab.public_fixture_directory.mkdir(parents=True, exist_ok=True)
+    (lab.public_fixture_directory / "history-transfer-public-fixture.json").write_text(json.dumps(
         {"checkpoint": checkpoint, **accepted}, indent=2))
     receive_record(lab, "a1", publish(lab, "after_copy_new_device", "b2"))
     receive_record(lab, "b2", publish(lab, "after_copy_existing_device"))

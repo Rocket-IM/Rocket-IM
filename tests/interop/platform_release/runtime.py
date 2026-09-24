@@ -20,8 +20,10 @@ def tree_hashes(directory):
 
 
 class Runtime:
-    def __init__(self, root, work):
+    def __init__(self, root, work, release_root=None, interop_root=None):
         self.root, self.work = Path(root), Path(work)
+        self.release_root = Path(release_root) if release_root else self.root / "dist/platform-release"
+        self.interop_root = Path(interop_root) if interop_root else self.root / "dist/platform-interop"
         self.log = self.work / "runtime.log"
         self.booted_here, self.ios_apps, self.android_apps = [], [], []
         self.browser, self.android_hosts = None, None
@@ -59,13 +61,13 @@ class Runtime:
         self.metadata[endpoint]["installed_app_sha256"] = installed_hashes
         env = os.environ.copy()
         for name, value in {"URL": url, "RUN_ID": run_id, "ENDPOINT_ID": endpoint}.items():
-            env["SIMCTL_CHILD_ROCKETS_INTEROP_" + name] = value
+            env["SIMCTL_CHILD_ROCKET_INTEROP_" + name] = value
         launched = self.command(["xcrun", "simctl", "launch", "--terminate-running-process", simulator, bundle], env=env)
         self.metadata[endpoint]["launch"] = launched.strip()
 
     def android(self, kotlin, flutter, url, run_id):
         from .android_runtime import AndroidRuntimes
-        self.android_hosts = AndroidRuntimes(self.root, self.work, self.command)
+        self.android_hosts = AndroidRuntimes(self.root, self.work, self.command, self.release_root, self.interop_root)
         hosts = self.android_hosts.start()
         base = url.replace("127.0.0.1", "10.0.2.2")
         apps = [(kotlin["apk"], kotlin["bundle_id"], kotlin["activity"], "kotlin-android"),
@@ -98,7 +100,7 @@ class Runtime:
     def chrome(self, url, run_id, playwright_module):
         query = urlencode({"interop_url": url, "interop_run_id": run_id, "interop_endpoint_id": "browser"})
         env = os.environ.copy()
-        env["ROCKETS_PLAYWRIGHT_MODULE"] = str(playwright_module)
+        env["ROCKET_PLAYWRIGHT_MODULE"] = str(playwright_module)
         with (self.work / "browser.log").open("w") as log:
             self.browser = subprocess.Popen(["node", str(self.root / "tests/interop/platform_release/browser_host.mjs"),
                                               url + "/browser/index.html?" + query],

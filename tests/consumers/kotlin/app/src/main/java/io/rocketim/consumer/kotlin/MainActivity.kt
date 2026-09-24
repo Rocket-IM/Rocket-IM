@@ -1,12 +1,12 @@
-package io.rocketsim.consumer.kotlin
+package io.rocketim.consumer.kotlin
 
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
-import io.rocketsim.stage0.Stage0Device
-import io.rocketsim.stage0.DeviceException
-import io.rocketsim.stage0.sdkVersion
+import io.rocketim.stage0.Stage0Device
+import io.rocketim.stage0.DeviceException
+import io.rocketim.stage0.sdkVersion
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
@@ -30,7 +30,7 @@ class MainActivity : Activity() {
                     val result = endpoint.run()
                     runOnUiThread { if (!isDestroyed) status.text = "互通控制：$result" }
                 } catch (error: Exception) {
-                    Log.e("RocketsInterop", "harness_failed: ${error.javaClass.simpleName}")
+                    Log.e("RocketInterop", "harness_failed: ${error.javaClass.simpleName}")
                     runOnUiThread { if (!isDestroyed) status.text = "互通装置失败：${error.javaClass.simpleName}" }
                 }
             }
@@ -47,7 +47,7 @@ class MainActivity : Activity() {
                 result.put("status", "failed").put("error", error.javaClass.name).put("message", error.message ?: "")
             }
             val encoded = result.toString()
-            Log.i("RocketsStage0", encoded)
+            Log.i("RocketStage0", encoded)
             runOnUiThread { status.text = encoded }
         }
     }

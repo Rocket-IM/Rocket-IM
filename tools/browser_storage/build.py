@@ -12,7 +12,7 @@ import subprocess
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
-OUTPUT = ROOT / "dist/browser-storage"
+OUTPUT = Path(os.environ.get("ROCKET_IM_BROWSER_STORAGE_OUTPUT", ROOT / "dist/browser-storage")).resolve()
 CRATE = ROOT / "poc/browser-storage"
 COMPILER = ROOT / "src/sdk/typescript/node_modules/typescript/bin/tsc"
 BINDGEN = ROOT / "dist/platform-release/codegen/wasm-bindgen-0.2.128-aarch64-apple-darwin/wasm-bindgen-0.2.128-aarch64-apple-darwin/wasm-bindgen"
@@ -75,7 +75,7 @@ def main():
         stage = output / "package"
         shutil.copytree(CRATE / "package", stage, ignore=shutil.ignore_patterns("generated", "dist", "node_modules"))
         generated = stage / "generated"
-        wasm = OUTPUT / "target/wasm32-unknown-unknown/release/rockets_browser_storage_probe.wasm"
+        wasm = OUTPUT / "target/wasm32-unknown-unknown/release/rocket_browser_storage_probe.wasm"
         run([BINDGEN, "--target", "web", "--out-dir", generated, wasm], ROOT, output / "bindgen.log")
         run(["node", COMPILER, "-p", stage / "tsconfig.json"], stage, output / "typescript.log")
         run(["python3", ROOT / "tools/browser_storage/licenses.py", "--output", stage / "licenses"], ROOT, output / "licenses.log")

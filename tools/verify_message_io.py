@@ -57,8 +57,7 @@ def capture_baseline(output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path)
-    parser.add_argument("--anchor-helper", type=Path,
-                        default=ROOT / "dist/crypto-probes/target/openmls/release/openmls-rollback-anchor")
+    parser.add_argument("--anchor-helper", type=Path, help="明确指定本轮构建的独立锚程序")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/network-relay/m06")
     parser.add_argument("--case", action="append", choices=[item[0] for item in CASES])
     parser.add_argument("--capture-baseline", action="store_true")
@@ -68,8 +67,8 @@ def main():
     if args.capture_baseline:
         capture_baseline(output)
         return 0
-    if args.binary is None:
-        parser.error("必须以 --binary 指明本次验证的 Release 程序")
+    if args.binary is None or args.anchor_helper is None:
+        parser.error("必须以 --binary 和 --anchor-helper 指明本次验证的 Release 程序")
     binary, helper = args.binary.resolve(), args.anchor_helper.resolve()
     run_id = str(uuid.uuid4())
     run = output / "runs" / run_id

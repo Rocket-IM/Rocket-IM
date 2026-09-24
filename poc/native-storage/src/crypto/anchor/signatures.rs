@@ -5,9 +5,9 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde::{de::DeserializeOwned, Serialize};
 
-const REQUEST_DOMAIN: &[u8] = b"Rockets-IM/POC/rollback-anchor-request/v1\0";
-const RESPONSE_DOMAIN: &[u8] = b"Rockets-IM/POC/rollback-anchor-response/v1\0";
-pub(crate) const LOCAL_DOMAIN: &[u8] = b"Rockets-IM/native-anchor-journal/v1\0";
+const REQUEST_DOMAIN: &[u8] = b"Rocket-IM/POC/rollback-anchor-request/v1\0";
+const RESPONSE_DOMAIN: &[u8] = b"Rocket-IM/POC/rollback-anchor-response/v1\0";
+pub(crate) const LOCAL_DOMAIN: &[u8] = b"Rocket-IM/native-anchor-journal/v1\0";
 pub(crate) const LOCAL_LIMIT: usize = 256 * 1024;
 pub(crate) const LOCAL_JSON_LIMIT: usize = 512 * 1024;
 

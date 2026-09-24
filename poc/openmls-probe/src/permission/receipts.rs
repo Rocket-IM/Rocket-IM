@@ -5,8 +5,8 @@ use super::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const RECEIPT_DOMAIN: &[u8] = b"Rockets-IM/POC/permission-receipt/v1\0";
-pub const CLOSE_DOMAIN: &[u8] = b"Rockets-IM/POC/permission-close/v1\0";
+pub const RECEIPT_DOMAIN: &[u8] = b"Rocket-IM/POC/permission-receipt/v1\0";
+pub const CLOSE_DOMAIN: &[u8] = b"Rocket-IM/POC/permission-close/v1\0";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -56,7 +56,7 @@ pub struct RecoveryRecord {
 
 pub fn proof_digest(proof: &Proof) -> Result<String, PermissionError> {
     let mut digest = Sha256::new();
-    digest.update(b"Rockets-IM/POC/permission-proof/v1\0");
+    digest.update(b"Rocket-IM/POC/permission-proof/v1\0");
     for (value, limit) in [
         (&proof.statement_bytes, 16 * 1024),
         (&proof.signature_bytes, 64),

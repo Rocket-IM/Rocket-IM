@@ -16,9 +16,9 @@ from rebuild_verify import package_hashes
 from signing_access import run_access
 from signing_build import BASE, NAMES, binaries, command, prepare
 from signing_lifecycle import run_lifecycle
-from support import ROOT, sha, utc_now, write_json
+from support import OUTPUT as STORAGE_OUTPUT, sha, utc_now, write_json
 
-OUTPUT = ROOT / 'dist/native-storage/signing'
+OUTPUT = STORAGE_OUTPUT / 'signing'
 
 
 def instrument_processes(records):

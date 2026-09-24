@@ -17,7 +17,7 @@ from node_pack import ROOT, NAME, VERSION, TEMPLATE, sha, write_json
 OUTPUT = ROOT / "dist/platform-release/node/windows"
 CONSUMER_FILES = ("package.json", "package-lock.json", "tsconfig.json", "consumer.ts", "run.mjs")
 RUNNER_FILES = ("node_verify.mjs", "node_verify_support.mjs")
-SDK_FILENAME = "rockets-im-stage0-node-0.1.0-stage0.1.tgz"
+SDK_FILENAME = "rocket-im-stage0-node-0.1.0-stage0.1.tgz"
 
 
 def now():
@@ -56,7 +56,7 @@ def read_report(path):
 
 def build(args):
     bundle_id = str(uuid.uuid4())
-    output = OUTPUT / "bundles" / bundle_id
+    output = args.output.resolve() / "bundles" / bundle_id
     output.mkdir(parents=True)
     report = {"bundle_id": bundle_id, "status": "RUNNING", "started_at": now(),
               "scope": "offline acceptance kit; no Windows execution", "windows_acceptance": "NOT_TESTED"}
@@ -156,7 +156,7 @@ def build(args):
                                    "consumer_source_sha256": {(TEMPLATE.relative_to(ROOT) / name).as_posix(): digest
                                                               for name, digest in consumer_hashes.items()}}}
         write_json(kit / "manifest.json", manifest)
-        destination = output / ("rockets-node-windows-acceptance-" + bundle_id + ".zip")
+        destination = output / ("rocket-node-windows-acceptance-" + bundle_id + ".zip")
         with zipfile.ZipFile(destination, "x", zipfile.ZIP_DEFLATED) as zipped:
             for path in sorted(kit.rglob("*")):
                 if path.is_file():
@@ -190,6 +190,7 @@ def main():
     parser.add_argument("--pack-report", type=Path, required=True)
     parser.add_argument("--verify-report", type=Path, required=True)
     parser.add_argument("--typescript-archive", type=Path, required=True)
+    parser.add_argument("--output", type=Path, default=OUTPUT)
     return build(parser.parse_args())
 
 

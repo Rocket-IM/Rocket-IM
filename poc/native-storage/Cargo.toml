@@ -1,5 +1,5 @@
 [package]
-name = "rockets-native-storage-probe"
+name = "rocket-native-storage-probe"
 version = "0.1.0"
 edition = "2021"
 publish = false

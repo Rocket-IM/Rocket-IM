@@ -1,7 +1,7 @@
 // 只负责启动真实Chrome；密码调用在安装了实际npm包的浏览器页面内执行。
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.ROCKETS_PLAYWRIGHT_MODULE);
+const { chromium } = require(process.env.ROCKET_PLAYWRIGHT_MODULE);
 const browser = await chromium.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true,

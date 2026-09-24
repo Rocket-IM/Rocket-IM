@@ -5,7 +5,7 @@ use crate::permission::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const SIGNING_DOMAIN: &[u8] = b"Rockets-IM/POC/consistency-head/v1\0";
+pub const SIGNING_DOMAIN: &[u8] = b"Rocket-IM/POC/consistency-head/v1\0";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

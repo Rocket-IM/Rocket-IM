@@ -2113,31 +2113,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "rockets-bindings-flutter"
+name = "rocket-bindings-flutter"
 version = "0.1.0-stage0.1"
 dependencies = [
  "flutter_rust_bridge",
- "rockets-im-sdk",
+ "rocket-im-sdk",
 ]
 
 [[package]]
-name = "rockets-bindings-uniffi"
+name = "rocket-bindings-uniffi"
 version = "0.1.0-stage0.1"
 dependencies = [
- "rockets-im-sdk",
+ "rocket-im-sdk",
  "uniffi",
 ]
 
 [[package]]
-name = "rockets-bindings-wasm"
+name = "rocket-bindings-wasm"
 version = "0.1.0-stage0.1"
 dependencies = [
- "rockets-im-sdk",
+ "rocket-im-sdk",
  "wasm-bindgen",
 ]
 
 [[package]]
-name = "rockets-crypto-core"
+name = "rocket-crypto-core"
 version = "0.1.0-stage0.1"
 dependencies = [
  "getrandom 0.2.17",
@@ -2148,10 +2148,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rockets-im-sdk"
+name = "rocket-im-sdk"
 version = "0.1.0-stage0.1"
 dependencies = [
- "rockets-crypto-core",
+ "rocket-crypto-core",
 ]
 
 [[package]]

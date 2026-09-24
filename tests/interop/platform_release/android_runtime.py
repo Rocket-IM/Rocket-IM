@@ -30,8 +30,12 @@ def sha(path):
 
 
 class AndroidRuntimes:
-    def __init__(self, root, work, command):
+    def __init__(self, root, work, command, release_root=None, interop_root=None):
         self.root, self.work, self.command = Path(root).resolve(), Path(work).resolve(), command
+        self.release_root = Path(release_root).resolve() if release_root else self.root / "dist/platform-release"
+        self.interop_root = Path(interop_root).resolve() if interop_root else self.root / "dist/platform-interop"
+        if not all(path.is_relative_to(self.root / "dist") for path in (self.release_root, self.interop_root)):
+            raise ValueError("Android测试环境必须位于项目dist内")
         self.adb, self.emulator = SDK / "platform-tools/adb", SDK / "emulator/emulator"
         self.targets, self.processes, self.locks = {}, {}, []
         self.log = self.work / "android-runtimes.jsonl"
@@ -43,8 +47,8 @@ class AndroidRuntimes:
             log.write(json.dumps({"time_utc": datetime.now(timezone.utc).isoformat(), "event": event, **values}) + "\n")
 
     def _specifications(self):
-        original_home = self.root / "dist/platform-release/android-avd"
-        original_name = "RocketsIM_Stage0_16k"
+        original_home = self.release_root / "android-avd"
+        original_name = "RocketIM_Stage0_16k"
         original = original_home / (original_name + ".avd")
         config = read_ini(original / "config.ini")
         index = read_ini(original_home / (original_name + ".ini"))
@@ -57,14 +61,14 @@ class AndroidRuntimes:
         properties = read_ini(image / "source.properties")
         if properties.get("SystemImage.Abi") != "arm64-v8a" or properties.get("AndroidVersion.ApiLevel") != "37.1":
             raise RuntimeError("installed_system_image_metadata_mismatch")
-        new_home = self.root / "dist/platform-interop/android-avd"
+        new_home = self.interop_root / "android-avd"
         return [
             {"endpoint": "kotlin-android", "name": original_name, "port": 5580, "avd": original,
-             "home": original_home, "user_home": self.root / "dist/platform-release/android-user", "create": False,
-             "lock": self.root / "dist/platform-release/android-consumer.lock"},
-            {"endpoint": "flutter-android", "name": "RocketsIM_Interop_Flutter_16k", "port": 5582,
-             "avd": new_home / "RocketsIM_Interop_Flutter_16k.avd", "home": new_home,
-             "user_home": self.root / "dist/platform-interop/android-user", "create": True,
+             "home": original_home, "user_home": self.release_root / "android-user", "create": False,
+             "lock": self.release_root / "android-consumer.lock"},
+            {"endpoint": "flutter-android", "name": "RocketIM_Interop_Flutter_16k", "port": 5582,
+             "avd": new_home / "RocketIM_Interop_Flutter_16k.avd", "home": new_home,
+             "user_home": self.interop_root / "android-user", "create": True,
              "device": config.get("hw.device.name", "pixel_8"), "lock": new_home / "emulator-5582.lock"},
         ]
 
@@ -200,11 +204,41 @@ class AndroidRuntimes:
                 selected.append(line)
         return "\n".join(selected[:500])
 
+    @staticmethod
+    def _harness_events(output, pid, since):
+        """按固定字段采集测试控制异常，未知行及异常正文不进入证据。"""
+        allowed = {"SocketTimeoutException", "SocketException", "ConnectException", "EOFException",
+                   "IOException", "InterruptedIOException", "ProtocolException", "UnknownHostException",
+                   "JSONException", "IllegalArgumentException", "IllegalStateException", "ClassCastException",
+                   "NullPointerException", "URISyntaxException", "MalformedURLException", "Failure"}
+        prefix = r"\s*([0-9]+\.[0-9]+)\s+([0-9]+)\s+([0-9]+)\s+E\s+RocketInterop\s*: "
+        failure = re.compile(prefix + r"harness_failed: ([A-Za-z][A-Za-z0-9]*)\s*")
+        transport = re.compile(prefix + r"transport_failed: (GET|POST) (ready|next|result) "
+            r"(configure|write_body|response_status|read_body) (unexpected_eof|timeout|connect_failed|socket_failed|eof|other_io) "
+            r"([A-Za-z][A-Za-z0-9]*) ([A-Za-z][A-Za-z0-9]*) (none|cmd[0-9]{6})\s*")
+        events, discarded = [], 0
+        for line in output.splitlines():
+            match = failure.fullmatch(line) or transport.fullmatch(line)
+            if match is None or match[2] != pid or float(match[1]) < since:
+                discarded += 1
+                continue
+            event = {"epoch_seconds": match[1], "pid": pid, "tid": match[3]}
+            if match.re is failure and match[4] in allowed:
+                event.update(event="harness_failed", exception_type=match[4])
+            elif match.re is transport and match[8] in allowed and match[9] in allowed | {"none"}:
+                event.update(event="transport_failed", method=match[4], action=match[5], phase=match[6],
+                             reason=match[7], exception_type=match[8], cause_type=match[9], last_command_id=match[10])
+            else:
+                discarded += 1
+                continue
+            events.append(event)
+        return events, discarded
+
     def capture_diagnostics(self, bundle_by_endpoint):
         """必须在root force-stop/uninstall前调用；不唤醒、不切前台、不改系统策略。"""
         report = {}
         for endpoint, bundle in bundle_by_endpoint.items():
-            if endpoint not in self.targets or not re.fullmatch(r"io\.rocketsim\.consumer\.[A-Za-z0-9_.]+\.interop\.[A-Za-z0-9_.]+", bundle):
+            if endpoint not in self.targets or not re.fullmatch(r"io\.rocketim\.consumer\.[A-Za-z0-9_.]+\.interop\.[A-Za-z0-9_.]+", bundle):
                 raise ValueError("diagnostics_requires_this_run_unique_test_bundle")
             target = self.targets[endpoint]
             record = {"serial": target["serial"], "bundle_id": bundle, "captured_at": datetime.now(timezone.utc).isoformat()}
@@ -230,26 +264,12 @@ class AndroidRuntimes:
                     if recent and (bundle in line or (pattern is not None and pattern.search(line))):
                         related.append(line)
                 record["system_log"] = {"exit": code, "output": "\n".join(related[-500:]), "error": error}
-                # MainActivity 只输出异常类；单独按目标 PID/tag 读取，不保存正文或堆栈。
-                allowed = {"SocketTimeoutException", "SocketException", "ConnectException", "EOFException",
-                           "IOException", "InterruptedIOException", "ProtocolException", "UnknownHostException",
-                           "JSONException", "IllegalArgumentException", "IllegalStateException", "ClassCastException",
-                           "NullPointerException", "URISyntaxException", "MalformedURLException", "Failure"}
-                message = re.compile(r"\s*([0-9]+\.[0-9]+)\s+([0-9]+)\s+([0-9]+)\s+E\s+"
-                                     r"RocketsInterop\s*: harness_failed: ([A-Za-z][A-Za-z0-9]*)\s*")
+                # 单独按目标 PID/tag 读取固定诊断字段，不保存正文或堆栈。
                 record["harness_log"] = []
                 for pid in pids:
                     code, output, _ = self._diagnostic_command(target["serial"], ["logcat", "-d", "--pid", pid,
-                        "-v", "epoch", "-s", "RocketsInterop:E"])
-                    events, discarded = [], 0
-                    for line in output.splitlines():
-                        match = message.fullmatch(line)
-                        if (match is None or match[2] != pid or float(match[1]) < self.started_epoch
-                                or match[4] not in allowed):
-                            discarded += 1
-                            continue
-                        events.append({"epoch_seconds": match[1], "pid": pid, "tid": match[3],
-                                       "event": "harness_failed", "exception_type": match[4]})
+                        "-v", "epoch", "-s", "RocketInterop:E"])
+                    events, discarded = self._harness_events(output, pid, self.started_epoch)
                     record["harness_log"].append({"pid": pid, "exit": code, "events": events[-32:],
                         "discarded_lines": discarded, "earlier_matching_events": max(0, len(events) - 32),
                         "error": None if code == 0 else "logcat_command_failed"})

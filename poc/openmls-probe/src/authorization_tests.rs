@@ -94,6 +94,25 @@ fn forged_signature_and_service_token_cannot_authorize() {
 }
 
 #[test]
+fn legacy_project_domain_signature_is_rejected_without_consuming_authorization() {
+    let mut fixture = Fixture::new();
+    let mut legacy = fixture.authorization();
+    // 保留改名前真实域作为兼容边界负例；正文和可信公钥均不变，仅签名域不同。
+    let mut signed_bytes = b"Rockets-IM/POC/device-authorization/v1\0".to_vec();
+    signed_bytes.extend(serde_json::to_vec(&legacy.request).unwrap());
+    legacy.signature = fixture.signer.sign(&signed_bytes).unwrap();
+    fixture.rejects_unchanged(&legacy, AuthorizationError::InvalidSignature);
+
+    let current = fixture.authorization();
+    fixture
+        .roster
+        .apply(&current, KEY_PACKAGE, &fixture.new_key, NOW)
+        .unwrap();
+    assert_eq!(fixture.roster.version(), 1);
+    assert!(fixture.roster.is_trusted("a2"));
+}
+
+#[test]
 fn directory_public_key_replacement_cannot_replace_pinned_key() {
     let mut fixture = Fixture::new();
     let attacker_signer = SignatureKeyPair::new(SignatureScheme::ED25519).unwrap();

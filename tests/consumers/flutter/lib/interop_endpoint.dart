@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:rockets_im_stage0/rockets_im_stage0.dart' as sdk;
+import 'package:rocket_im_stage0/rocket_im_stage0.dart' as sdk;
 
 /// 仅本机验收的串行控制端，不在控制器内替代SDK处理密码操作。
 class InteropEndpoint {

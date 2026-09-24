@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""验证隔离密码候选；日志和临时产物仅写入 dist/crypto-probes。"""
+"""验证隔离密码候选；日志和临时产物写入指定目录，默认 dist/crypto-probes。"""
 
 import argparse
 from datetime import datetime, timezone
@@ -22,8 +22,8 @@ OUTPUT = ROOT / "dist" / "crypto-probes"
 CANDIDATES = ("vodozemac", "openmls")
 
 
-def run(candidate, label, arguments, environment):
-    log = OUTPUT / "logs" / f"{candidate}-{label}.log"
+def run(candidate, label, arguments, environment, output_directory):
+    log = output_directory / "logs" / f"{candidate}-{label}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("w") as output:
         output.write("command: " + " ".join(map(str, arguments)) + "\n")
@@ -36,12 +36,12 @@ def run(candidate, label, arguments, environment):
     return result.returncode == 0
 
 
-def verify(candidate, mode):
+def verify(candidate, mode, output_directory):
     manifest = ROOT / "poc" / f"{candidate}-probe" / "Cargo.toml"
     lockfile = manifest.with_name("Cargo.lock")
     if not lockfile.is_file():
         raise RuntimeError(f"缺少已锁定依赖: {lockfile}")
-    target = OUTPUT / "target" / candidate
+    target = output_directory / "target" / candidate
     environment = {**os.environ, "CARGO_TARGET_DIR": str(target)}
     toolchain = tomllib.loads((ROOT / "poc/rust-toolchain.toml").read_text())["toolchain"]["channel"]
     cargo = ["cargo", f"+{toolchain}"]
@@ -54,11 +54,11 @@ def verify(candidate, mode):
             ("run", cargo + ["run", *base, "--release"]),
         ]
         for label, arguments in commands:
-            if not run(candidate, label, arguments, environment):
+            if not run(candidate, label, arguments, environment, output_directory):
                 return False
         return True
     if not run(candidate, "wasm-build", cargo + ["build", *base, "--release", "--lib",
-                                                "--target", "wasm32-unknown-unknown"], environment):
+                                                "--target", "wasm32-unknown-unknown"], environment, output_directory):
         return False
     if shutil.which("wasm-bindgen") is None:
         raise RuntimeError("WASM 构建后仍需匹配锁文件版本的 wasm-bindgen CLI，未生成浏览器包")
@@ -69,9 +69,9 @@ def verify(candidate, mode):
         raise RuntimeError(f"wasm-bindgen CLI 与锁文件不匹配: {cli}, {versions}")
     package = tomllib.loads(manifest.read_text())["package"]["name"].replace("-", "_")
     wasm = target / "wasm32-unknown-unknown" / "release" / f"{package}.wasm"
-    output = OUTPUT / "browser" / candidate
+    output = output_directory / "browser" / candidate
     return run(candidate, "wasm-bindgen", ["wasm-bindgen", str(wasm), "--target", "web",
-                                           "--out-dir", str(output), "--out-name", "probe"], environment)
+                                           "--out-dir", str(output), "--out-name", "probe"], environment, output_directory)
 
 
 class BrowserProbeHandler(SimpleHTTPRequestHandler):
@@ -93,8 +93,8 @@ class BrowserProbeHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-def serve():
-    browser = OUTPUT / "browser"
+def serve(output_directory):
+    browser = output_directory / "browser"
     if not browser.is_dir():
         raise RuntimeError(f"浏览器产物目录不存在: {browser}；请先执行 wasm 构建")
     for name in ("index.html", "build.json"):
@@ -122,12 +122,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("native", "wasm", "serve"))
     parser.add_argument("--candidate", choices=CANDIDATES)
+    parser.add_argument("--output", type=Path, default=OUTPUT, help="独立构建、报告与浏览器产物目录")
     args = parser.parse_args()
+    output_directory = args.output.resolve()
     if args.mode == "serve":
         if args.candidate:
             parser.error("serve 使用已有构建清单，不接受 --candidate")
         try:
-            return serve()
+            return serve(output_directory)
         except (RuntimeError, OSError) as error:
             print(f"FAIL serve: {error}", file=sys.stderr)
             return 1
@@ -136,7 +138,7 @@ def main():
     candidates = (args.candidate,) if args.candidate else CANDIDATES
     build = None
     if args.mode == "wasm":
-        browser = OUTPUT / "browser"
+        browser = output_directory / "browser"
         browser.mkdir(parents=True, exist_ok=True)
         build = {"status": "building", "id": str(uuid.uuid4()),
                  "created_at": datetime.now(timezone.utc).isoformat(), "candidates": []}
@@ -145,7 +147,7 @@ def main():
     ok = True
     for candidate in candidates:
         try:
-            ok = verify(candidate, args.mode) and ok
+            ok = verify(candidate, args.mode, output_directory) and ok
         except (RuntimeError, OSError, subprocess.SubprocessError) as error:
             print(f"FAIL {candidate}: {error}", file=sys.stderr)
             ok = False
@@ -153,12 +155,12 @@ def main():
         build["status"] = "ready" if ok else "failed"
         if ok:
             for candidate in candidates:
-                wasm = OUTPUT / "browser" / candidate / "probe_bg.wasm"
+                wasm = output_directory / "browser" / candidate / "probe_bg.wasm"
                 lockfile = ROOT / "poc" / f"{candidate}-probe" / "Cargo.lock"
                 build["candidates"].append({"name": candidate,
                     "wasm_sha256": hashlib.sha256(wasm.read_bytes()).hexdigest(),
                     "lock_sha256": hashlib.sha256(lockfile.read_bytes()).hexdigest()})
-        (OUTPUT / "browser/build.json").write_text(json.dumps(build, indent=2) + "\n")
+        (output_directory / "browser/build.json").write_text(json.dumps(build, indent=2) + "\n")
         if ok:
             print("浏览器装置已生成，仍须通过 HTTP 在真实浏览器执行；本脚本不将构建当成运行通过。")
     return 0 if ok else 1

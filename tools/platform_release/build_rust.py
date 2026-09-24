@@ -28,11 +28,11 @@ def source_digests():
             if p.is_file() and p.suffix in (".rs", ".toml", ".lock")}
 
 
-def environment():
+def environment(output=OUTPUT):
     env = os.environ.copy()
     env.update(CARGO_HOME=str(ROOT / "dist/toolchains/rust/cargo"),
                RUSTUP_HOME=str(ROOT / "dist/toolchains/rust/rustup"),
-               CARGO_TARGET_DIR=str(OUTPUT / "target"), CARGO_NET_OFFLINE="true")
+               CARGO_TARGET_DIR=str(output / "target"), CARGO_NET_OFFLINE="true")
     env["PATH"] = env["CARGO_HOME"] + "/bin:" + env.get("PATH", "")
     return env
 
@@ -45,20 +45,24 @@ def main():
     parser.add_argument("--generate-wasm", action="store_true")
     parser.add_argument("--generate-node", action="store_true")
     parser.add_argument("--flutter-xcframework", action="store_true")
+    parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--ndk", type=Path,
                         default=Path.home() / "Library/Android/sdk/ndk/28.2.13676358")
     args = parser.parse_args()
     if not (args.target or args.checks or args.generate_uniffi or args.generate_wasm or args.generate_node or args.flutter_xcframework):
         parser.error("必须明确选择构建、检查或生成操作")
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    output = args.output.resolve()
+    if not output.is_relative_to((ROOT / "dist").resolve()):
+        parser.error("构建输出必须位于项目dist目录内")
+    output.mkdir(parents=True, exist_ok=True)
     run_id = str(uuid.uuid4())
-    run = OUTPUT / "rust-runs" / run_id
+    run = output / "rust-runs" / run_id
     run.mkdir(parents=True)
     report = {"run_id": run_id, "status": "RUNNING", "scope": "maintainer_release_build",
               "started_at": datetime.now(timezone.utc).isoformat(), "steps": [],
               "source_before": source_digests(), "outputs": {}}
     report_path = run / "report.json"
-    env = environment()
+    env = environment(output)
 
     def save():
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
@@ -97,7 +101,7 @@ def main():
             targets.append("wasm32-unknown-unknown")
         for target in targets:
             extra = {}
-            packages = ["rockets-bindings-uniffi", "rockets-bindings-flutter"]
+            packages = ["rocket-bindings-uniffi", "rocket-bindings-flutter"]
             if target.endswith("linux-android"):
                 triple = "aarch64-linux-android" if target.startswith("aarch64") else "x86_64-linux-android"
                 compiler = args.ndk / "toolchains/llvm/prebuilt/darwin-x86_64/bin" / (triple + "23-clang")
@@ -109,29 +113,29 @@ def main():
                 extra["CC_" + target.replace("-", "_")] = str(compiler)
                 extra["AR_" + target.replace("-", "_")] = str(compiler.parent / "llvm-ar")
             if target.startswith("wasm"):
-                packages = ["rockets-bindings-wasm"]
+                packages = ["rocket-bindings-wasm"]
             selection = [arg for package in packages for arg in ("-p", package)]
             execute("build-" + target, cargo + ["build", *fixed, "--release", "--lib",
                                                 "--target", target, *selection], extra)
-            folder = OUTPUT / "target" / target / "release"
+            folder = output / "target" / target / "release"
             if target.startswith("wasm"):
-                record(folder / "rockets_stage0_wasm.wasm")
+                record(folder / "rocket_stage0_wasm.wasm")
             else:
                 for library in ("uniffi", "flutter"):
                     suffix = ".so" if "android" in target else ".a"
-                    record(folder / ("librockets_stage0_" + library + suffix))
+                    record(folder / ("librocket_stage0_" + library + suffix))
         if args.generate_uniffi:
             # 绑定元数据来自当前源码构建的宿主库，不能误用先前生成器/动态库。
             execute("build-uniffi-generator", cargo + ["build", *fixed, "--release",
-                "-p", "rockets-bindings-uniffi", "--features", "bindgen",
-                "--lib", "--bin", "rockets-uniffi-bindgen"])
-            generator = OUTPUT / "target/release/rockets-uniffi-bindgen"
-            library = OUTPUT / "target/release/librockets_stage0_uniffi.dylib"
+                "-p", "rocket-bindings-uniffi", "--features", "bindgen",
+                "--lib", "--bin", "rocket-uniffi-bindgen"])
+            generator = output / "target/release/rocket-uniffi-bindgen"
+            library = output / "target/release/librocket_stage0_uniffi.dylib"
             record(generator)
             record(library)
             config = WORKSPACE / "crates/bindings-uniffi/uniffi.toml"
             for language in ("swift", "kotlin"):
-                destination = OUTPUT / "generated" / language
+                destination = output / "generated" / language
                 destination.mkdir(parents=True, exist_ok=True)
                 execute("generate-" + language, [str(generator), "generate", "--library",
                     str(library), "--language", language, "--config", str(config),
@@ -144,19 +148,19 @@ def main():
             if not generate:
                 continue
             tool = OUTPUT / "codegen/wasm-bindgen-0.2.128-aarch64-apple-darwin/wasm-bindgen-0.2.128-aarch64-apple-darwin/wasm-bindgen"
-            destination = OUTPUT / "generated" / folder
+            destination = output / "generated" / folder
             destination.mkdir(parents=True, exist_ok=True)
-            execute("generate-" + folder, [str(tool), str(OUTPUT / "target/wasm32-unknown-unknown/release/rockets_stage0_wasm.wasm"),
-                    "--target", target, "--out-name", "rockets_stage0_wasm", "--out-dir", str(destination)])
+            execute("generate-" + folder, [str(tool), str(output / "target/wasm32-unknown-unknown/release/rocket_stage0_wasm.wasm"),
+                    "--target", target, "--out-name", "rocket_stage0_wasm", "--out-dir", str(destination)])
             for path in sorted(destination.rglob("*")):
                 if path.is_file():
                     record(path)
         if args.flutter_xcframework:
-            directory = OUTPUT / "flutter-native" / run_id
+            directory = output / "flutter-native" / run_id
             directory.mkdir(parents=True)
-            library = "librockets_stage0_flutter.a"
+            library = "librocket_stage0_flutter.a"
             simulator = directory / library
-            release = OUTPUT / "target"
+            release = output / "target"
             execute("flutter-lipo", ["xcrun", "lipo", "-create",
                 str(release / "aarch64-apple-ios-sim/release" / library),
                 str(release / "x86_64-apple-ios/release" / library), "-output", str(simulator)])
@@ -167,17 +171,17 @@ def main():
                 ("device", release / "aarch64-apple-ios/release" / library, "iPhoneOS"),
                 ("simulator", simulator, "iPhoneSimulator"),
             ):
-                bundle = directory / variant / "RocketsStage0Flutter.framework"
+                bundle = directory / variant / "RocketStage0Flutter.framework"
                 bundle.mkdir(parents=True)
-                shutil.copy2(binary, bundle / "RocketsStage0Flutter")
-                info = {"CFBundleExecutable": "RocketsStage0Flutter",
-                        "CFBundleIdentifier": "dev.rocketsim.stage0.flutter",
-                        "CFBundleName": "RocketsStage0Flutter", "CFBundlePackageType": "FMWK",
+                shutil.copy2(binary, bundle / "RocketStage0Flutter")
+                info = {"CFBundleExecutable": "RocketStage0Flutter",
+                        "CFBundleIdentifier": "dev.rocketim.stage0.flutter",
+                        "CFBundleName": "RocketStage0Flutter", "CFBundlePackageType": "FMWK",
                         "CFBundleVersion": "1", "CFBundleShortVersionString": "0.1.0",
                         "CFBundleSupportedPlatforms": [platform], "MinimumOSVersion": "13.0"}
                 (bundle / "Info.plist").write_bytes(plistlib.dumps(info))
                 slices.extend(("-framework", str(bundle)))
-            framework = directory / "RocketsStage0Flutter.xcframework"
+            framework = directory / "RocketStage0Flutter.xcframework"
             execute("flutter-xcframework", ["xcodebuild", "-create-xcframework", *slices,
                 "-output", str(framework)])
             for path in sorted(framework.rglob("*")):

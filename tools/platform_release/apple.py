@@ -17,7 +17,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = "0.1.0-stage0.1"
 DEFAULT_OUTPUT = ROOT / "dist/platform-release/swift"
-FRAMEWORK = "RocketsIMStage0FFI.xcframework"
+FRAMEWORK = "RocketIMStage0FFI.xcframework"
 
 
 def sha(path):
@@ -57,19 +57,19 @@ def pack(args):
         raise RuntimeError("需要真实UniFFI Swift、C header和唯一modulemap，不能使用占位绑定")
     with tempfile.TemporaryDirectory(prefix="swift-package-", dir=output) as temporary:
         stage = Path(temporary)
-        package = stage / "RocketsIMStage0"
-        generated = package / "Sources/RocketsIMStage0/Generated"; generated.mkdir(parents=True)
+        package = stage / "RocketIMStage0"
+        generated = package / "Sources/RocketIMStage0/Generated"; generated.mkdir(parents=True)
         shutil.copy2(ROOT / "src/sdk/swift/Package.swift", package / "Package.swift")
-        for path in (ROOT / "src/sdk/swift/Sources/RocketsIMStage0").glob("*.swift"):
+        for path in (ROOT / "src/sdk/swift/Sources/RocketIMStage0").glob("*.swift"):
             shutil.copy2(path, generated.parent / path.name)
         for path in swift:
             shutil.copy2(path, generated / path.name)
-        shutil.copytree(ROOT / "dist/platform-release/licenses", package / "licenses")
+        shutil.copytree(args.licenses, package / "licenses")
         include = stage / "headers"; include.mkdir()
         for path in headers:
             shutil.copy2(path, include / path.name)
         shutil.copy2(maps[0], include / "module.modulemap")
-        simulator = stage / "librockets_stage0_uniffi.a"
+        simulator = stage / "librocket_stage0_uniffi.a"
         command(["xcrun", "lipo", "-create", libraries["sim_arm64_lib"], libraries["sim_x86_64_lib"], "-output", simulator],
                 ROOT, logs / "lipo.log")
         arches = {"device": command(["xcrun", "lipo", "-archs", libraries["device_lib"]], ROOT, logs / "device-arches.log").strip(),
@@ -83,7 +83,7 @@ def pack(args):
         manifest = {"version": VERSION, "architectures": arches, "xcframework_libraries": info["AvailableLibraries"],
                     "files_sha256": {str(p.relative_to(package)):sha(p) for p in sorted(package.rglob("*")) if p.is_file()}}
         write_json(package / "artifact.json", manifest)
-        archive = output / ("RocketsIMStage0-" + VERSION + ".zip")
+        archive = output / ("RocketIMStage0-" + VERSION + ".zip")
         # Cargo归档可保留早于1980年的可复现时间戳；ZIP仅规范元数据，许可证正文不变。
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as bundle:
             for path in sorted(package.rglob("*")):
@@ -108,10 +108,10 @@ def extract(archive, destination):
 def verify(args):
     output = args.output.resolve(); output.mkdir(parents=True, exist_ok=True)
     run_id = str(uuid.uuid4())
-    consumer = ROOT / "dist/platform-release/consumers/swift" / run_id
+    consumer = output / "consumers" / run_id
     shutil.copytree(ROOT / "tests/consumers/swift", consumer)
     vendor = consumer / "Vendor"; vendor.mkdir(); extract(args.archive, vendor)
-    package = vendor / "RocketsIMStage0"
+    package = vendor / "RocketIMStage0"
     report = {"run_id":run_id, "status":"RUNNING", "version":VERSION, "archive":str(args.archive.resolve()),
               "archive_sha256":sha(args.archive), "consumer":str(consumer), "cases":[],
               "source_sha256_before":source_hashes(),
@@ -146,7 +146,7 @@ def verify(args):
                      "PRODUCT_BUNDLE_IDENTIFIER=" + bundle_id, "build"], consumer, consumer / (name + "-build.log"), expected=expected)
             return derived / "Build/Products" / ("Release-iphoneos" if generic else "Release-iphonesimulator") / "Stage0Consumer.app"
 
-        base_bundle = "dev.rocketsim.stage0.consumer.r" + run_id.replace("-", "")[:12]
+        base_bundle = "dev.rocketim.stage0.consumer.r" + run_id.replace("-", "")[:12]
         application = build("public_api", base_bundle + ".normal")
         report["cases"].append({"name":"simulator_release_build", "status":"PASS"})
         build("device_release", base_bundle + ".device", generic=True)
@@ -176,7 +176,7 @@ def verify(args):
         normal = run_application("public_api", application, base_bundle + ".normal")
         if normal["status"] != "PASS" or len(normal.get("checks", [])) < 10:
             raise RuntimeError("独立Swift消费真实预编译包失败")
-        wrapper = package / "Sources/RocketsIMStage0/Stage0Device.swift"; original = wrapper.read_text()
+        wrapper = package / "Sources/RocketIMStage0/Stage0Device.swift"; original = wrapper.read_text()
         changed = original.replace(f'public let stage0SDKVersion = "{VERSION}"', 'public let stage0SDKVersion = "0.0.0-invalid"')
         if changed == original:
             raise RuntimeError("没有向解压后的SDK副本注入包与binary版本差异")
@@ -194,7 +194,7 @@ def verify(args):
         try:
             build("missing_binary", base_bundle + ".missing", expected=1)
             missing_log = (consumer / "missing_binary-build.log").read_text()
-            if "RocketsIMStage0FFI" not in missing_log or "does not contain a binary artifact" not in missing_log:
+            if "RocketIMStage0FFI" not in missing_log or "does not contain a binary artifact" not in missing_log:
                 raise RuntimeError("缺失二进制负例没有得到具体binary artifact缺失诊断")
             report["cases"].append({"name":"missing_binary", "status":"FAIL", "expected_failure":True,
                                     "assertion":"新DerivedData消费缺失XCFramework明确失败，未调用Rust构建"})
@@ -237,6 +237,7 @@ def main():
     package = sub.add_parser("pack")
     for option in ("generated", "device-lib", "sim-arm64-lib", "sim-x86_64-lib"):
         package.add_argument("--" + option, type=Path, required=True)
+    package.add_argument("--licenses", type=Path, default=ROOT / "dist/platform-release/licenses")
     package.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     test = sub.add_parser("verify"); test.add_argument("--archive", type=Path, required=True)
     test.add_argument("--device", help="既有模拟器UDID；缺省选择已关闭的可用iPhone")

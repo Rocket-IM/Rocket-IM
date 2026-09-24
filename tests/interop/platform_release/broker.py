@@ -82,6 +82,7 @@ class Broker:
         self.states = {name: {"ready": None, "pending": None, "delivered": False,
                               "response": None, "timed_out": False} for name in endpoints}
         self.sequence, self.transcript = 0, []
+        self.connection_sequence = 0
         self.http_errors = deque(maxlen=32)
         self.closing = False
         self.browser_directory = None
@@ -100,6 +101,14 @@ class Broker:
                 self.http_errors.append({"origin": "harness", "code": "harness_error",
                                          "reason": str(error) if isinstance(error, ProtocolError) else "invalid_request_or_connection"})
 
+    def record_control_event(self, event, endpoint, command_id=None, transport=None):
+        """仅记录已校验的控制标识和时序，不保存请求、响应或异常正文。"""
+        with self.condition:
+            with (self.output / "control-events.jsonl").open("a") as stream:
+                stream.write(json.dumps({"time_epoch": time.time(), "event": event,
+                                         "endpoint": endpoint, "command_id": command_id,
+                                         "transport": transport}) + "\n")
+
     def handler(self):
         broker = self
 
@@ -110,6 +119,17 @@ class Broker:
             def setup(self):
                 super().setup()
                 self.connection.settimeout(15)
+                with broker.condition:
+                    broker.connection_sequence += 1
+                    self.control_connection_id = broker.connection_sequence
+
+            def control(self, event, endpoint, command_id=None):
+                connection = self.headers.get("Connection", "absent").lower()
+                broker.record_control_event(event, endpoint, command_id, {
+                    "connection_id": self.control_connection_id,
+                    "request_version": self.request_version if self.request_version in {"HTTP/1.0", "HTTP/1.1"} else "other",
+                    "request_connection": connection if connection in {"close", "keep-alive", "absent"} else "other",
+                    "response_version": self.protocol_version})
 
             def send_json(self, status, body=None):
                 data = b"" if body is None else json.dumps(body).encode()
@@ -117,6 +137,8 @@ class Broker:
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-store")
+                # 本控制器每请求关闭HTTP/1.0连接，明确通知Android客户端不要将该连接返池。
+                self.send_header("Connection", "close")
                 self.end_headers()
                 if data:
                     self.wfile.write(data)
@@ -139,6 +161,7 @@ class Broker:
                     name, action = self.route()
                     if action != "next":
                         raise ProtocolError("invalid_action")
+                    self.control("poll_received", name)
                     deadline = time.monotonic() + 10
                     with broker.condition:
                         state = broker.states[name]
@@ -151,7 +174,10 @@ class Broker:
                         if not broker.closing and state["pending"] and not state["delivered"] and not state["timed_out"]:
                             state["delivered"] = True
                             command = state["pending"]
+                            self.control("command_delivered", name, command["command_id"])
                     self.send_json(200, command) if command else self.send_json(204)
+                    if command:
+                        self.control("command_written", name, command["command_id"])
                 except (ValueError, OSError) as error:
                     broker.record_http_error(error)
                     if isinstance(error, ValueError):
@@ -160,6 +186,8 @@ class Broker:
             def do_POST(self):
                 try:
                     name, action = self.route()
+                    if action in {"ready", "result"}:
+                        self.control("post_received", name)
                     length = int(self.headers.get("Content-Length", "-1"))
                     if not 0 <= length <= LIMIT:
                         raise ProtocolError("invalid_content_length")
@@ -168,6 +196,7 @@ class Broker:
                         raise ProtocolError("response_scope_mismatch")
                     with broker.condition:
                         state = broker.states[name]
+                        command_id = None
                         if broker.closing:
                             raise ProtocolError("broker_closed")
                         if action == "ready":
@@ -181,10 +210,13 @@ class Broker:
                                     or body.get("command_id") != command["command_id"] or state["response"] is not None):
                                 raise ProtocolError("unexpected_or_duplicate_result")
                             state["response"] = validate_result(body, command)
+                            command_id = command["command_id"]
+                            self.control("result_received", name, command_id)
                         else:
                             raise ProtocolError("invalid_action")
                         broker.condition.notify_all()
                     self.send_json(200, {"ok": True})
+                    self.control("ack_written", name, command_id)
                 except (ValueError, OSError) as error:
                     broker.record_http_error(error)
                     if isinstance(error, ValueError):

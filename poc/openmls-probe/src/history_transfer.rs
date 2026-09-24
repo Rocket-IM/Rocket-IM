@@ -23,15 +23,12 @@ pub fn request_digest(request: &SignedRecord) -> Result<String, PermissionError>
     let raw = bytes(&request.statement_bytes, 16 * 1024)?;
     let signature = bytes(&request.signature_bytes, 64)?;
     Ok(digest(
-        b"Rockets-IM/POC/history-request-digest/v1\0",
+        b"Rocket-IM/POC/history-request-digest/v1\0",
         &[&raw, &signature],
     ))
 }
 pub fn ciphertext_digest(kem: &[u8], ciphertext: &[u8]) -> String {
-    digest(
-        b"Rockets-IM/POC/history-ciphertext/v1\0",
-        &[kem, ciphertext],
-    )
+    digest(b"Rocket-IM/POC/history-ciphertext/v1\0", &[kem, ciphertext])
 }
 pub fn package_digest(package: &Package) -> Result<String, PermissionError> {
     let raw = bytes(&package.statement_bytes, 16 * 1024)?;
@@ -39,13 +36,13 @@ pub fn package_digest(package: &Package) -> Result<String, PermissionError> {
     let kem = bytes(&package.kem_output, 32)?;
     let ciphertext = bytes(&package.ciphertext, MAX_BODY + 16)?;
     Ok(digest(
-        b"Rockets-IM/POC/history-package-digest/v1\0",
+        b"Rocket-IM/POC/history-package-digest/v1\0",
         &[&raw, &signature, &kem, &ciphertext],
     ))
 }
 pub fn hpke_info(request: &SignedRecord) -> Result<Vec<u8>, PermissionError> {
     let hash = request_digest(request)?;
-    let mut info = b"Rockets-IM/POC/history-hpke/v1\0".to_vec();
+    let mut info = b"Rocket-IM/POC/history-hpke/v1\0".to_vec();
     // 摘要由上面的固定实现生成，仅转换为32个原始字节。
     for i in (0..hash.len()).step_by(2) {
         info.push(u8::from_str_radix(&hash[i..i + 2], 16).map_err(|_| invalid())?);

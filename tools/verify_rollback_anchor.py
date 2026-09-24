@@ -74,11 +74,10 @@ def digest(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    release = ROOT / "dist/crypto-probes/target/openmls/release"
-    parser.add_argument("--binary", type=Path, default=release / "openmls-state-lab")
-    parser.add_argument("--helper", type=Path, default=release / "openmls-rollback-anchor")
-    parser.add_argument("--permission-verifier", type=Path, default=release / "openmls-permission-verify")
-    parser.add_argument("--receipt-signer", type=Path, default=release / "openmls-relay-receipt")
+    parser.add_argument("--binary", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
+    parser.add_argument("--helper", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
+    parser.add_argument("--permission-verifier", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
+    parser.add_argument("--receipt-signer", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
     parser.add_argument("--case", action="append", choices=[case[0] for case in CASES])
     parser.add_argument("--output", type=Path, default=ROOT / "dist/rollback-anchor")
     args = parser.parse_args()

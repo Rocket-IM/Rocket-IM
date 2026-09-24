@@ -202,7 +202,7 @@ fn signed_digest_rejects_short_signatures_and_oversized_or_noncanonical_base64()
     };
     assert_eq!(
         signed_digest(&record).unwrap(),
-        "cdb8c979d86e1d76a250839cd11844179c69b00f923629145198d0d2891cabf7"
+        "611eed9e4d17b367c0333335c913b25252a2fa4e86f6b04f4d0ddcddad2bba0d"
     );
 }
 

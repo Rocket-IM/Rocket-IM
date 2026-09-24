@@ -49,7 +49,7 @@ def reject(lab, packet, logical="M1", attempt="P1", **submit_fields):
     raw_header = base64.b64decode(envelope["header_bytes"], validate=True)
     raw_payload = base64.b64decode(envelope["payload_bytes"], validate=True)
     header = json.loads(raw_header)
-    digest = hashlib.sha256(b"Rockets-IM/POC/message-envelope/v1\0" + len(raw_header).to_bytes(8, "big") + raw_header
+    digest = hashlib.sha256(b"Rocket-IM/POC/message-envelope/v1\0" + len(raw_header).to_bytes(8, "big") + raw_header
                             + len(raw_payload).to_bytes(8, "big") + raw_payload).hexdigest()
     check(fact["protocol_version"] == "rim-message-rejection-1"
           and fact["code"] == proof["code"] and fact["outcome"] == proof["outcome"]

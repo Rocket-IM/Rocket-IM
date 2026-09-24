@@ -52,7 +52,7 @@ class ExchangeContractTests(unittest.TestCase):
                                  {"$ref": "#/$defs/PermissionSignatureBytes"})
                 self.assertEqual(definition["x-statement-schema"], {"$ref": "#/$defs/" + statement})
                 self.assertEqual(definition["x-signing-domain-utf8"],
-                                 f"Rockets-IM/POC/consistency-exchange-{kind.lower()}/v1\0")
+                                 f"Rocket-IM/POC/consistency-exchange-{kind.lower()}/v1\0")
                 self.assertEqual(DEFINITIONS[byte_schema]["x-max-decoded-bytes"], limit)
                 self.assertEqual(DEFINITIONS[statement]["x-max-utf8-json-bytes"], limit)
 

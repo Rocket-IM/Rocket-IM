@@ -59,7 +59,7 @@ export async function boundaryCases(k, api) {
     assert.deepEqual(result, { ok: 64, QUEUE_FULL: 6 }); await close(p); return result;
   });
   await k.check("wasm_version_mismatch_explicit_rejection", async () => {
-    const rule = "**/generated/rockets_browser_storage_probe.js";
+    const rule = "**/generated/rocket_browser_storage_probe.js";
     await k.context().route(rule, async route => {
       const response = await route.fetch();
       await route.fulfill({ response, body: (await response.text()) + '\nprobe_version = () => "incompatible-test-version";\n' });

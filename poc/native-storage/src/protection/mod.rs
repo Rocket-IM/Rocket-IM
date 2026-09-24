@@ -11,7 +11,7 @@ use record::{Locator, Record, Trust};
 use std::path::Path;
 use zeroize::Zeroizing;
 
-const SERVICE: &str = "org.rockets-im.native-protected.v1";
+const SERVICE: &str = "org.rocket-im.native-protected.v1";
 
 #[derive(Clone)]
 pub(crate) struct Guard {

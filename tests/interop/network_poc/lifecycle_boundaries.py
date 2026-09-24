@@ -117,6 +117,10 @@ def old_program(lab):
     finally:
         lab.binary = current_binary
     check(snapshot(lab) == before, '旧程序未知事件失败后改写状态')
+    lab.case_evidence.update(old_binary=str(lab.old_binary), old_page_error=error,
+        before_snapshot_sha256=before, signed_page=page.wrapper)
+    check(error['code'] == 'stream_page_invalid' and 'message_availability' in error['message'],
+          '旧程序必须在未知生命周期事件处拒绝；错钥、旧命名域或启动失败不能代替此验证')
     lab.download('b1', page)
     final = finished(lab, 'b1', 'deleted', 'queued')
     after = snapshot(lab)
@@ -126,6 +130,8 @@ def old_program(lab):
     finally:
         lab.binary = current_binary
     check(snapshot(lab) == after, '旧程序读取新快照失败后改写状态')
+    check(load_error['code'] == 'state_decoding',
+          '旧程序必须在新快照结构解码处拒绝；密码上下文失败不能代替此验证')
     lab.case_evidence.update(old_binary=str(lab.old_binary), old_page_error=error,
         old_snapshot_error=load_error, before_snapshot_sha256=before, after_snapshot_sha256=after,
         signed_page=page.wrapper, final=final, final_relay=relay_records(lab))

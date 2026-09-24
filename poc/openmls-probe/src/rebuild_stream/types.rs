@@ -9,11 +9,11 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const REQUEST_DOMAIN: &[u8] = b"Rockets-IM/POC/rebuild-stream-request/v1\0";
-pub const BINDING_DOMAIN: &[u8] = b"Rockets-IM/POC/rebuild-stream-binding/v1\0";
-pub const PULL_DOMAIN: &[u8] = b"Rockets-IM/POC/rebuild-stream-pull/v1\0";
-pub const PAGE_DOMAIN: &[u8] = b"Rockets-IM/POC/rebuild-stream-page/v1\0";
-pub const SIGNED_DIGEST_DOMAIN: &[u8] = b"Rockets-IM/POC/rebuild-stream-signed-digest/v1\0";
+pub const REQUEST_DOMAIN: &[u8] = b"Rocket-IM/POC/rebuild-stream-request/v1\0";
+pub const BINDING_DOMAIN: &[u8] = b"Rocket-IM/POC/rebuild-stream-binding/v1\0";
+pub const PULL_DOMAIN: &[u8] = b"Rocket-IM/POC/rebuild-stream-pull/v1\0";
+pub const PAGE_DOMAIN: &[u8] = b"Rocket-IM/POC/rebuild-stream-page/v1\0";
+pub const SIGNED_DIGEST_DOMAIN: &[u8] = b"Rocket-IM/POC/rebuild-stream-signed-digest/v1\0";
 pub const STATEMENT_LIMIT: usize = 16 * 1024;
 pub const REGISTRATION_LIMIT: usize = 1024 * 1024;
 pub const PAGE_BYTES_LIMIT: usize = 740 * 1024;

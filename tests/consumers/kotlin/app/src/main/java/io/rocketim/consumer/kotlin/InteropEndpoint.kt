@@ -1,17 +1,20 @@
-package io.rocketsim.consumer.kotlin
+package io.rocketim.consumer.kotlin
 
 import android.util.Base64
-import io.rocketsim.stage0.DeviceException
-import io.rocketsim.stage0.Stage0Device
-import io.rocketsim.stage0.sdkVersion
+import android.util.Log
+import io.rocketim.stage0.DeviceException
+import io.rocketim.stage0.Stage0Device
+import io.rocketim.stage0.sdkVersion
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
+import java.io.IOException
 
 /** 本机互通装置；只串行调用已发布SDK，不实现密码处理或有状态命令重试。 */
 class InteropEndpoint(url: String, private val runId: String, private val endpointId: String) {
     private val handles = mutableMapOf<String, Stage0Device>()
     private val seenCommands = mutableSetOf<String>()
+    private var currentCommandId = "none"
     @Volatile private var active = true
     @Volatile private var connection: HttpURLConnection? = null
     private val base: String
@@ -39,6 +42,7 @@ class InteropEndpoint(url: String, private val runId: String, private val endpoi
                 require(command.get("run_id") == runId) { "command run mismatch" }
                 val commandId = string(command, "command_id")
                 require(validId(commandId) && seenCommands.size < 10_000 && seenCommands.add(commandId)) { "duplicate or excessive commands" }
+                currentCommandId = commandId
                 val op = string(command, "op")
                 val result = JSONObject().put("run_id", runId).put("endpoint_id", endpointId).put("command_id", commandId)
                 try {
@@ -103,6 +107,7 @@ class InteropEndpoint(url: String, private val runId: String, private val endpoi
         check(active) { "endpoint cancelled" }
         val http = URI("$base/$path").toURL().openConnection() as HttpURLConnection
         connection = http
+        var phase = "configure"
         try {
             http.requestMethod = method
             http.instanceFollowRedirects = false
@@ -114,10 +119,13 @@ class InteropEndpoint(url: String, private val runId: String, private val endpoi
                 http.doOutput = true
                 http.setRequestProperty("Content-Type", "application/json")
                 http.setFixedLengthStreamingMode(encoded.size)
+                phase = "write_body"
                 http.outputStream.use { it.write(encoded) }
             }
+            phase = "response_status"
             if (method == "GET" && http.responseCode == 204) return null
             check(http.responseCode == 200) { "HTTP control channel failed: ${http.responseCode}" }
+            phase = "read_body"
             val buffer = java.io.ByteArrayOutputStream()
             http.inputStream.use { input ->
                 val block = ByteArray(8192)
@@ -129,6 +137,19 @@ class InteropEndpoint(url: String, private val runId: String, private val endpoi
                 }
             }
             return JSONObject(buffer.toString("UTF-8"))
+        } catch (error: IOException) {
+            // 只记录固定分类，不输出URL、请求/响应正文、异常原文或重试有状态命令。
+            val reason = when {
+                error.message.orEmpty().startsWith("unexpected end of stream") -> "unexpected_eof"
+                error is java.net.SocketTimeoutException -> "timeout"
+                error is java.net.ConnectException -> "connect_failed"
+                error is java.net.SocketException -> "socket_failed"
+                error is java.io.EOFException -> "eof"
+                else -> "other_io"
+            }
+            val cause = error.cause?.javaClass?.simpleName ?: "none"
+            Log.e("RocketInterop", "transport_failed: $method $path $phase $reason ${error.javaClass.simpleName} $cause $currentCommandId")
+            throw error
         } finally {
             connection = null
             http.disconnect()

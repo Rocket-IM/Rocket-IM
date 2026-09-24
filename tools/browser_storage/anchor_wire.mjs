@@ -4,8 +4,8 @@ import { createHash, createPrivateKey, createPublicKey, sign, verify } from "nod
 export const PROTOCOL = "rim-rollback-anchor-1";
 export const LIMIT = 32 * 1024;
 const STATEMENT_LIMIT = 8 * 1024;
-const REQUEST_DOMAIN = Buffer.from("Rockets-IM/POC/rollback-anchor-request/v1\0");
-const RESPONSE_DOMAIN = Buffer.from("Rockets-IM/POC/rollback-anchor-response/v1\0");
+const REQUEST_DOMAIN = Buffer.from("Rocket-IM/POC/rollback-anchor-request/v1\0");
+const RESPONSE_DOMAIN = Buffer.from("Rocket-IM/POC/rollback-anchor-response/v1\0");
 const PRIVATE_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 const PUBLIC_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 

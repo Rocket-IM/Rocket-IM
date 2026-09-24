@@ -3,12 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 val consumerApplicationId = providers.gradleProperty("interopApplicationId")
-    .orElse("io.rocketsim.consumer.kotlin").get()
+    .orElse("io.rocketim.consumer.kotlin").get()
 require(Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+").matches(consumerApplicationId)) {
     "Invalid consumer application ID"
 }
 android {
-    namespace = "io.rocketsim.consumer.kotlin"
+    namespace = "io.rocketim.consumer.kotlin"
     compileSdk = 36
     defaultConfig {
         applicationId = consumerApplicationId
@@ -24,4 +24,4 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 }
-dependencies { implementation("io.rocketsim:rockets-stage0:0.1.0-stage0.1") }
+dependencies { implementation("io.rocketim:rocket-stage0:0.1.0-stage0.1") }

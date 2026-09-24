@@ -15,7 +15,7 @@ use rusqlite::{Connection, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-const OFFER_DOMAIN: &[u8] = b"Rockets-IM/browser-rebuild-candidate/v1\0";
+const OFFER_DOMAIN: &[u8] = b"Rocket-IM/browser-rebuild-candidate/v1\0";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

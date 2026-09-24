@@ -1,6 +1,6 @@
 mod receive_support;
 use receive_support::*;
-use rockets_native_storage_probe::crypto::{
+use rocket_native_storage_probe::crypto::{
     contract::{DownloadRecord, DownloadRequest, Fault},
     model::Envelope,
     Client,
@@ -205,7 +205,7 @@ fn old_v2_pending_store_is_refused_without_upgrading_or_clearing_reservation() {
     for sql in ddl {
         tx.execute_batch(sql).unwrap();
     }
-    tx.execute_batch("INSERT INTO crypto_meta VALUES(1,'Rockets-IM/native-crypto/sqlite/v2','local','alice','alice-device','0',NULL,NULL,NULL,'','0','0','0'); PRAGMA user_version=2").unwrap();
+    tx.execute_batch("INSERT INTO crypto_meta VALUES(1,'Rocket-IM/native-crypto/sqlite/v2','local','alice','alice-device','0',NULL,NULL,NULL,'','0','0','0'); PRAGMA user_version=2").unwrap();
     tx.execute(
         "INSERT INTO crypto_pending VALUES(1,'init','initialize',?1,'0','')",
         ["0".repeat(64)],

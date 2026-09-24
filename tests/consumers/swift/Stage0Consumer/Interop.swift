@@ -1,11 +1,11 @@
 import Foundation
-import RocketsIMStage0
+import RocketIMStage0
 
 /// 仅供独立消费验证的控制通道。密码对象由串行actor持有，不在UI回调执行。
 enum Interop {
     static func startIfConfigured() -> Bool {
         let environment = ProcessInfo.processInfo.environment
-        let keys = ["ROCKETS_INTEROP_URL", "ROCKETS_INTEROP_RUN_ID", "ROCKETS_INTEROP_ENDPOINT_ID"]
+        let keys = ["ROCKET_INTEROP_URL", "ROCKET_INTEROP_RUN_ID", "ROCKET_INTEROP_ENDPOINT_ID"]
         guard keys.contains(where: { environment[$0] != nil }) else { return false }
         Task {
             do {
@@ -28,11 +28,11 @@ enum Interop {
         let endpointID: String
 
         init(environment: [String: String]) throws {
-            guard let raw = environment["ROCKETS_INTEROP_URL"], let url = URL(string: raw),
+            guard let raw = environment["ROCKET_INTEROP_URL"], let url = URL(string: raw),
                   url.scheme == "http", url.host == "127.0.0.1", url.port != nil,
                   url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
-                  let runID = environment["ROCKETS_INTEROP_RUN_ID"],
-                  let endpointID = environment["ROCKETS_INTEROP_ENDPOINT_ID"],
+                  let runID = environment["ROCKET_INTEROP_RUN_ID"],
+                  let endpointID = environment["ROCKET_INTEROP_ENDPOINT_ID"],
                   validID(runID), validID(endpointID) else {
                 throw HarnessError(code: "configuration_invalid")
             }
@@ -228,7 +228,7 @@ enum Interop {
             let directory = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
                                                         appropriateFor: nil, create: true)
             try data.write(to: directory.appendingPathComponent("interop-result.json"), options: .atomic)
-            print("ROCKETS_INTEROP:" + String(decoding: data, as: UTF8.self))
-        } catch { print("ROCKETS_INTEROP:FAIL recording terminal result") }
+            print("ROCKET_INTEROP:" + String(decoding: data, as: UTF8.self))
+        } catch { print("ROCKET_INTEROP:FAIL recording terminal result") }
     }
 }

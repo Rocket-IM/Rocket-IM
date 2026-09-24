@@ -78,7 +78,7 @@ impl Client {
         let client_public_key = protocol::encode_hex(signing_key.verifying_key().as_bytes());
         let mut fingerprint = protocol::hash(
             &serde_json::to_vec(&(
-                "Rockets-IM/native-anchor-config/v1",
+                "Rocket-IM/native-anchor-config/v1",
                 &config.program,
                 &config.directory,
                 &config.scope,
@@ -91,7 +91,7 @@ impl Client {
             trust.validate(&config.scope)?;
             fingerprint = protocol::hash(
                 &serde_json::to_vec(&(
-                    "Rockets-IM/native-anchor-rebuild-trust/v1",
+                    "Rocket-IM/native-anchor-rebuild-trust/v1",
                     &fingerprint,
                     trust,
                 ))
@@ -102,7 +102,7 @@ impl Client {
             protocol::decode_hex(&origin.client_public_key)?;
             protocol::decode_hex(&origin.fingerprint)?;
             fingerprint = protocol::hash(
-                &serde_json::to_vec(&("Rockets-IM/native-rebuild-origin/v1", &fingerprint, origin))
+                &serde_json::to_vec(&("Rocket-IM/native-rebuild-origin/v1", &fingerprint, origin))
                     .map_err(|_| config_error())?,
             );
         }

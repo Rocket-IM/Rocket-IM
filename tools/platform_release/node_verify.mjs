@@ -10,7 +10,7 @@ import { checkedRelative, command, consumerResult, equalHashes, fail, fileHashes
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const CONSUMER = ["consumer.ts", "package-lock.json", "package.json", "run.mjs", "tsconfig.json"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const WASM = "dist/generated/rockets_stage0_wasm_bg.wasm";
+const WASM = "dist/generated/rocket_stage0_wasm_bg.wasm";
 const now = () => new Date().toISOString();
 
 function options() {
@@ -28,7 +28,7 @@ function validateManifest(value) {
   requireValue(plainObject(value) && value.schema_version === 1 && UUID.test(value.bundle_id)
     && value.target_os === "win32", "invalid_manifest");
   const { sdk, typescript: compiler, provenance } = value;
-  requireValue(plainObject(sdk) && sdk.name === "@rockets-im/stage0-node" && sdk.version === "0.1.0-stage0.1"
+  requireValue(plainObject(sdk) && sdk.name === "@rocket-im/stage0-node" && sdk.version === "0.1.0-stage0.1"
     && plainObject(compiler) && compiler.version === "5.9.3", "invalid_package_contract");
   for (const item of [sdk, compiler]) {
     checkedRelative(item.archive); validateHashes({ [item.archive]: item.sha256 });
@@ -113,7 +113,7 @@ async function install(report, run, inputs, npmCli) {
     "--no-audit", "--no-fund", "--save-exact", "--bin-links=false", inputs.sdk, inputs.compiler], directory,
   { timeoutMs: 120000, env: { npm_config_cache: cache, npm_config_userconfig: userConfig, npm_config_globalconfig: globalConfig,
     npm_config_update_notifier: "false" } });
-  const modules = path.join(directory, "node_modules"), installed = path.join(modules, "@rockets-im/stage0-node");
+  const modules = path.join(directory, "node_modules"), installed = path.join(modules, "@rocket-im/stage0-node");
   report.package_sha256 = await validatePackage(installed, inputs.manifest.sdk);
   report.installed_files_sha256 = await fileHashes(modules);
   const compiler = await readJson(await resolveInput(modules, "typescript/package.json"));

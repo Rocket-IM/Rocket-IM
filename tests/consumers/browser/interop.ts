@@ -1,4 +1,4 @@
-import { initialize, SDK_VERSION, Stage0Device } from "@rockets-im/stage0";
+import { initialize, SDK_VERSION, Stage0Device } from "@rocket-im/stage0";
 
 type JsonObject = { [name: string]: unknown };
 interface Command { run_id: string; command_id: string; op: string; handle: string; args: Record<string, string>; }

@@ -1,5 +1,5 @@
 import Foundation
-import RocketsIMStage0
+import RocketIMStage0
 import UIKit
 
 private struct VerificationFailure: Error, CustomStringConvertible {

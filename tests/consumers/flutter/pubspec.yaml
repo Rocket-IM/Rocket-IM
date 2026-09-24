@@ -1,4 +1,4 @@
-name: rockets_stage0_consumer
+name: rocket_stage0_consumer
 description: Independent consumer of an extracted local release package.
 version: 1.0.0+1
 publish_to: none
@@ -7,7 +7,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  rockets_im_stage0:
+  rocket_im_stage0:
     path: ../installed-package
 flutter:
   uses-material-design: true

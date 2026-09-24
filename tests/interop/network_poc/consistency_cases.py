@@ -63,7 +63,7 @@ def mutate_bytes(encoded):
 def accepted_witness(lab, proof):
     """控制器模拟 Service 双签；只处理公开证明，不读取任何设备私钥。"""
     statement = json.loads(base64.b64decode(proof["statement_bytes"]))
-    digest = hashlib.sha256(b"Rockets-IM/POC/permission-proof/v1\0")
+    digest = hashlib.sha256(b"Rocket-IM/POC/permission-proof/v1\0")
     for field in ("statement_bytes", "signature_bytes", "commit_bytes"):
         raw = base64.b64decode(proof[field])
         digest.update(len(raw).to_bytes(8, "big"))

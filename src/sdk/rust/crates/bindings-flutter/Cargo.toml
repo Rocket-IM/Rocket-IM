@@ -1,16 +1,16 @@
 [package]
-name = "rockets-bindings-flutter"
+name = "rocket-bindings-flutter"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
 [lib]
-name = "rockets_stage0_flutter"
+name = "rocket_stage0_flutter"
 crate-type = ["rlib", "cdylib", "staticlib"]
 
 [dependencies]
-rockets-im-sdk = { path = "../im-sdk", version = "=0.1.0-stage0.1" }
+rocket-im-sdk = { path = "../im-sdk", version = "=0.1.0-stage0.1" }
 flutter_rust_bridge = "=2.11.1"
 
 [lints.rust]

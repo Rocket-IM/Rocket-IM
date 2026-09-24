@@ -186,7 +186,7 @@ fn device_needles(root: &Path, device: &Device, needles: &mut Vec<scan::Needle>)
     checked_path(root, &path)?;
     let before = read_file(root, &path, MAX_FILE_BYTES)?;
     let context =
-        serde_json::to_vec(&("Rockets-IM/state-lab/v1", &device.context)).map_err(|_| "context")?;
+        serde_json::to_vec(&("Rocket-IM/state-lab/v1", &device.context)).map_err(|_| "context")?;
     let plaintext =
         openmls_probe::snapshot::load(&path, &key, &context).map_err(|_| "snapshot_load")?;
     let state: Value = serde_json::from_slice(&plaintext).map_err(|_| "snapshot_json")?;

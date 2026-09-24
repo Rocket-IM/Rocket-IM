@@ -43,6 +43,11 @@ def check_terminal(lab, packet, outcome, *, reason=None, parent=None):
         if outcome == "rejected_final":
             fields.add("code")
             check(value["code"] == reason, "重启后拒绝原因改变")
+            if reason == "state_stale":
+                # 本装置启用真实签名，旧版本拒绝必须保留证明；不能降为可选字段。
+                fields.add("rejection_receipt")
+                check(set(value["rejection_receipt"]) == {"statement_bytes", "signature_bytes"},
+                      "旧版本拒绝缺少完整原签名证明")
         check(set(value) == fields and bool(value["closure_id"]), "拒绝或封口缺少精确结果/唯一封口标识")
     if outcome == "cancelled_before_accept":
         check(record["header_sha256"] is None and record["payload_sha256"] is None,

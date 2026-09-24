@@ -6,8 +6,8 @@ use crate::permission::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const REQUEST_DOMAIN: &[u8] = b"Rockets-IM/POC/consistency-exchange-request/v1\0";
-pub const PACKAGE_DOMAIN: &[u8] = b"Rockets-IM/POC/consistency-exchange-package/v1\0";
+pub const REQUEST_DOMAIN: &[u8] = b"Rocket-IM/POC/consistency-exchange-request/v1\0";
+pub const PACKAGE_DOMAIN: &[u8] = b"Rocket-IM/POC/consistency-exchange-package/v1\0";
 pub const REQUEST_LIMIT: usize = 16 * 1024;
 pub const PACKAGE_LIMIT: usize = 512 * 1024;
 

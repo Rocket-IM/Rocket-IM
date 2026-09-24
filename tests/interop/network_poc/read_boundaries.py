@@ -9,6 +9,7 @@ import subprocess
 from .deletion_observer import relay_records
 from .deletion_support import check_deleted_slot, delete
 from .fixture import check, identity
+from .lifecycle_support import notification
 from .permission_cases import prepare as prepare_permission, submit as submit_permission
 from .read_support import (finish, inspect, load_messages, mark, pending, publish,
                            refuse, report, snapshot, synchronize)
@@ -119,9 +120,12 @@ def project_deleted(lab, record):
     delete(lab, record["accepted"])
     page = lab.pull("b1")
     check_deleted_slot(page["events"][0], original["events"][0])
+    notice = notification(page, original["events"][0], record["accepted"], "deleted")
     downloaded = lab.download("b1", page)
     processed = lab.rust("b1", "wire_process")
-    check(processed["results"] == [] and inspect(lab) == before, "删除重发已处理消息或改变既有阅读意图")
+    check(processed["results"] == [{"event_id": notice["event_id"], "event_seq": notice["event_seq"],
+                                    "result": {"status": "availability_recorded"}}]
+          and inspect(lab) == before, "删除未精确处理生命周期通知，或重发消息/改变既有阅读意图")
     slot = lab.rust("b1", "wire_slot_inspect", event_seq="1")
     check(slot["slot"]["availability"] == "deleted" and slot["result"]["status"] == "valid",
           "删除投影未保留原成功处理事实")

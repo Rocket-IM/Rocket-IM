@@ -169,7 +169,8 @@ def lifecycle(lab):
     error = lab.http("b1", "pull_events", {"service_id": SERVICE, "stream_id": "wrong_stream",
                                            "after_seq": "0", "limit": "1"}, expected=409)
     check(error["code"] == "cursor_invalid", "失效游标被默默重置")
-    conflict = copy.deepcopy(page)
+    # 保持最新已观察水位，在同一可信页内制造槽冲突，避免先触发旧水位拒绝。
+    conflict = copy.deepcopy(unavailable)
     conflict["events"][0]["event_id"] = "replaced_slot"
     conflict = lab.sign_test_page(conflict)
     result = lab.download("b1", conflict)

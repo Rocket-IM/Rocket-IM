@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 
 from signing_keychain import CF, P, S, api, release, string
-from support import ROOT
+from support import OUTPUT as STORAGE_OUTPUT, ROOT
 
 
 _dictionary = api(CF, 'CFDictionaryCreate', P, [P, P, P, C.c_long, P, P])
@@ -102,9 +102,11 @@ def sign_local(path, identifier, identity_ref, requirement):
     系统启动、Developer ID 或公证验收。后续必须独立验证签名与业务行为。
     """
     target = Path(path).resolve(strict=True)
-    output = (ROOT / 'dist/native-storage/signing').resolve()
+    output = (STORAGE_OUTPUT / 'signing').resolve()
+    if not output.is_relative_to((ROOT / 'dist').resolve()):
+        raise ValueError('直接签名输出必须位于本项目 dist 内')
     if not target.is_relative_to(output) or not target.is_file():
-        raise ValueError('直接签名仅允许 dist/native-storage/signing 内的实验副本')
+        raise ValueError('直接签名仅允许本轮 signing 输出内的实验副本')
     if target.stat().st_nlink != 1:
         raise ValueError('直接签名不接受硬链接，必须先复制已验收程序')
     for name, value in (('identifier', identifier), ('requirement', requirement)):

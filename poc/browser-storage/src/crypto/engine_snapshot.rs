@@ -11,7 +11,7 @@ use crate::{
     protocol::{validate_id, ApiError, Scope},
 };
 
-const FORMAT: &str = "Rockets-IM/browser-crypto/state/v1";
+const FORMAT: &str = "Rocket-IM/browser-crypto/state/v1";
 const OPENMLS_VERSION: &str = "0.9.0";
 const PROVIDER_VERSION: &str = "0.6.0";
 

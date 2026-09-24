@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:rockets_im_stage0/rockets_im_stage0.dart' as sdk;
+import 'package:rocket_im_stage0/rocket_im_stage0.dart' as sdk;
 import 'interop_endpoint.dart';
 
 void main() {
@@ -22,7 +22,7 @@ class _ConsumerAppState extends State<ConsumerApp> {
   @override
   void initState() {
     super.initState();
-    const url = String.fromEnvironment('ROCKETS_INTEROP_URL');
+    const url = String.fromEnvironment('ROCKET_INTEROP_URL');
     if (url.isNotEmpty) {
       _runInterop(url);
     } else {
@@ -34,14 +34,14 @@ class _ConsumerAppState extends State<ConsumerApp> {
     try {
       final endpoint = InteropEndpoint(
         url,
-        const String.fromEnvironment('ROCKETS_INTEROP_RUN_ID'),
-        const String.fromEnvironment('ROCKETS_INTEROP_ENDPOINT_ID'),
+        const String.fromEnvironment('ROCKET_INTEROP_RUN_ID'),
+        const String.fromEnvironment('ROCKET_INTEROP_ENDPOINT_ID'),
       );
       _interop = endpoint;
       final status = await endpoint.run();
       if (mounted) setState(() => _status = '互通控制：$status');
     } catch (error) {
-      debugPrint('ROCKETS_INTEROP_HARNESS_FAILED:${error.runtimeType}');
+      debugPrint('ROCKET_INTEROP_HARNESS_FAILED:${error.runtimeType}');
       if (mounted) setState(() => _status = '互通装置失败：${error.runtimeType}');
     }
   }
@@ -75,14 +75,14 @@ class _ConsumerAppState extends State<ConsumerApp> {
     }
     final encoded = jsonEncode(result);
     // 实验输出只含结果，不打印身份钥、KeyPackage、密文或内部状态。
-    debugPrint('ROCKETS_STAGE0_RESULT:$encoded');
+    debugPrint('ROCKET_STAGE0_RESULT:$encoded');
     if (mounted) setState(() => _status = encoded);
   }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     home: Scaffold(
-      appBar: AppBar(title: const Text('Rockets Stage 0')),
+      appBar: AppBar(title: const Text('Rocket Stage 0')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: SelectableText(_status),

@@ -309,7 +309,10 @@ class Cases(FaultCases):
         require(sha(destination) == original, "旧 v2 数据库复制摘要不符")
         with self.probe(ready=False) as legacy:
             error = legacy.startup.get("error") or {}
-            require(error.get("code") == "crypto_store_upgrade_required", "旧 v2 格式未明确拒绝自动升级")
+            # 当前 Rocket 命名空间的 v2 升级门另由 Rust 旧 schema 测试覆盖。
+            require(error.get("code") == "crypto_store_corrupt" and error.get("paused") is True,
+                    "旧工程名 v2 格式未明确暂停拒绝")
         require(sha(source) == original and sha(destination) == original, "旧 v2 格式拒绝修改了原库或副本")
         return {"fixture": str(source), "fixture_sha256": original, "copy_sha256": original,
-                "error": error, "original_and_copy_unchanged": True}
+                "error": error, "rejection_boundary": "legacy_project_namespace",
+                "original_and_copy_unchanged": True}

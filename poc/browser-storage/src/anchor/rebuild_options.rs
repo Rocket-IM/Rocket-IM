@@ -80,7 +80,7 @@ impl Options {
     pub(super) fn binding(&self) -> Result<String, ApiError> {
         Ok(protocol::hash_bytes(
             &serde_json::to_vec(&(
-                "Rockets-IM/browser-rebuild-context/v1",
+                "Rocket-IM/browser-rebuild-context/v1",
                 &self.service,
                 &self.account,
                 &self.device,

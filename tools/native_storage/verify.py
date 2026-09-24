@@ -43,7 +43,7 @@ def build(output, report):
                             "ignored": sum(int(row[3]) for row in counts)}
     require(report["rust_tests"]["passed"] > 0, "Rust 单测未实际执行")
     run_command([*cargo, "build", *common, *target, "--release"], output / "build.log", commands)
-    binary = OUTPUT / "target/release/rockets-native-storage-probe"
+    binary = OUTPUT / "target/release/rocket-native-storage-probe"
     require(binary.is_file(), "缺少构建后的原生二进制")
     report.update(binary=str(binary), binary_sha256_before=sha(binary))
     return binary

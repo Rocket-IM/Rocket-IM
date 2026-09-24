@@ -20,8 +20,8 @@ VERSION = "0.1.0-stage0.1"
 PACKAGE = ROOT / "src/sdk/typescript"
 TEMPLATE = ROOT / "tests/consumers/browser"
 DEFAULT_OUTPUT = ROOT / "dist/platform-release/browser"
-WASM_NAME = "rockets_stage0_wasm_bg.wasm"
-NPM_CACHE = ROOT / "dist/platform-release/npm-cache"
+WASM_NAME = "rocket_stage0_wasm_bg.wasm"
+NPM_CACHE = Path(os.environ.get("ROCKET_IM_NPM_CACHE", ROOT / "dist/platform-release/npm-cache")).resolve()
 
 
 def sha(path):
@@ -57,7 +57,7 @@ def pack(args):
     compiler_package = compiler.parent.parent / "package.json"
     if not compiler.is_file() or json.loads(compiler_package.read_text())["version"] != "5.9.3":
         raise RuntimeError("维护者须先按package-lock安装固定TypeScript 5.9.3；不静默跳过严格编译")
-    required = ["rockets_stage0_wasm.js", "rockets_stage0_wasm.d.ts", WASM_NAME]
+    required = ["rocket_stage0_wasm.js", "rocket_stage0_wasm.d.ts", WASM_NAME]
     for name in required:
         if not (args.generated / name).is_file():
             raise RuntimeError("缺少真实wasm-bindgen产物：" + str(args.generated / name))
@@ -72,7 +72,7 @@ def pack(args):
                 shutil.copy2(source, generated / source.name)
         command(["node", compiler, "-p", stage / "tsconfig.json"], stage, output / "typescript-build.log")
         shutil.copytree(generated, stage / "dist/generated")
-        shutil.copytree(ROOT / "dist/platform-release/licenses", stage / "licenses")
+        shutil.copytree(args.licenses, stage / "licenses")
         compiler_license = stage / "licenses/typescript-5.9.3"; compiler_license.mkdir()
         shutil.copy2(compiler.parent.parent / "LICENSE.txt", compiler_license / "LICENSE.txt")
         shutil.copy2(ROOT / "dist/platform-release/typescript-metadata.json", compiler_license / "metadata.json")
@@ -117,7 +117,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 def verify(args):
     output = args.output.resolve(); output.mkdir(parents=True, exist_ok=True)
     run_id = str(uuid.uuid4())
-    consumer = ROOT / "dist/platform-release/consumers/browser" / run_id
+    consumer = output / "consumers" / run_id
     shutil.copytree(TEMPLATE, consumer)
     report = {"run_id": run_id, "status": "RUNNING", "target": "real Chrome / browser WASM",
               "executed_at": datetime.now(timezone.utc).isoformat(), "archive": str(args.archive.resolve()),
@@ -131,9 +131,9 @@ def verify(args):
         command(["npm", "install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", args.archive.resolve()],
                 consumer, consumer / "npm-install.log")
         command(["npm", "run", "build"], consumer, consumer / "typescript-build.log")
-        installed = consumer / "node_modules/@rockets-im/stage0"
+        installed = consumer / "node_modules/@rocket-im/stage0"
         package = json.loads((installed / "package.json").read_text())
-        if package["version"] != VERSION or package["name"] != "@rockets-im/stage0":
+        if package["version"] != VERSION or package["name"] != "@rocket-im/stage0":
             raise RuntimeError("独立消费安装的包名称或版本不符")
         manifest = json.loads((installed / "artifact.json").read_text())
         if manifest["version"] != VERSION or any(sha(installed / path) != digest for path,digest in manifest["files_sha256"].items()):
@@ -200,6 +200,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="operation", required=True)
     package = sub.add_parser("pack"); package.add_argument("--generated", type=Path, required=True)
+    package.add_argument("--licenses", type=Path, default=ROOT / "dist/platform-release/licenses")
     package.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     test = sub.add_parser("verify"); test.add_argument("--archive", type=Path, required=True)
     test.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)

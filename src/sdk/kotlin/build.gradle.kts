@@ -4,11 +4,11 @@ plugins {
     id("maven-publish")
 }
 
-group = "io.rocketsim"
+group = "io.rocketim"
 version = "0.1.0-stage0.1"
 
 android {
-    namespace = "io.rocketsim.stage0"
+    namespace = "io.rocketim.stage0"
     compileSdk = 36
     defaultConfig { minSdk = 24; consumerProguardFiles("consumer-rules.pro") }
     sourceSets["main"].java.srcDir("src/main/generated")
@@ -30,9 +30,9 @@ afterEvaluate {
         publications {
             create<MavenPublication>("release") {
                 from(components["release"])
-                artifactId = "rockets-stage0"
+                artifactId = "rocket-stage0"
                 pom {
-                    name.set("Rockets-IM Stage 0")
+                    name.set("Rocket-IM Stage 0")
                     description.set("Local Stage 0 release package validation; no persistence or network engine.")
                 }
             }

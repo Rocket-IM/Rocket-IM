@@ -1,4 +1,4 @@
-package io.rocketsim.stage0
+package io.rocketim.stage0
 
 /**
  * 阶段0内存设备。同步方法由调用方调度到后台线程；状态与错误完全由Rust维护。

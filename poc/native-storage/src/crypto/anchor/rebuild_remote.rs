@@ -9,8 +9,8 @@ use crate::model::{Error, Result};
 use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 
-const CLIENT_DOMAIN: &[u8] = b"Rockets-IM/POC/anchor-rebuild-client/v1\0";
-pub(super) const RESULT_DOMAIN: &[u8] = b"Rockets-IM/POC/anchor-rebuild-response/v1\0";
+const CLIENT_DOMAIN: &[u8] = b"Rocket-IM/POC/anchor-rebuild-client/v1\0";
+pub(super) const RESULT_DOMAIN: &[u8] = b"Rocket-IM/POC/anchor-rebuild-response/v1\0";
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Action {

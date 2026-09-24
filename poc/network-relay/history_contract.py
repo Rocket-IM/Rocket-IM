@@ -69,7 +69,7 @@ def validate_history_package(value):
 
 
 def history_digest(purpose, value, names):
-    digest = hashlib.sha256(f"Rockets-IM/POC/{purpose}/v1\0".encode())
+    digest = hashlib.sha256(f"Rocket-IM/POC/{purpose}/v1\0".encode())
     for name in names:
         raw = decode_bytes(value[name], name, MAX_CIPHERTEXT)
         digest.update(len(raw).to_bytes(8, "big"))

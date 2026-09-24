@@ -7,7 +7,7 @@ import json
 import secrets
 import time
 
-from .fixture import ACCOUNTS, CONVERSATION, ROOT, SERVICE, check, identity
+from .fixture import ACCOUNTS, CONVERSATION, SERVICE, check, identity
 from .history_cases import publish, receive_record
 from .join_cases import accept_add, material, mutate_bytes, statement, submit_add
 from .permission_cases import prepare, reject_unchanged, version
@@ -48,7 +48,8 @@ def future_device_flow(lab):
     old = publish(lab, "before_device_join", "b1")
     old_page = lab.pull("b1")
     candidate = prepare_device(lab, "bob_device_join")
-    (ROOT / "dist/network-relay/device-join-public-fixture.json").write_text(json.dumps(
+    lab.public_fixture_directory.mkdir(parents=True, exist_ok=True)
+    (lab.public_fixture_directory / "device-join-public-fixture.json").write_text(json.dumps(
         {"checkpoint": lab.checkpoint, "change": candidate["change"], "join": candidate["join"]}, indent=2))
     record = accept_add(lab, candidate, "b1")
     check(version(lab, "b1") == "1", "Service 接受不能代替旧设备完成本机提交")

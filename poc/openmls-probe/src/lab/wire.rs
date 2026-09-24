@@ -17,7 +17,7 @@ pub(super) fn state_ref(group: &MlsGroup) -> Result<String, LabError> {
             .group_context()
             .tls_serialize_detached(),
     )?;
-    let mut bytes = b"Rockets-IM/rim-poc-1/MLS-GroupContext\0".to_vec();
+    let mut bytes = b"Rocket-IM/rim-poc-1/MLS-GroupContext\0".to_vec();
     bytes.extend(context);
     Ok(codec::digest_hex(&codec::digest(&bytes)))
 }

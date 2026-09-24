@@ -16,7 +16,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-static const char service[] = "org.rockets-im.native-protected.v1";
+static const char service[] = "org.rocket-im.native-protected.v1";
 enum { MAX_ENTRIES = 64, MAX_PUBLIC_BYTES = 65536, MAX_ITEM = 256 };
 
 static void release(CFTypeRef value) {

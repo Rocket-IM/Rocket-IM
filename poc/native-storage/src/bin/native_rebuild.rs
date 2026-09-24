@@ -1,5 +1,5 @@
 //! 原生安全重建控制入口：旧可信配置、新SQLite路径与明确新设备标识。
-use rockets_native_storage_probe::{
+use rocket_native_storage_probe::{
     crypto::{
         anchor::{contract::AnchorFault, RebuildClient},
         contract::{DownloadRequest, Fault, Request},

@@ -1,9 +1,9 @@
-# Rockets-IM Stage 0 Node 包
+# Rocket-IM Stage 0 Node 包
 
 面向桌面 Node 宿主的最小 SDK 产物：公开 JavaScript 接口、TypeScript 声明和预编译 Rust WASM。安装本地发行 `.tgz` 即可消费，不需要 Rust/Cargo、wasm-bindgen 或浏览器。项目尚未发布 npm 公共版本，项目分发许可证未确定。
 
 ```typescript
-import { initialize, Stage0Device } from "@rockets-im/stage0-node";
+import { initialize, Stage0Device } from "@rocket-im/stage0-node";
 
 // 此模块由宿主通过 node:worker_threads 在工作线程加载。
 await initialize();

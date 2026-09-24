@@ -27,7 +27,7 @@ def receive_record(lab, device, record, **options):
 def signed_for_packet(lab, packet, accepted, **changes):
     """合成 Service 为异常证据签名，只用于区分服务承诺与实际 MLS 校验。"""
     statement = json.loads(base64.b64decode(accepted["acceptance_receipt"]["statement_bytes"]))
-    digest = hashlib.sha256(b"Rockets-IM/POC/message-envelope/v1\0")
+    digest = hashlib.sha256(b"Rocket-IM/POC/message-envelope/v1\0")
     for field in ("header_bytes", "payload_bytes"):
         raw = base64.b64decode(packet["envelope"][field])
         digest.update(len(raw).to_bytes(8, "big"))

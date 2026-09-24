@@ -10,9 +10,9 @@ use crate::{
 };
 
 pub(super) const PROTOCOL: &str = "rim-browser-rebuild-1";
-const APPROVAL_DOMAIN: &[u8] = b"Rockets-IM/browser-rebuild-approval/v1\0";
-const REQUEST_DOMAIN: &[u8] = b"Rockets-IM/browser-rebuild-request/v1\0";
-const RESPONSE_DOMAIN: &[u8] = b"Rockets-IM/browser-rebuild-response/v1\0";
+const APPROVAL_DOMAIN: &[u8] = b"Rocket-IM/browser-rebuild-approval/v1\0";
+const REQUEST_DOMAIN: &[u8] = b"Rocket-IM/browser-rebuild-request/v1\0";
+const RESPONSE_DOMAIN: &[u8] = b"Rocket-IM/browser-rebuild-response/v1\0";
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

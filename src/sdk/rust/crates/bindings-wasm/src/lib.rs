@@ -1,5 +1,5 @@
 //! Web与Node共用的同步WASM边界；调用方工作线程调度，存储不在本次最小发布范围。
-use rockets_im_sdk::Device;
+use rocket_im_sdk::Device;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(js_name = sdkVersion)]

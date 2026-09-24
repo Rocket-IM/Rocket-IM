@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "RocketsIMStage0",
+    name: "RocketIMStage0",
     platforms: [.iOS(.v15)],
-    products: [.library(name: "RocketsIMStage0", targets: ["RocketsIMStage0"])],
+    products: [.library(name: "RocketIMStage0", targets: ["RocketIMStage0"])],
     targets: [
-        .binaryTarget(name: "RocketsIMStage0FFI", path: "Artifacts/RocketsIMStage0FFI.xcframework"),
-        .target(name: "RocketsIMStage0", dependencies: ["RocketsIMStage0FFI"],
-                path: "Sources/RocketsIMStage0")
+        .binaryTarget(name: "RocketIMStage0FFI", path: "Artifacts/RocketIMStage0FFI.xcframework"),
+        .target(name: "RocketIMStage0", dependencies: ["RocketIMStage0FFI"],
+                path: "Sources/RocketIMStage0")
     ]
 )

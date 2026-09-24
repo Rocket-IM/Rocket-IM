@@ -1776,7 +1776,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rockets-browser-storage-probe"
+name = "rocket-browser-storage-probe"
 version = "0.1.0"
 dependencies = [
  "base64",

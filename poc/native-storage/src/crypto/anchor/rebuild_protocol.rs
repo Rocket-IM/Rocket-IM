@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 pub(crate) const PROTOCOL: &str = "rim-anchor-rebuild-1";
-pub(crate) const APPROVAL_DOMAIN: &[u8] = b"Rockets-IM/POC/anchor-rebuild-approval/v1\0";
-pub(crate) const ADMISSION_DOMAIN: &[u8] = b"Rockets-IM/native-rebuild-add-admission/v1\0";
+pub(crate) const APPROVAL_DOMAIN: &[u8] = b"Rocket-IM/POC/anchor-rebuild-approval/v1\0";
+pub(crate) const ADMISSION_DOMAIN: &[u8] = b"Rocket-IM/native-rebuild-add-admission/v1\0";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

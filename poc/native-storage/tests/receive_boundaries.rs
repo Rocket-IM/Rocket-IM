@@ -1,7 +1,41 @@
 mod receive_support;
 use receive_support::*;
-use rockets_native_storage_probe::crypto::{contract::Fault, Client};
+use rocket_native_storage_probe::crypto::{contract::Fault, Client};
 use std::fs;
+
+#[test]
+fn renamed_store_rejects_legacy_project_format_without_modifying_bytes() {
+    let files = Files::new();
+    let mut client = files.open(true);
+    value(client.close());
+    drop(client);
+    let mut db = rusqlite::Connection::open(files.db()).unwrap();
+    let tx = db.transaction().unwrap();
+    let current: String = tx
+        .query_row(
+            "SELECT format FROM crypto_meta WHERE singleton=1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(current, "Rocket-IM/native-crypto/sqlite/v3");
+    // 旧工程名只作为兼容性负例，所有故障注入仍在显式事务中。
+    tx.execute(
+        "UPDATE crypto_meta SET format=?1 WHERE singleton=1",
+        ["Rockets-IM/native-crypto/sqlite/v3"],
+    )
+    .unwrap();
+    tx.commit().unwrap();
+    db.close().unwrap();
+    let before = fs::read(files.db()).unwrap();
+    let error = match Client::open(files.db(), scope("alice"), false) {
+        Ok(_) => panic!("旧工程名格式不应被隐式接受"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code, "crypto_scope_mismatch");
+    assert!(error.paused);
+    assert_eq!(fs::read(files.db()).unwrap(), before);
+}
 
 #[test]
 fn deleted_receipt_table_and_corrupt_cursor_are_rejected_without_repair() {
@@ -68,7 +102,7 @@ fn old_v1_pending_store_is_refused_without_upgrading_or_changing_identity_state(
     for sql in ddl {
         tx.execute_batch(sql).unwrap();
     }
-    tx.execute_batch("INSERT INTO crypto_meta VALUES(1,'Rockets-IM/native-crypto/sqlite/v1','local','alice','alice-device','0',NULL,NULL,NULL,'','0'); PRAGMA user_version=1").unwrap();
+    tx.execute_batch("INSERT INTO crypto_meta VALUES(1,'Rocket-IM/native-crypto/sqlite/v1','local','alice','alice-device','0',NULL,NULL,NULL,'','0'); PRAGMA user_version=1").unwrap();
     tx.execute(
         "INSERT INTO crypto_pending VALUES(1,'init','initialize',?1,'0','')",
         ["0".repeat(64)],

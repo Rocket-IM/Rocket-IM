@@ -32,7 +32,7 @@ def get(url, limit=MAX_TEXT_BYTES):
     # 只取公开静态文本/API；不执行下载内容，不读取认证凭证。
     for attempt in range(2):
         try:
-            with urlopen(Request(url, headers={"User-Agent": "Rockets-IM-license-collector"}),
+            with urlopen(Request(url, headers={"User-Agent": "Rocket-IM-license-collector"}),
                          timeout=35) as response:
                 data = response.read(limit + 1)
             if len(data) > limit:
@@ -160,9 +160,14 @@ def cached_files(previous, vcs):
 
 
 def main():
+    global OUTPUT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true", help="只复用已核验的许可证，不访问网络")
+    parser.add_argument("--output", type=Path, default=OUTPUT)
     args = parser.parse_args()
+    OUTPUT = args.output.resolve()
+    if not OUTPUT.is_relative_to((ROOT / "dist").resolve()):
+        parser.error("许可证输出必须位于项目dist目录内")
     env = os.environ.copy()
     env.update(CARGO_HOME=str(ROOT / "dist/toolchains/rust/cargo"),
                RUSTUP_HOME=str(ROOT / "dist/toolchains/rust/rustup"), CARGO_NET_OFFLINE="true")
@@ -279,7 +284,7 @@ def main():
               "packages": packages, "project_license": "undecided; no public upload authorized"}
     (OUTPUT / "dependencies.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     (OUTPUT / "PROJECT-LICENSE-STATUS.txt").write_text(
-        "Rockets-IM Stage 0 local validation artifacts.\n"
+        "Rocket-IM Stage 0 local validation artifacts.\n"
         "The project license and public distribution decision are not finalized.\n"
         "This file grants no new license. Third-party license notices are included separately.\n"
         "dependencies.json distinguishes archive texts, exact-commit supplements, and standard license texts.\n"

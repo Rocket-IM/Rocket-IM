@@ -1,5 +1,5 @@
 //! Swift/Kotlin共享生成绑定；密码和状态规则只由im-sdk持有。
-use rockets_im_sdk::Device;
+use rocket_im_sdk::Device;
 use std::{fmt, sync::Arc};
 
 uniffi::setup_scaffolding!();
@@ -19,8 +19,8 @@ impl fmt::Display for DeviceError {
     }
 }
 impl std::error::Error for DeviceError {}
-impl From<rockets_im_sdk::Error> for DeviceError {
-    fn from(error: rockets_im_sdk::Error) -> Self {
+impl From<rocket_im_sdk::Error> for DeviceError {
+    fn from(error: rocket_im_sdk::Error) -> Self {
         Self::Failure {
             code: error.code.as_str().to_owned(),
             device_poisoned: error.device_poisoned,

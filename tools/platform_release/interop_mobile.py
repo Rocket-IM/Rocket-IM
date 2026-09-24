@@ -15,12 +15,9 @@ import xml.etree.ElementTree as ET
 
 from android import ROOT, SDK, GRADLE, command, digest, environment, native_alignment
 from flutter import FLUTTER, prepare_consumer
+from interop_apple_web import accepted, configure
 
-RELEASE = ROOT / "dist/platform-release"
-KOTLIN_COORDINATE = "io/rocketsim/rockets-stage0/0.1.0-stage0.1/rockets-stage0-0.1.0-stage0.1.aar"
-KOTLIN_SHA256 = "0c6a16438587583b46363bc657624d38fcb7652efface98ff3edc584bbd2487a"
-FLUTTER_ARCHIVE = RELEASE / "packages/flutter/rockets_im_stage0-0.1.0-stage0.1.tar.gz"
-FLUTTER_SHA256 = "52f328a9a96bfb2e52553463c170b10a0d06233e78305788e58671fa6af91164"
+KOTLIN_COORDINATE = "io/rocketim/rocket-stage0/0.1.0-stage0.1/rocket-stage0-0.1.0-stage0.1.aar"
 ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
 
 
@@ -35,12 +32,16 @@ def prepare_kotlin(work: Path) -> dict:
     work.mkdir(parents=True, exist_ok=True)
     log = work / "kotlin-build.log"
     build_id = uuid.uuid4().hex
-    application_id = f"io.rocketsim.consumer.kotlin.interop.r{build_id}"
-    original = RELEASE / "packages/maven" / KOTLIN_COORDINATE
-    checked(original, KOTLIN_SHA256)
+    application_id = f"io.rocketim.consumer.kotlin.interop.r{build_id}"
+    original, acceptance = accepted("kotlin")
+    expected = acceptance["sha256"]
+    source_repository = original.parents[4]
+    if source_repository / KOTLIN_COORDINATE != original:
+        raise RuntimeError("Kotlin验收清单必须指向准确的Maven坐标")
+    checked(original, expected)
     repository = work / "installed-maven"
-    shutil.copytree(RELEASE / "packages/maven", repository)
-    checked(repository / KOTLIN_COORDINATE, KOTLIN_SHA256)
+    shutil.copytree(source_repository, repository)
+    checked(repository / KOTLIN_COORDINATE, expected)
     consumer = work / "consumer"
     shutil.copytree(ROOT / "tests/consumers/kotlin", consumer)
     (consumer / "local.properties").write_text(f"sdk.dir={SDK}\n")
@@ -50,8 +51,8 @@ def prepare_kotlin(work: Path) -> dict:
             consumer, log, env, timeout=1200)
     apk = consumer / "app/build/outputs/apk/debug/app-debug.apk"
     result = {"apk": str(apk), "apk_sha256": digest(apk), "bundle_id": application_id,
-              "activity": "io.rocketsim.consumer.kotlin.MainActivity", "build_id": build_id,
-              "sdk_sha256": KOTLIN_SHA256, "sdk_package": str(repository / KOTLIN_COORDINATE), "consumer": str(consumer), "log": str(log),
+              "activity": "io.rocketim.consumer.kotlin.MainActivity", "build_id": build_id,
+              "sdk_sha256": expected, "sdk_package": str(repository / KOTLIN_COORDINATE), "consumer": str(consumer), "log": str(log),
               "native": native_alignment(apk, SDK, work, log, env)}
     (work / "kotlin-build.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     return result
@@ -83,16 +84,16 @@ def configure_local_http(consumer):
 def configure_flutter_identity(consumer, run_id):
     """只改本轮生成App身份；namespace及Activity代码包名保持生成器原值。"""
     suffix = "r" + hashlib.sha256(run_id.encode("ascii")).hexdigest()
-    android_id = f"io.rocketsim.consumer.rockets_stage0_consumer.interop.{suffix}"
-    ios_id = f"io.rocketsim.consumer.rocketsStage0Consumer.interop.{suffix}"
+    android_id = f"io.rocketim.consumer.rocket_stage0_consumer.interop.{suffix}"
+    ios_id = f"io.rocketim.consumer.rocketStage0Consumer.interop.{suffix}"
     gradle = consumer / "android/app/build.gradle.kts"
-    changed, count = re.subn(r'\bapplicationId\s*=\s*"io\.rocketsim\.consumer\.rockets_stage0_consumer"',
+    changed, count = re.subn(r'\bapplicationId\s*=\s*"io\.rocketim\.consumer\.rocket_stage0_consumer"',
                              f'applicationId = "{android_id}"', gradle.read_text())
     if count != 1:
         raise RuntimeError("Flutter生成器Android应用标识与固定模板不符")
     gradle.write_text(changed)
     project = consumer / "ios/Runner.xcodeproj/project.pbxproj"
-    changed, count = re.subn(r'PRODUCT_BUNDLE_IDENTIFIER = io\.rocketsim\.consumer\.rocketsStage0Consumer(\.RunnerTests)?;',
+    changed, count = re.subn(r'PRODUCT_BUNDLE_IDENTIFIER = io\.rocketim\.consumer\.rocketStage0Consumer(\.RunnerTests)?;',
                              lambda match: f'PRODUCT_BUNDLE_IDENTIFIER = {ios_id}{match.group(1) or ""};', project.read_text())
     if count != 6:
         raise RuntimeError("Flutter生成器iOS应用标识与固定模板不符")
@@ -111,10 +112,12 @@ def prepare_flutter(work: Path, url: str, run_id: str) -> dict:
     work = Path(work).resolve()
     work.mkdir(parents=True, exist_ok=True)
     log = work / "flutter-build.log"
-    checked(FLUTTER_ARCHIVE, FLUTTER_SHA256)
+    archive, acceptance = accepted("flutter")
+    expected = acceptance["sha256"]
+    checked(archive, expected)
     installed = work / "installed-package"
     installed.mkdir()
-    with tarfile.open(FLUTTER_ARCHIVE) as source:
+    with tarfile.open(archive) as source:
         source.extractall(installed, filter="data")
     args = argparse.Namespace(flutter=FLUTTER)
     env = environment(work, SDK)
@@ -122,23 +125,23 @@ def prepare_flutter(work: Path, url: str, run_id: str) -> dict:
     consumer = prepare_consumer(args, work, log, env)
     configure_local_http(consumer)
     android_id, ios_id = configure_flutter_identity(consumer, run_id)
-    common = [f"--dart-define=ROCKETS_INTEROP_RUN_ID={run_id}", "--no-pub"]
+    common = [f"--dart-define=ROCKET_INTEROP_RUN_ID={run_id}", "--no-pub"]
     command([FLUTTER, "build", "apk", "--release", "--target-platform", "android-arm64,android-x64",
-             f"--dart-define=ROCKETS_INTEROP_URL={android_url}", "--dart-define=ROCKETS_INTEROP_ENDPOINT_ID=flutter-android", *common],
+             f"--dart-define=ROCKET_INTEROP_URL={android_url}", "--dart-define=ROCKET_INTEROP_ENDPOINT_ID=flutter-android", *common],
             consumer, log, env, timeout=1200)
     apk = consumer / "build/app/outputs/flutter-apk/app-release.apk"
     native = native_alignment(apk, SDK, work, log, env)
     command([FLUTTER, "build", "ios", "--simulator", "--debug", "--no-codesign",
-             f"--dart-define=ROCKETS_INTEROP_URL={url}", "--dart-define=ROCKETS_INTEROP_ENDPOINT_ID=flutter-ios", *common],
+             f"--dart-define=ROCKET_INTEROP_URL={url}", "--dart-define=ROCKET_INTEROP_ENDPOINT_ID=flutter-ios", *common],
             consumer, log, env, timeout=1200)
     app = consumer / "build/ios/iphonesimulator/Runner.app"
     bundle_id = plistlib.loads((app / "Info.plist").read_bytes())["CFBundleIdentifier"]
     if bundle_id != ios_id:
         raise RuntimeError("Flutter iOS产物身份与本轮配置不符")
     result = {"android_apk": str(apk), "android_apk_sha256": digest(apk), "android_bundle_id": android_id,
-              "android_activity": "io.rocketsim.consumer.rockets_stage0_consumer.MainActivity",
+              "android_activity": "io.rocketim.consumer.rocket_stage0_consumer.MainActivity",
               "ios_app": str(app), "ios_bundle_id": bundle_id, "ios_binary_sha256": digest(app / "Runner"),
-              "sdk_package": str(FLUTTER_ARCHIVE), "sdk_sha256": FLUTTER_SHA256, "consumer": str(consumer), "log": str(log),
+              "sdk_package": str(archive), "sdk_sha256": expected, "consumer": str(consumer), "log": str(log),
               "run_id": run_id, "android_native": native}
     (work / "flutter-build.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     return result
@@ -150,7 +153,10 @@ def main():
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--url")
     parser.add_argument("--run-id")
+    parser.add_argument("--accepted-packages", type=Path)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    configure(args.accepted_packages, args.output)
     result = prepare_kotlin(args.work) if args.platform == "kotlin" else prepare_flutter(args.work, args.url or "", args.run_id or "")
     print(json.dumps(result, ensure_ascii=False))
 

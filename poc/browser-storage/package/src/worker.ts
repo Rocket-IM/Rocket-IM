@@ -1,4 +1,4 @@
-import initialize, { StorageProbe, CryptoProbe, AnchorProbe, RebuildProbe, probe_version } from "../generated/rockets_browser_storage_probe.js";
+import initialize, { StorageProbe, CryptoProbe, AnchorProbe, RebuildProbe, probe_version } from "../generated/rocket_browser_storage_probe.js";
 import { VERSION, StorageError, object, openOptions, parseJsonResult, parseOutcome, request, wireError } from "./protocol.js";
 import { cryptoOpenOptions, cryptoRequest, parseCryptoOutcome } from "./crypto_protocol.js";
 import { anchorOptions, anchorRequest, parseAnchorOutcome } from "./anchor_protocol.js";

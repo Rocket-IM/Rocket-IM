@@ -7,7 +7,7 @@ use wasm_bindgen_futures::JsFuture;
 use super::protocol::{self, Action, Request, Response, Scope, Signed, INPUT_LIMIT, PROTOCOL};
 use crate::protocol::ApiError;
 
-const JOURNAL_DOMAIN: &[u8] = b"Rockets-IM/browser-anchor-journal/v1\0";
+const JOURNAL_DOMAIN: &[u8] = b"Rocket-IM/browser-anchor-journal/v1\0";
 
 /// 仅适用于合成本地锚实验；此可信配置必须保存在被回滚的浏览器数据库之外。
 #[derive(Clone, Serialize, Deserialize)]
@@ -79,7 +79,7 @@ impl Client {
         // 不含认证 seed；固定域与数组位置使配置指纹无拼接歧义。
         let fingerprint = protocol::hash_bytes(
             &serde_json::to_vec(&(
-                "Rockets-IM/browser-anchor-config/v1",
+                "Rocket-IM/browser-anchor-config/v1",
                 &config.endpoint,
                 &config.scope,
                 &config.anchor_public_key,

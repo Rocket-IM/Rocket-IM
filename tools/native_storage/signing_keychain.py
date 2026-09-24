@@ -72,7 +72,7 @@ class LabIdentity:
         # 全新实验私钥只经子进程 stdout 与导入 API，磁盘仅保存公开证书。
         result = subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048',
                                  '-noenc', '-days', '2', '-subj',
-                                 f'/CN=Rockets-IM isolated signing {self.label}',
+                                 f'/CN=Rocket-IM isolated signing {self.label}',
                                  '-addext', 'basicConstraints=critical,CA:FALSE',
                                  '-addext', 'keyUsage=critical,digitalSignature',
                                  '-addext', 'extendedKeyUsage=critical,codeSigning',
@@ -107,7 +107,7 @@ class LabIdentity:
             refs.append(runner)
             app_values = (P * 2)(app.value, runner.value)
             apps = array(None, app_values, 2, None); refs.append(apps)
-            title = string(None, b'Rockets-IM isolated codesign key', 0x08000100); refs.append(title)
+            title = string(None, b'Rocket-IM isolated codesign key', 0x08000100); refs.append(title)
             access = P(); checked(access_create(title, apps, C.byref(access)), 'codesign_access')
             refs.append(access)
             view = (C.c_ubyte * len(imported)).from_buffer(imported)

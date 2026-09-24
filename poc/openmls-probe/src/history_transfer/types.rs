@@ -3,9 +3,9 @@ use crate::permission::{types, Identity, PermissionError};
 use serde::{Deserialize, Serialize};
 
 pub const MAX_BODY: usize = 256 * 1024;
-pub const REQUEST_DOMAIN: &[u8] = b"Rockets-IM/POC/history-request/v1\0";
-pub const PACKAGE_DOMAIN: &[u8] = b"Rockets-IM/POC/history-package/v1\0";
-pub const RECEIPT_DOMAIN: &[u8] = b"Rockets-IM/POC/history-receipt/v1\0";
+pub const REQUEST_DOMAIN: &[u8] = b"Rocket-IM/POC/history-request/v1\0";
+pub const PACKAGE_DOMAIN: &[u8] = b"Rocket-IM/POC/history-package/v1\0";
+pub const RECEIPT_DOMAIN: &[u8] = b"Rocket-IM/POC/history-receipt/v1\0";
 
 pub(super) fn invalid() -> PermissionError {
     PermissionError::new("history_invalid", "历史迁移字段、编码或范围无效")

@@ -6,8 +6,8 @@ from contract import (MAX_HEADER_BYTES, MAX_PAYLOAD_BYTES, decode_bytes, fields,
                       invalid, parse_json, parse_u64, validate_id, validate_state_ref)
 from permission_contract import PROOF_FIELDS, validate_checkpoint
 
-PROOF_DOMAIN = b"Rockets-IM/POC/permission-proof/v1\0"
-MESSAGE_ENVELOPE_DOMAIN = b"Rockets-IM/POC/message-envelope/v1\0"
+PROOF_DOMAIN = b"Rocket-IM/POC/permission-proof/v1\0"
+MESSAGE_ENVELOPE_DOMAIN = b"Rocket-IM/POC/message-envelope/v1\0"
 
 
 def proof_digest(change):

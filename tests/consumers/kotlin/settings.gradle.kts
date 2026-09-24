@@ -9,5 +9,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "RocketsStage0Consumer"
+rootProject.name = "RocketStage0Consumer"
 include(":app")

@@ -4,11 +4,11 @@ import shutil
 import subprocess
 
 from signing_keychain import LabIdentity
-from support import ROOT, require, sha, utc_now
+from support import OUTPUT as STORAGE_OUTPUT, ROOT, require, sha, utc_now
 
 NAMES = ('native_anchored', 'native_crypto', 'native_rebuild', 'native_protection')
-BASE = ROOT / 'dist/native-storage/signing/baseline-binaries'
-UPGRADE = ROOT / 'dist/native-storage/signing/target/release'
+BASE = STORAGE_OUTPUT / 'signing/baseline-binaries'
+UPGRADE = STORAGE_OUTPUT / 'signing/target/release'
 HELPER = BASE / 'openmls-rollback-anchor'
 
 
@@ -84,7 +84,7 @@ def copy_group(output, label, signer, records, version=1, other_id=False):
             command(['xcrun', 'vtool', '-set-build-version', 'macos', '12.0', '26.1',
                      '-replace', '-output', path, path], records)
         unsigned_payloads[name] = sha(path)
-        identifier = f'org.rockets-im.lab.{"other." if other_id else ""}{name}'
+        identifier = f'org.rocket-im.lab.{"other." if other_id else ""}{name}'
         sign(path, identifier, signer, records)
     return directory, unsigned_payloads
 
@@ -151,9 +151,9 @@ def prepare(output, mode, records, report, identity=None):
                  '-framework', 'Security', '-framework', 'CoreFoundation', probe_source, '-o', unsealed], records)
         probes = {}
         for label, signer, identifier in [
-                ('fifth-id', first, 'org.rockets-im.lab.fifth_reader'),
-                ('same-id-new-content', first, 'org.rockets-im.lab.native_protection'),
-                ('other-signer-same-id', second, 'org.rockets-im.lab.native_protection')]:
+                ('fifth-id', first, 'org.rocket-im.lab.fifth_reader'),
+                ('same-id-new-content', first, 'org.rocket-im.lab.native_protection'),
+                ('other-signer-same-id', second, 'org.rocket-im.lab.native_protection')]:
             path = output / f'probe-{label}'
             shutil.copy2(unsealed, path); sign(path, identifier, signer, records)
             probes[label] = path

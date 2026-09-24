@@ -1,5 +1,5 @@
 // 独立安装 Node 包的互通端；仅由 interop.mjs 的 Worker 调用，不实现密码算法。
-import { initialize, SDK_VERSION, Stage0Device } from "@rockets-im/stage0-node";
+import { initialize, SDK_VERSION, Stage0Device } from "@rocket-im/stage0-node";
 
 type JsonObject = { [name: string]: unknown };
 interface Command { run_id: string; command_id: string; op: string; handle: string; args: Record<string, string>; }

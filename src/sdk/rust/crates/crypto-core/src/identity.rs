@@ -24,17 +24,14 @@ fn encode(domain: &[u8], fields: &[&str]) -> Vec<u8> {
 
 pub(crate) fn credential(service: &str, account: &str, device: &str) -> Credential {
     BasicCredential::new(encode(
-        b"Rockets-IM/SDK/stage0-identity/v1\0",
+        b"Rocket-IM/SDK/stage0-identity/v1\0",
         &[service, account, device],
     ))
     .into()
 }
 
 pub(crate) fn group_id(service: &str, conversation: &str) -> Vec<u8> {
-    encode(
-        b"Rockets-IM/SDK/stage0-group/v1\0",
-        &[service, conversation],
-    )
+    encode(b"Rocket-IM/SDK/stage0-group/v1\0", &[service, conversation])
 }
 
 pub(crate) fn matches(

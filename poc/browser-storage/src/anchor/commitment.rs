@@ -38,7 +38,7 @@ pub(super) fn without_crypto_reservation(tx: &Transaction<'_>) -> Result<String,
 
 fn commitment(tx: &Transaction<'_>, project_reservation_empty: bool) -> Result<String, ApiError> {
     let mut hasher = Sha256::new();
-    hasher.update(b"Rockets-IM/browser-crypto-complete-state/v1\0");
+    hasher.update(b"Rocket-IM/browser-crypto-complete-state/v1\0");
     let mut total = 0usize;
     for (name, sql) in QUERIES {
         bounded(&mut hasher, name.as_bytes())?;

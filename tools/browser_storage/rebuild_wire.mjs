@@ -3,9 +3,9 @@ import { createPublicKey, verify, sign } from "node:crypto";
 import { AnchorError, exact, scope, hex, revision, base64, signed, hash, privateKey, requireValue } from "./anchor_wire.mjs";
 
 export const REBUILD_PROTOCOL = "rim-browser-rebuild-1";
-export const APPROVAL_DOMAIN = Buffer.from("Rockets-IM/browser-rebuild-approval/v1\0");
-const REQUEST_DOMAIN = Buffer.from("Rockets-IM/browser-rebuild-request/v1\0");
-const RESPONSE_DOMAIN = Buffer.from("Rockets-IM/browser-rebuild-response/v1\0");
+export const APPROVAL_DOMAIN = Buffer.from("Rocket-IM/browser-rebuild-approval/v1\0");
+const REQUEST_DOMAIN = Buffer.from("Rocket-IM/browser-rebuild-request/v1\0");
+const RESPONSE_DOMAIN = Buffer.from("Rocket-IM/browser-rebuild-response/v1\0");
 const FIELDS = ["protocol_version", "rebuild_id", "anchor_public_key", "approver_public_key", "old_scope", "old_head",
   "old_txn", "old_revision", "old_conversation", "successor_scope", "successor_head", "successor_client_public_key",
   "successor_key_package_sha256", "conversation", "peer"];

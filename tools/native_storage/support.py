@@ -12,7 +12,7 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-OUTPUT = ROOT / "dist/native-storage"
+OUTPUT = Path(os.environ.get("ROCKET_IM_NATIVE_STORAGE_OUTPUT", ROOT / "dist/native-storage")).resolve()
 CRATE = ROOT / "poc/native-storage"
 
 

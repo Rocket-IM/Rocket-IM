@@ -376,7 +376,7 @@ fn pause(actual: &str, target: &str, metrics: &Metrics) -> Result<()> {
     Ok(())
 }
 fn group_id(service: &str, conversation: &str) -> String {
-    let mut raw = b"Rockets-IM/native-crypto/group/v1\0".to_vec();
+    let mut raw = b"Rocket-IM/native-crypto/group/v1\0".to_vec();
     for value in [service, conversation] {
         raw.extend_from_slice(&(value.len() as u16).to_be_bytes());
         raw.extend_from_slice(value.as_bytes());

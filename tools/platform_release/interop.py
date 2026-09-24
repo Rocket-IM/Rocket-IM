@@ -28,15 +28,8 @@ def source_hashes():
 
 
 def accepted_packages():
-    packages = json.loads((OUTPUT / "accepted-packages.json").read_text())
-    if (not isinstance(packages, list) or len(packages) != 4
-            or {p.get("platform") for p in packages} != {"swift", "browser", "kotlin", "flutter"}):
-        raise RuntimeError("invalid_accepted_package_set")
-    for package in packages:
-        artifact = (ROOT / package["artifact"]).resolve()
-        if not artifact.is_relative_to(ROOT / "dist/platform-release") or sha(artifact) != package["sha256"]:
-            raise RuntimeError("accepted_package_changed")
-    return packages
+    from interop_apple_web import accepted_entries
+    return accepted_entries()
 
 
 def verify_build_package(platform, build, packages):
@@ -58,7 +51,7 @@ def reuse_build(platform, path, packages=None):
         if build["status"] != "PASS" or build["source_sha256_before"] != inputs(platform):
             raise RuntimeError("reused_build_source_changed:" + platform)
         directory = Path(build["directory"])
-        package = directory / ("Vendor/RocketsIMStage0" if platform == "swift" else "node_modules/@rockets-im/stage0")
+        package = directory / ("Vendor/RocketIMStage0" if platform == "swift" else "node_modules/@rocket-im/stage0")
         if hashes(package) != build["package_sha256"] or sha(build["archive"]) != build["archive_sha256"]:
             raise RuntimeError("reused_build_package_changed:" + platform)
         output = Path(build["app"]) if platform == "swift" else directory / "dist"
@@ -102,12 +95,21 @@ def apply_final_gates(report):
 
 
 def main():
+    global OUTPUT
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--accepted-packages", type=Path)
+    parser.add_argument("--release-root", type=Path, default=ROOT / "dist/platform-release")
+    parser.add_argument("--swift-simulator")
+    parser.add_argument("--flutter-simulator")
     parser.add_argument("--case", help="只用于故障定位；单项通过不能代替完整矩阵")
     for platform in ("swift", "browser", "kotlin"):
         parser.add_argument("--" + platform + "-build-report", type=Path, help="复用摘要与当前源码一致的独立构建")
     parser.add_argument("--playwright-module", type=Path, default=Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright")
     args = parser.parse_args()
+    from interop_apple_web import configure
+    configure(args.accepted_packages, args.output)
+    OUTPUT = args.output.resolve()
     from platform_release.broker import Broker
     from platform_release.artifacts import audit_artifacts
     from platform_release.cases import run_cases
@@ -130,7 +132,7 @@ def main():
         temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         temporary.replace(path)
 
-    broker, runtime = None, Runtime(ROOT, work)
+    broker, runtime = None, Runtime(ROOT, work, release_root=args.release_root, interop_root=OUTPUT)
     phase = "accepted_packages"
     try:
         save()
@@ -157,10 +159,10 @@ def main():
         save()
         broker.browser_directory = Path(builds["browser"]["directory"])
         phase = "launch_swift_ios"
-        runtime.ios(SWIFT_SIMULATOR, builds["swift"]["app"], builds["swift"]["bundle_id"],
+        runtime.ios(args.swift_simulator or SWIFT_SIMULATOR, builds["swift"]["app"], builds["swift"]["bundle_id"],
                     "swift-ios", broker.url, run_id)
         phase = "launch_flutter_ios"
-        runtime.ios(FLUTTER_SIMULATOR, builds["flutter"]["ios_app"], builds["flutter"]["ios_bundle_id"],
+        runtime.ios(args.flutter_simulator or FLUTTER_SIMULATOR, builds["flutter"]["ios_app"], builds["flutter"]["ios_bundle_id"],
                     "flutter-ios", broker.url, run_id)
         phase = "launch_android"
         runtime.android(builds["kotlin"], builds["flutter"], broker.url, run_id)

@@ -3,9 +3,17 @@ import { Worker, isMainThread, parentPort, workerData, threadId } from "node:wor
 import { release } from "node:os";
 
 const runtime = { node: process.version, platform: process.platform, arch: process.arch, osRelease: release() };
-const timeoutMilliseconds = 180000;
+function timeoutBudget() {
+  const value = process.env.ROCKET_INTEROP_TIMEOUT_SECONDS ?? "180";
+  if (!/^[0-9]+$/.test(value)) throw new Error("invalid_timeout_budget");
+  const seconds = Number(value);
+  if (!Number.isSafeInteger(seconds) || seconds < 10 || seconds > 3600) {
+    throw new Error("invalid_timeout_budget");
+  }
+  return seconds * 1000;
+}
 
-function runWorker(configuration) {
+function runWorker(configuration, timeoutMilliseconds) {
   return new Promise(resolve => {
     const worker = new Worker(new URL(import.meta.url), {
       workerData: configuration, env: {}, execArgv: [], stdout: true, stderr: true,
@@ -53,8 +61,8 @@ if (isMainThread) {
   let result;
   try {
     if (process.platform !== "darwin") throw new Error("runtime_not_macos");
-    result = await runWorker({ url: process.env.ROCKETS_INTEROP_URL,
-      runId: process.env.ROCKETS_INTEROP_RUN_ID, endpointId: process.env.ROCKETS_INTEROP_ENDPOINT_ID });
+    result = await runWorker({ url: process.env.ROCKET_INTEROP_URL,
+      runId: process.env.ROCKET_INTEROP_RUN_ID, endpointId: process.env.ROCKET_INTEROP_ENDPOINT_ID }, timeoutBudget());
   } catch { result = { status: "FAIL", runtime, error: "runtime_or_worker_start_failed" }; }
   console.log(JSON.stringify(result));
   if (result.status !== "PASS") process.exitCode = 1;

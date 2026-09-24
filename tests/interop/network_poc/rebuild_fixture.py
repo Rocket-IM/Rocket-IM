@@ -189,7 +189,7 @@ class RebuildLab(AnchorLab):
 
     def accepted(self, proof):
         statement = decoded(proof)
-        digest = hashlib.sha256(b"Rockets-IM/POC/permission-proof/v1\0")
+        digest = hashlib.sha256(b"Rocket-IM/POC/permission-proof/v1\0")
         for field in ("statement_bytes", "signature_bytes", "commit_bytes"):
             value = base64.b64decode(proof[field])
             digest.update(len(value).to_bytes(8, "big")); digest.update(value)
@@ -205,7 +205,7 @@ class RebuildLab(AnchorLab):
     def message_receipt(self, packet, acceptance_id):
         envelope = packet["envelope"]
         header = json.loads(base64.b64decode(envelope["header_bytes"]))
-        digest = hashlib.sha256(b"Rockets-IM/POC/message-envelope/v1\0")
+        digest = hashlib.sha256(b"Rocket-IM/POC/message-envelope/v1\0")
         for field in ("header_bytes", "payload_bytes"):
             raw = base64.b64decode(envelope[field])
             digest.update(len(raw).to_bytes(8, "big")); digest.update(raw)

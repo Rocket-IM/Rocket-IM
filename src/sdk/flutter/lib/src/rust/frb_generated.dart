@@ -70,7 +70,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   int get rustContentHash => -524724445;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
-                    stem: 'rockets_stage0_flutter',
+                    stem: 'rocket_stage0_flutter',
                     ioDirectory: '../rust/crates/bindings-flutter/target/release/',
                     webPrefix: 'pkg/',
                   );

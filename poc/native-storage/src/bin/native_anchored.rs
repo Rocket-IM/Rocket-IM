@@ -1,5 +1,5 @@
 //! 必填外置可信配置的原生锚验收入口；普通 v3 入口不作为降级备选。
-use rockets_native_storage_probe::{
+use rocket_native_storage_probe::{
     crypto::{
         anchor::{contract::AnchorFault, AnchoredClient},
         contract::{DownloadRequest, Fault, Request},
@@ -60,7 +60,7 @@ enum Command {
     RebuildApprove {
         id: String,
         plan: Value,
-        peer: rockets_native_storage_probe::crypto::model::Identity,
+        peer: rocket_native_storage_probe::crypto::model::Identity,
         confirm_plan_sha256: String,
         #[serde(default)]
         fault: Fault,

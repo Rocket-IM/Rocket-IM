@@ -20,7 +20,11 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flutter-sdk", type=Path, default=Path.home() / "fvm/versions/3.41.0")
+    parser.add_argument("--output", type=Path, default=OUTPUT)
     args = parser.parse_args()
+    output_root = args.output.resolve()
+    if not output_root.is_relative_to((ROOT / "dist").resolve()):
+        parser.error("生成输出必须位于项目dist目录内")
     codegen = OUTPUT / "codegen/flutter_rust_bridge_codegen-aarch64-apple-darwin-v2.11.1/flutter_rust_bridge_codegen"
     expand = OUTPUT / "codegen/bin/cargo-expand"
     for path in (codegen, expand, args.flutter_sdk / "bin/dart"):
@@ -30,12 +34,12 @@ def main():
     if version != "flutter_rust_bridge_codegen 2.11.1":
         raise RuntimeError("FRB生成器版本不匹配：" + version)
     run_id = str(uuid.uuid4())
-    output = OUTPUT / "flutter-generation" / run_id
+    output = output_root / "flutter-generation" / run_id
     output.mkdir(parents=True)
     env = os.environ.copy()
     env.update(CARGO_HOME=str(ROOT / "dist/toolchains/rust/cargo"),
                RUSTUP_HOME=str(ROOT / "dist/toolchains/rust/rustup"),
-               CARGO_TARGET_DIR=str(OUTPUT / "target"), CARGO_NET_OFFLINE="true",
+               CARGO_TARGET_DIR=str(output_root / "target"), CARGO_NET_OFFLINE="true",
                FLUTTER_SUPPRESS_ANALYTICS="true", DART_SUPPRESS_ANALYTICS="true")
     env["PATH"] = os.pathsep.join((str(expand.parent), env["CARGO_HOME"] + "/bin",
                                   str(args.flutter_sdk / "bin"), env.get("PATH", "")))

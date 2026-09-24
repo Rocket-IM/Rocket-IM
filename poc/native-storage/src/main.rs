@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use rockets_native_storage_probe::{
+use rocket_native_storage_probe::{
     model::{Error, Fault, OpenOptions, Put, Scope},
     Change, Engine, Reply,
 };
