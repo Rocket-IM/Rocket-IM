@@ -1,0 +1,33 @@
+# 本机产物和历史验证材料；保留本地文件，按文档另行归档。
+/dist/
+
+# 依赖、构建与运行缓存（同时覆盖 SDK 和独立消费工程）。
+node_modules/
+target/
+build/
+.dart_tool/
+.gradle/
+.build/
+.swiftpm/
+DerivedData/
+__pycache__/
+*.py[cod]
+.venv/
+.fvm/flutter_sdk/
+
+# 本机系统与开发环境状态；共享工程配置和锁文件继续入库。
+.DS_Store
+xcuserdata/
+*.xcuserstate
+local.properties
+
+# 本机环境秘密与签名身份；可共享的示例配置保留。
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.keychain
+*.keychain-db
+*.p12
+*.pfx
+*.mobileprovision

@@ -1,0 +1,62 @@
+[package]
+name = "openmls-probe"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91.0"
+publish = false
+default-run = "openmls-probe"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "openmls-state-lab"
+path = "src/bin/state_lab.rs"
+
+[[bin]]
+name = "openmls-permission-verify"
+path = "src/bin/permission_verify.rs"
+
+[[bin]]
+name = "openmls-relay-receipt"
+path = "src/bin/relay_receipt.rs"
+
+[[bin]]
+name = "openmls-rollback-anchor"
+path = "src/bin/rollback_anchor.rs"
+
+[[bin]]
+name = "openmls-secret-surface-scan"
+path = "src/bin/secret_surface_scan.rs"
+required-features = ["m01-secret-probe"]
+
+[features]
+# 默认关闭；仅原生隔离验收计数 wire_send 的实际 MLS 消息创建调用。
+wire-send-probe = []
+# 默认关闭；仅把已验签的空设备流设到固定大序号测试起点，不生成历史事件。
+wire-sequence-probe = []
+# 默认关闭；只读观察本轮合成设备快照和隔离观测文件，不提供秘密导出。
+m01-secret-probe = []
+
+[dependencies]
+openmls = "=0.9.0"
+openmls_basic_credential = "=0.6.0"
+openmls_rust_crypto = "=0.6.0"
+openmls_traits = "=0.6.0"
+
+# 原生隔离实验复用锁文件内的密码、序列化与系统依赖，不进入浏览器探针。
+[target.'cfg(unix)'.dependencies]
+ed25519-dalek = "=2.2.0"
+sha2 = "=0.10.9"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+aes-gcm = "=0.10.3"
+getrandom = "=0.2.17"
+libc = "=0.2.189"
+base64 = "=0.22.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+openmls = { version = "=0.9.0", features = ["js"] }
+wasm-bindgen = "=0.2.128"
+# 与官方 openmls-wasm 示例一致，为签名与密码提供者启用浏览器随机源。
+getrandom = { version = "=0.2.17", features = ["js"] }

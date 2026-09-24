@@ -1,0 +1,12 @@
+{
+  "name": "@rockets-im/browser-storage-probe",
+  "version": "0.1.0-q05.4",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Q05 isolated Rust SQLite browser persistence experiment; not an IM SDK.",
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "generated", "licenses", "artifact.json"],
+  "devDependencies": { "typescript": "5.9.3" },
+  "scripts": { "build": "tsc -p tsconfig.json" }
+}

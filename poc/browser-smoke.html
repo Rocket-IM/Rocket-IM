@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>密码候选浏览器验证</title>
+<style>
+body{font:16px system-ui;max-width:960px;margin:48px auto;padding:0 24px;background:#f6f7f8;color:#18212b}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:20px;border:1px solid #dbe0e5;border-radius:8px}
+.pass{color:#17623b}.fail{color:#a02828}
+</style>
+<h1>密码候选浏览器验证</h1>
+<p>仅验证同一 Rust 探针在浏览器运行。未验证身份授权、持久化、Relay 或四端 SDK 发布。</p>
+<p>请在项目根目录运行 <code>python3 tools/verify_crypto_probes.py serve</code>，保持终端运行，再打开 <a href="http://127.0.0.1:8765/">http://127.0.0.1:8765/</a>。不能直接双击 HTML 文件运行验证。</p>
+<pre id="result">RUNNING</pre>
+<script type="module">
+const result = document.querySelector('#result');
+const rows = [];
+const serviceRecovery = '请在项目根目录运行 python3 tools/verify_crypto_probes.py serve，保持终端运行，再刷新 http://127.0.0.1:8765/。若返回 HTTP 404，请检查生成产物是否完整，必要时重新执行 wasm 构建。';
+let allPassed = true;
+let build;
+let stage = '检查页面打开方式';
+let resource = location.href;
+
+async function fetchResource(url, responseType) {
+  try {
+    const response = await fetch(url, {cache: 'no-store'});
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    return responseType === 'json' ? await response.json() : await response.arrayBuffer();
+  } catch (error) {
+    throw new Error(`读取资源失败：${url}；${String(error)}。${serviceRecovery}`);
+  }
+}
+
+try {
+  if (location.protocol === 'file:') {
+    throw new Error(`不能通过 file:// 直接打开此页面运行验证。${serviceRecovery}`);
+  }
+  stage = '读取构建清单';
+  resource = new URL('./build.json', location.href).href;
+  build = await fetchResource(resource, 'json');
+  if (build.status !== 'ready' || !Array.isArray(build.candidates) || !build.candidates.length) {
+    throw new Error('本轮构建未全部成功，或构建清单无有效候选；请重新执行 wasm 构建');
+  }
+  for (const entry of build.candidates) {
+    const candidate = entry.name;
+    try {
+      stage = '检查候选';
+      resource = new URL('./build.json', location.href).href;
+      if (!['vodozemac', 'openmls'].includes(candidate)) throw new Error('未知候选');
+      stage = '加载 JavaScript 模块';
+      resource = new URL(`./${candidate}/probe.js?run=${encodeURIComponent(build.id)}`, location.href).href;
+      let probe;
+      try {
+        probe = await import(resource);
+      } catch (error) {
+        throw new Error(`模块加载失败：${resource}；${String(error)}。${serviceRecovery}`);
+      }
+      stage = '读取 WASM';
+      resource = new URL(`./${candidate}/probe_bg.wasm`, location.href).href;
+      const bytes = await fetchResource(resource, 'arrayBuffer');
+      stage = '校验 WASM 摘要';
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+      const hash = [...digest].map(value => value.toString(16).padStart(2, '0')).join('');
+      if (hash !== entry.wasm_sha256) throw new Error('WASM 与本轮构建摘要不匹配');
+      stage = '初始化 WASM';
+      await probe.default({module_or_path: bytes});
+      stage = '运行密码机制探针';
+      const summary = candidate === 'vodozemac' ? probe.run_browser_smoke() : probe.run_smoke();
+      rows.push({candidate, status: 'PASS', summary});
+    } catch (error) {
+      allPassed = false;
+      rows.push({candidate, status: 'FAIL', stage, resource, error: String(error)});
+    }
+  }
+} catch (error) {
+  allPassed = false;
+  rows.push({status: 'FAIL', stage, resource, error: String(error)});
+}
+result.textContent = JSON.stringify({status: allPassed ? 'PASS' : 'FAIL', build_id: build?.id, browser: navigator.userAgent, rows}, null, 2);
+result.className = allPassed ? 'pass' : 'fail';
+document.title = `${allPassed ? 'PASS' : 'FAIL'} 密码候选浏览器验证`;
+</script>
+</html>

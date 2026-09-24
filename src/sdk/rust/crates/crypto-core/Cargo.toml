@@ -1,0 +1,17 @@
+[package]
+name = "rockets-crypto-core"
+version = "0.1.0-stage0.1"
+edition = "2021"
+rust-version = "1.91.0"
+publish = false
+description = "Rockets-IM 阶段0双设备内存密码接口，仅用于发布包验证"
+
+[dependencies]
+openmls = "=0.9.0"
+openmls_basic_credential = "=0.6.0"
+openmls_rust_crypto = "=0.6.0"
+openmls_traits = "=0.6.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+openmls = { version = "=0.9.0", features = ["js"] }
+getrandom = { version = "=0.2.17", features = ["js"] }

@@ -1,0 +1,29 @@
+// !$*UTF8*$!
+{
+ archiveVersion = 1;
+ classes = {};
+ objectVersion = 56;
+ objects = {
+  A20000000000000000000001 = {isa = PBXBuildFile; fileRef = A20000000000000000000002;};
+  A20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Interop.swift; sourceTree = "<group>";};
+  A10000000000000000000001 = {isa = PBXBuildFile; fileRef = A10000000000000000000002;};
+  A10000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Consumer.swift; sourceTree = "<group>";};
+  A10000000000000000000003 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stage0Consumer.app; sourceTree = BUILT_PRODUCTS_DIR;};
+  A10000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>";};
+  A10000000000000000000005 = {isa = PBXGroup; children = (A10000000000000000000006, A10000000000000000000007); sourceTree = "<group>";};
+  A10000000000000000000006 = {isa = PBXGroup; children = (A10000000000000000000002, A20000000000000000000002, A10000000000000000000004); path = Stage0Consumer; sourceTree = "<group>";};
+  A10000000000000000000007 = {isa = PBXGroup; children = (A10000000000000000000003); name = Products; sourceTree = "<group>";};
+  A10000000000000000000008 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A20000000000000000000001); runOnlyForDeploymentPostprocessing = 0;};
+  A10000000000000000000009 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A1000000000000000000000A); runOnlyForDeploymentPostprocessing = 0;};
+  A1000000000000000000000A = {isa = PBXBuildFile; productRef = A1000000000000000000000B;};
+  A1000000000000000000000B = {isa = XCSwiftPackageProductDependency; package = A1000000000000000000000C; productName = RocketsIMStage0;};
+  A1000000000000000000000C = {isa = XCLocalSwiftPackageReference; relativePath = Vendor/RocketsIMStage0;};
+  A1000000000000000000000D = {isa = PBXNativeTarget; buildConfigurationList = A10000000000000000000010; buildPhases = (A10000000000000000000008, A10000000000000000000009); buildRules = (); dependencies = (); name = Stage0Consumer; packageProductDependencies = (A1000000000000000000000B); productName = Stage0Consumer; productReference = A10000000000000000000003; productType = "com.apple.product-type.application";};
+  A1000000000000000000000E = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = YES; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600;}; buildConfigurationList = A1000000000000000000000F; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = A10000000000000000000005; packageReferences = (A1000000000000000000000C); productRefGroup = A10000000000000000000007; projectDirPath = ""; projectRoot = ""; targets = (A1000000000000000000000D);};
+  A1000000000000000000000F = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000011); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+  A10000000000000000000010 = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000012); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+  A10000000000000000000011 = {isa = XCBuildConfiguration; name = Release; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 15.0;};};
+  A10000000000000000000012 = {isa = XCBuildConfiguration; name = Release; buildSettings = {ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO; CODE_SIGNING_ALLOWED = NO; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Stage0Consumer/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; PRODUCT_BUNDLE_IDENTIFIER = dev.rocketsim.stage0.consumer; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_OPTIMIZATION_LEVEL = "-O"; TARGETED_DEVICE_FAMILY = "1,2";};};
+ };
+ rootObject = A1000000000000000000000E;
+}

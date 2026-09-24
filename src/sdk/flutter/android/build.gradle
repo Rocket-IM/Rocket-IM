@@ -1,0 +1,26 @@
+group = 'io.rocketsim.stage0.flutter'
+version = '0.1.0-stage0.1'
+
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.11.1' }
+}
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'io.rocketsim.stage0.flutter'
+    compileSdk 36
+    defaultConfig { minSdk 24 }
+    sourceSets.main.jniLibs.srcDirs = ['src/main/jniLibs']
+}
+
+// 这里只打包预编译库；不声明externalNativeBuild或Cargokit任务。
+tasks.register('verifyReleaseLibraries') {
+    doLast {
+        ['arm64-v8a', 'x86_64'].each { abi ->
+            def library = file("src/main/jniLibs/${abi}/librockets_stage0_flutter.so")
+            if (!library.isFile()) throw new GradleException("缺少发布库: ${abi}")
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'verifyReleaseLibraries' }

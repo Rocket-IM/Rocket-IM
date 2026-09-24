@@ -1,0 +1,9 @@
+[bindings.kotlin]
+package_name = "io.rocketsim.stage0"
+cdylib_name = "rockets_stage0_uniffi"
+
+[bindings.swift]
+module_name = "RocketsIMStage0"
+ffi_module_name = "RocketsIMStage0FFI"
+generate_module_map = true
+

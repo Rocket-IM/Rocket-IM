@@ -1,0 +1,3345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rockets-IM rim-poc-1 消息契约",
+  "description": "阶段 0 的本机实验协议源，未发布。JSON Schema 验证形状；重复 JSON 键、严格 UTF-8、原始头认证、解码字节限额、目标排序及权限/状态对应关系须由相应边界另外校验。",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Envelope"
+    },
+    {
+      "$ref": "#/$defs/EventSlot"
+    }
+  ],
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]{1,64}(?![\\s\\S])"
+    },
+    "U64": {
+      "type": "string",
+      "maxLength": 20,
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)(?![\\s\\S])",
+      "description": "0 至 18446744073709551615 的十进制字符串；禁止前导零。"
+    },
+    "StateRef": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "description": "Rust 探针的公共群检查点摘要：SHA-256(固定域字节 || GroupContext TLS 序列化字节)，输出 64 位小写十六进制。公共结构含协议版本、套件、群标识、epoch、树哈希、已确认 transcript 和扩展；不导出私有状态。",
+      "x-hash-domain-utf8": "Rockets-IM/rim-poc-1/MLS-GroupContext\u0000",
+      "x-context-encoding": "OpenMLS GroupContext.tls_serialize_detached()"
+    },
+    "HeaderBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 21848,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 16384,
+      "description": "标准带填充 Base64；解码长度及解码后再编码完全相等由输入边界验证。"
+    },
+    "PayloadBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 699052,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 524288,
+      "description": "标准带填充 Base64；解码长度及解码后再编码完全相等由输入边界验证。"
+    },
+    "Identity": {
+      "type": "object",
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "account_id",
+        "device_id"
+      ],
+      "additionalProperties": false
+    },
+    "Header": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-poc-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sender": {
+          "$ref": "#/$defs/Identity"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "security_mode": {
+          "const": "e2ee"
+        },
+        "crypto_profile": {
+          "const": "mls-poc"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "recipients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "sender",
+        "logical_message_id",
+        "attempt_id",
+        "security_mode",
+        "crypto_profile",
+        "authorization_version",
+        "crypto_state_ref",
+        "recipients"
+      ],
+      "additionalProperties": false,
+      "description": "解码后的头仅用于解释；发送和接收密码 AAD 使用原始 header_bytes。目标按账号、设备 ASCII 升序，唯一且排除发送设备；实际成员集合须由可信上下文检查。"
+    },
+    "Envelope": {
+      "type": "object",
+      "properties": {
+        "header_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "payload_bytes": {
+          "$ref": "#/$defs/PayloadBytes"
+        }
+      },
+      "required": [
+        "header_bytes",
+        "payload_bytes"
+      ],
+      "additionalProperties": false
+    },
+    "SubmitRequest": {
+      "type": "object",
+      "properties": {
+        "envelope": {
+          "$ref": "#/$defs/Envelope"
+        },
+        "replaces_attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "closure_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "envelope"
+      ],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "replaces_attempt_id": [
+          "closure_id"
+        ],
+        "closure_id": [
+          "replaces_attempt_id"
+        ]
+      }
+    },
+    "AttemptRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "logical_message_id",
+        "attempt_id"
+      ],
+      "additionalProperties": false
+    },
+    "PullRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "after_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)(?![\\s\\S])"
+        }
+      },
+      "required": [
+        "service_id",
+        "after_seq",
+        "limit"
+      ],
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "stream_id"
+          ]
+        },
+        {
+          "properties": {
+            "after_seq": {
+              "const": "0"
+            }
+          }
+        }
+      ]
+    },
+    "DeliveryRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "event_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "service_id",
+        "acceptance_id",
+        "attempt_id",
+        "event_id"
+      ],
+      "additionalProperties": false
+    },
+    "ReadRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "acceptance_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "service_id",
+        "acceptance_ids"
+      ],
+      "additionalProperties": false
+    },
+    "DependencyRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "from_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "to_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "after_control_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[12][0-9]|3[0-2])(?![\\s\\S])"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "from_state_ref",
+        "to_state_ref",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "Availability": {
+      "enum": [
+        "available",
+        "expired",
+        "deleted",
+        "access_removed"
+      ]
+    },
+    "Accepted": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "const": "accepted"
+        },
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "accepted_at_unix_ms": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_ms": {
+          "$ref": "#/$defs/U64"
+        },
+        "recipients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "acceptance_receipt": {
+          "$ref": "#/$defs/SignedMessageAcceptance"
+        }
+      },
+      "required": [
+        "outcome",
+        "acceptance_id",
+        "logical_message_id",
+        "attempt_id",
+        "accepted_at_unix_ms",
+        "expires_at_unix_ms",
+        "recipients",
+        "availability"
+      ],
+      "additionalProperties": false,
+      "description": "持久接受历史事实及当前availability；acceptance_receipt绑定原始消息头和密文。查询及精确重试只返回接受元数据，不返回正文或原Envelope，也不因取得旧接受证明恢复已删除、过期或失权内容的访问。"
+    },
+    "Closed": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "const": "cancelled_before_accept"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "closure_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "closure_receipt": {
+          "$ref": "#/$defs/SignedMessageClosure"
+        }
+      },
+      "required": [
+        "outcome",
+        "logical_message_id",
+        "attempt_id",
+        "closure_id"
+      ],
+      "additionalProperties": false,
+      "description": "未接受尝试的持久封口事实。仅新建且请求envelope_sha256的签名封口附closure_receipt。get_attempt返回原证明；重复close须保持原摘要和前驱（含有无前驱），缺失或改绑返回idempotency_conflict。旧无证明记录保持原响应，不自动升级。迟到submit原尝试仍为attempt_closed。"
+    },
+    "NotFound": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "const": "not_found"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "outcome",
+        "logical_message_id",
+        "attempt_id"
+      ],
+      "additionalProperties": false
+    },
+    "Rejected": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "const": "rejected_final"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "closure_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "code": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "rejection_receipt": {
+          "$ref": "#/$defs/SignedMessageRejection"
+        }
+      },
+      "required": [
+        "outcome",
+        "logical_message_id",
+        "attempt_id",
+        "closure_id",
+        "code"
+      ],
+      "additionalProperties": false,
+      "description": "仅receipt模式下新出现且原头authorization_version严格小于当前版本的state_stale附rejection_receipt；其他拒绝及旧无签名记录不补签。原头、密文、拒绝结果、closure_id和链尾在同一事务保存。已签拒绝的原包重试必须保持原前驱绑定，改变或省略前驱返回idempotency_conflict。get/close返回原终态，后续权限变化不得改变原证明及required恢复下界。"
+    },
+    "AttemptResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Accepted"
+        },
+        {
+          "$ref": "#/$defs/Closed"
+        },
+        {
+          "$ref": "#/$defs/NotFound"
+        },
+        {
+          "$ref": "#/$defs/Rejected"
+        }
+      ]
+    },
+    "Control": {
+      "type": "object",
+      "properties": {
+        "control_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "from_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "to_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "payload_bytes": {
+          "$ref": "#/$defs/PayloadBytes"
+        }
+      },
+      "required": [
+        "control_id",
+        "from_state_ref",
+        "to_state_ref",
+        "payload_bytes"
+      ],
+      "additionalProperties": false
+    },
+    "MessageEvent": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "message"
+        },
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "envelope": {
+          "$ref": "#/$defs/Envelope"
+        },
+        "acceptance_receipt": {
+          "$ref": "#/$defs/SignedMessageAcceptance"
+        }
+      },
+      "required": [
+        "type",
+        "acceptance_id",
+        "envelope"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiptEvent": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "delivery",
+            "read"
+          ]
+        },
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "type",
+        "acceptance_id",
+        "attempt_id",
+        "device"
+      ],
+      "additionalProperties": false
+    },
+    "ControlEvent": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "crypto_control"
+        },
+        "control": {
+          "$ref": "#/$defs/Control"
+        }
+      },
+      "required": [
+        "type",
+        "control"
+      ],
+      "additionalProperties": false
+    },
+    "MessageAvailabilityEvent": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "message_availability"
+        },
+        "target_event_seq": {
+          "$ref": "#/$defs/U64",
+          "not": {
+            "const": "0"
+          }
+        },
+        "target_event_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "availability": {
+          "enum": [
+            "deleted",
+            "expired"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "target_event_seq",
+        "target_event_id",
+        "acceptance_id",
+        "attempt_id",
+        "availability"
+      ],
+      "additionalProperties": false,
+      "description": "同一设备流内更早的原消息槽可用性终态通知。目标流由已认证签页外层stream_id绑定；target_event_seq须小于本通知序号，target_event_id、acceptance_id和attempt_id须对应同设备原消息。只给原消息槽当前仍有权且未撤销的持有者，不给后来加入者补发旧元数据。客户端完整验签及验证整页后，将目标投影、新槽和下载游标共同落盘；保留原成功处理、去重和已有副本，不产生新的送达或已读。仅形状可由Schema验证，跨槽来源和终态关系须由实现验证。未识别新变体的旧POC客户端明确拒绝，不承诺透明向后兼容。"
+    },
+    "Event": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MessageEvent"
+        },
+        {
+          "$ref": "#/$defs/ReceiptEvent"
+        },
+        {
+          "$ref": "#/$defs/ControlEvent"
+        },
+        {
+          "$ref": "#/$defs/MessageAvailabilityEvent"
+        }
+      ]
+    },
+    "EventSlot": {
+      "type": "object",
+      "properties": {
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "event_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "event_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "event": {
+          "$ref": "#/$defs/Event"
+        }
+      },
+      "required": [
+        "stream_id",
+        "event_seq",
+        "event_id",
+        "availability"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "const": "available"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "event"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "event"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "PullResult": {
+      "type": "object",
+      "properties": {
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EventSlot"
+          },
+          "minItems": 0,
+          "maxItems": 100
+        },
+        "next_after_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "watermark": {
+          "$ref": "#/$defs/U64"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "stream_id",
+        "events",
+        "next_after_seq",
+        "watermark",
+        "has_more"
+      ],
+      "additionalProperties": false
+    },
+    "Receipt": {
+      "type": "object",
+      "properties": {
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device": {
+          "$ref": "#/$defs/Identity"
+        },
+        "delivered": {
+          "const": true
+        },
+        "read": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "acceptance_id",
+        "attempt_id",
+        "device",
+        "delivered",
+        "read"
+      ],
+      "additionalProperties": false
+    },
+    "ReadResult": {
+      "type": "object",
+      "properties": {
+        "receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Receipt"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "receipts"
+      ],
+      "additionalProperties": false
+    },
+    "DependencyResult": {
+      "type": "object",
+      "properties": {
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "from_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "to_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "controls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Control"
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "next_after_control_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "from_state_ref",
+        "to_state_ref",
+        "controls",
+        "next_after_control_id",
+        "has_more"
+      ],
+      "additionalProperties": false
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "outcome": {
+          "enum": [
+            "not_recorded",
+            "rejected_final",
+            "cancelled_before_accept",
+            "accepted",
+            "outcome_unknown"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "closure_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "retry_after_ms": {
+          "$ref": "#/$defs/U64"
+        },
+        "acceptance": {
+          "$ref": "#/$defs/Accepted"
+        },
+        "rejection_receipt": {
+          "$ref": "#/$defs/SignedMessageRejection"
+        }
+      },
+      "required": [
+        "code",
+        "outcome",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "$ref": "#/$defs/Error"
+        }
+      },
+      "required": [
+        "ok",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "AcceptedResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/Accepted"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "AttemptResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/AttemptResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "PullResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/PullResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 921600,
+      "description": "完整响应编码后至多 900 KiB；为 Rust CLI 的 1 MiB 输入及命令上下文预留余量。页大小是项数上限，也受整体字节预算限制。"
+    },
+    "ReceiptResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/Receipt"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ReadResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/ReadResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "DependencyResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/DependencyResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 921600,
+      "description": "完整响应编码后至多 900 KiB；为 Rust CLI 的 1 MiB 输入及命令上下文预留余量。页大小是项数上限，也受整体字节预算限制。"
+    },
+    "CloseRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "replaces_attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "closure_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "logical_message_id",
+        "attempt_id"
+      ],
+      "additionalProperties": false,
+      "dependentRequired": {
+        "replaces_attempt_id": [
+          "closure_id"
+        ],
+        "closure_id": [
+          "replaces_attempt_id"
+        ]
+      },
+      "description": "封口尚未被 Relay 登记的替代尝试时，必须成对提供当前链尾的 replaces_attempt_id 与 closure_id；接受和封口共用串行事务。可选 envelope_sha256 请求签名封口，值为原信封域分离摘要的64位小写hex，不传Envelope。摘要只绑定鉴权发送者的请求，不证明Service核对了未收到的密文。签名请求无签名器返回503，不降级；旧无证明封口及rejected_final只返回原结果，不补签；逻辑消息已accepted始终优先返回原接受事实。"
+    },
+    "PermissionSignatureBytes": {
+      "type": "string",
+      "minLength": 88,
+      "maxLength": 88,
+      "pattern": "^[A-Za-z0-9+/]{85}[AQgw]==(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-exact-decoded-bytes": 64
+    },
+    "PermissionKeyBytes": {
+      "type": "string",
+      "minLength": 44,
+      "maxLength": 44,
+      "pattern": "^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-exact-decoded-bytes": 32
+    },
+    "PermissionMember": {
+      "type": "object",
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signature_key": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        }
+      },
+      "required": [
+        "account_id",
+        "device_id",
+        "signature_key"
+      ],
+      "additionalProperties": false
+    },
+    "PermissionCheckpoint": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "owner_account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PermissionMember"
+          },
+          "minItems": 2,
+          "maxItems": 6,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "authorization_version",
+        "crypto_state_ref",
+        "owner_account_id",
+        "members"
+      ],
+      "additionalProperties": false,
+      "description": "由可信启动装置固定。成员按账号/设备排序，身份与公钥均唯一、包含所有者；仅允许合法变更沿前驱推进，不接受提交方提供的新检查点。"
+    },
+    "PermissionAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "remove_member"
+            },
+            "account_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "kind",
+            "account_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "revoke_device"
+            },
+            "account_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "device_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "kind",
+            "account_id",
+            "device_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "add_member"
+            },
+            "member": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "key_package_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "welcome_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "history_policy": {
+              "const": "from_join"
+            }
+          },
+          "required": [
+            "kind",
+            "member",
+            "key_package_sha256",
+            "welcome_sha256",
+            "history_policy"
+          ],
+          "additionalProperties": false,
+          "description": "仅群主当前设备邀请从未入群的新账号；不适用于同账号增加设备。"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "add_device"
+            },
+            "member": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "key_package_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "welcome_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "history_policy": {
+              "const": "from_join"
+            }
+          },
+          "required": [
+            "kind",
+            "member",
+            "key_package_sha256",
+            "welcome_sha256",
+            "history_policy"
+          ],
+          "additionalProperties": false,
+          "description": "仅目标同账号的当前有效旧设备签名授权，目标设备从未入群。群主不能代签其他账号设备；此授权仅作用于当前群和加入后的消息，不构成全局账号设备信任链。"
+        }
+      ]
+    },
+    "PermissionStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-permission-1"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "actor": {
+          "$ref": "#/$defs/Identity"
+        },
+        "previous_authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "from_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "to_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "action": {
+          "$ref": "#/$defs/PermissionAction"
+        },
+        "commit_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "nonce": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "issued_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "change_id",
+        "service_id",
+        "conversation_id",
+        "actor",
+        "previous_authorization_version",
+        "authorization_version",
+        "from_state_ref",
+        "to_state_ref",
+        "action",
+        "commit_sha256",
+        "nonce",
+        "issued_at_unix_secs",
+        "expires_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "不可变原始UTF-8 JSON签名声明。版本恰为前驱+1；有效期跨度1..300秒，首次Service接受要求issued<=当前秒<expires。实验单会话nonce唯一，已接受原证据重试不受当前过期影响。"
+    },
+    "PermissionProof": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        },
+        "commit_bytes": {
+          "$ref": "#/$defs/PayloadBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes",
+        "commit_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "原始声明<=16KiB、Ed25519签名64字节、原始Commit<=512KiB；Base64规范编码且重试逐字节复用。此结构验证不等于签名通过；签名域、摘要与权限判断由Rust公共验证器执行。"
+    },
+    "SubmitPermissionRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change": {
+          "$ref": "#/$defs/PermissionProof"
+        },
+        "join": {
+          "$ref": "#/$defs/JoinMaterial"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "change"
+      ],
+      "additionalProperties": false,
+      "description": "decoded声明为add_member或add_device时必须提供join；其他action禁止附加。两种Add均仅适用于具有完整初始设备公钥目录和成员历史的新空库，并要求既有Service receipt模式；schema4复用设备历史账本，不从重启fixture扩充信任。首次提交验证真实KeyPackage，原样重试复用同一接受及材料。add_member要求owner及never-account；add_device要求目标同账号当前旧设备签名及never-device。没有第二层群主审批；原TrustedRoster版本仅是本地视图，不能映射为群授权版本。"
+    },
+    "PermissionChangesRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "after_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[12][0-9]|3[0-2])(?![\\s\\S])"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "after_version",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "PermissionAccepted": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "const": "accepted"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedPermissionTerminal"
+        }
+      },
+      "required": [
+        "outcome",
+        "change_id",
+        "authorization_version",
+        "crypto_state_ref"
+      ],
+      "additionalProperties": false,
+      "description": "仅说明R0业务权限变更和证据已持久接受；不证明实际MLS Commit成员变更正确或端侧达到R1。接收端仍须独立验签、检查实际Commit和成员/公共状态一致性。 已启用Service固定公钥时额外返回与权限决定同事务持久化的receipt；未启用实例保持旧形状。receipt同样不代表接收端验证实际Commit通过。"
+    },
+    "PermissionChangesResult": {
+      "type": "object",
+      "properties": {
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PermissionProof"
+          },
+          "minItems": 0,
+          "maxItems": 32
+        },
+        "next_after_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "changes",
+        "next_after_version",
+        "authorization_version",
+        "has_more"
+      ],
+      "additionalProperties": false,
+      "description": "当前成员可查看从可信初始检查点起的公开权限证据metadata，包含入群前的公开链；不包含Welcome、入群前业务消息或历史解密私钥。新加入者验证该链不等于获得历史epoch或将其装入past。"
+    },
+    "PermissionAcceptedResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/PermissionAccepted"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "PermissionChangesResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/PermissionChangesResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 921600,
+      "description": "完整JSON响应<=900KiB，分页同时受32项及字节预算约束。"
+    },
+    "SignedPermissionTerminal": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "原始UTF-8 JSON声明与Ed25519签名。设备close和Service receipt使用独立协议版本及签名域，不能互换；原始字节必须保存并精确重试。"
+    },
+    "PermissionCloseStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-permission-close-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "actor": {
+          "$ref": "#/$defs/Identity"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "proof_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "actor",
+        "change_id",
+        "proof_sha256"
+      ],
+      "additionalProperties": false,
+      "description": "设备签名关闭精确候选；无需新时间/nonce，不代表撤回已接受变更。原Proof签名仍须由当前已授权actor公钥验证，旧版本或已过期不妨碍关闭未接受候选。"
+    },
+    "PermissionReceiptStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-permission-receipt-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "actor": {
+          "$ref": "#/$defs/Identity"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "proof_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "closed"
+          ]
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "actor",
+        "change_id",
+        "proof_sha256",
+        "outcome",
+        "authorization_version",
+        "crypto_state_ref"
+      ],
+      "additionalProperties": false,
+      "description": "Service固定公钥签名的终态。accepted绑定原Proof后继检查点；closed绑定封口时Service当前业务版本/状态，仅给恢复floor，不证明端侧已验证MLS。Proof摘要=SHA256(domain Rockets-IM/POC/permission-proof/v1加NUL + 按statement/signature/commit顺序各decoded字节前置u64BE长度)。"
+    },
+    "PermissionRecord": {
+      "type": "object",
+      "properties": {
+        "change": {
+          "$ref": "#/$defs/PermissionProof"
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedPermissionTerminal"
+        }
+      },
+      "required": [
+        "change",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "PermissionRecordResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/PermissionRecord"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ClosePermissionRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change": {
+          "$ref": "#/$defs/PermissionProof"
+        },
+        "close": {
+          "$ref": "#/$defs/SignedPermissionTerminal"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "change",
+        "close"
+      ],
+      "additionalProperties": false
+    },
+    "PermissionRecordsResult": {
+      "type": "object",
+      "properties": {
+        "next_after_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PermissionRecord"
+          },
+          "minItems": 0,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "records",
+        "next_after_version",
+        "authorization_version",
+        "has_more"
+      ],
+      "additionalProperties": false,
+      "description": "当前有效成员分页取得有序accepted {change,receipt}记录，不使用平行数组。关闭记录通过close返回；分页边界与原权限链一致，完整JSON<=900KiB，不跳游标。"
+    },
+    "PermissionRecordsResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/PermissionRecordsResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 921600
+    },
+    "SignedMessageAcceptance": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "Service 对原消息接受的签名，envelope 保留原声明字节。仅 receipt mode 新接受记录包含；旧无签名记录不补签，精确重试返回原字节。验签不能代替端侧 MLS 验证或授予已撤销发送者旧消息新的可信身份。"
+    },
+    "MessageAcceptanceStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-message-acceptance-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "acceptance_id",
+        "envelope_sha256",
+        "authorization_version",
+        "crypto_state_ref"
+      ],
+      "additionalProperties": false,
+      "description": "envelope_sha256=SHA256(domain Rockets-IM/POC/message-envelope/v1加NUL + 原始decoded header/payload依次前置u64BE长度)。原header绑定sender、logical/attempt ID及原targets。Ed25519签名输入为独立domain Rockets-IM/POC/message-acceptance/v1加NUL + 原statement_bytes。绑定业务接受，不包含可信全局时钟或R0水位；不证明端侧MLS已解密，也不解决Q02的Service分叉/回滚。"
+    },
+    "JoinMaterial": {
+      "type": "object",
+      "properties": {
+        "key_package": {
+          "$ref": "#/$defs/PayloadBytes"
+        },
+        "welcome": {
+          "$ref": "#/$defs/PayloadBytes"
+        }
+      },
+      "required": [
+        "key_package",
+        "welcome"
+      ],
+      "additionalProperties": false,
+      "description": "原始KeyPackage和Welcome的规范Base64，两份SHA256由对应动作的授权设备签名绑定：add_member由群主当前设备邀请新账号，add_device由目标同账号当前有效旧设备授权。两者均仅from_join。每段最大512KiB，首次提交会验证真实KeyPackage签名、身份及密码套件；完整请求不超过1MiB，完整材料响应不超过900KiB。Welcome仅精确目标当前有效设备可领；Service不能解密Welcome，接收端独立验证实际MLS加入。"
+    },
+    "JoinMaterialRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "change_id"
+      ],
+      "additionalProperties": false
+    },
+    "JoinMaterialResult": {
+      "type": "object",
+      "properties": {
+        "record": {
+          "$ref": "#/$defs/PermissionRecord"
+        },
+        "join": {
+          "$ref": "#/$defs/JoinMaterial"
+        }
+      },
+      "required": [
+        "record",
+        "join"
+      ],
+      "additionalProperties": false,
+      "description": "仅原签名Add动作的准确目标且当前有效成员设备领取；add_member和add_device共用。Service校对动作种类、目标、服务和会话，原材料逐字返回。公开权限链是授权元数据，其他成员不能领取此Welcome；不补发加入前历史消息。"
+    },
+    "JoinMaterialResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/JoinMaterialResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 921600,
+      "description": "完整JSON<=900KiB，Service首次接受前检查该上限，超限整体回滚。仅原目标且当前仍获授权设备领取；owner及其他成员不能代领。"
+    },
+    "HistorySelectionItem": {
+      "type": "object",
+      "properties": {
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "acceptance_id",
+        "envelope_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "HistoryRequestStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-history-request-1"
+        },
+        "transfer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "source": {
+          "$ref": "#/$defs/Identity"
+        },
+        "target": {
+          "$ref": "#/$defs/Identity"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "recipient_key": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HistorySelectionItem"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "nonce": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "issued_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "transfer_id",
+        "service_id",
+        "conversation_id",
+        "source",
+        "target",
+        "authorization_version",
+        "crypto_state_ref",
+        "recipient_key",
+        "selection",
+        "nonce",
+        "issued_at_unix_secs",
+        "expires_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "目标设备签名；双方同账号不同设备且当前有效，selection按acceptance_id排序唯一。当前CP必须精确匹配，有效跨度1..300秒，issued<=now<expires。不可复制MLS状态或隐式扩大选择。"
+    },
+    "SignedHistoryRequest": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "原不可变HistoryRequestStatement UTF8字节与目标签名。签名域Rockets-IM/POC/history-request/v1\\0。"
+    },
+    "HistoryPackageStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-history-package-1"
+        },
+        "transfer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "ciphertext_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "transfer_id",
+        "request_sha256",
+        "ciphertext_sha256"
+      ],
+      "additionalProperties": false,
+      "description": "由源设备签名；绑定完整请求及HPKE KEM/ciphertext。Service不解密包，不证明其中正文真实来自原作者。"
+    },
+    "HistoryPackage": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        },
+        "kem_output": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        },
+        "ciphertext": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 349548,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+          "contentEncoding": "base64",
+          "x-max-decoded-bytes": 262160,
+          "description": "标准带填充 Base64；解码长度及解码后再编码完全相等由输入边界验证。",
+          "x-min-decoded-bytes": 16
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes",
+        "kem_output",
+        "ciphertext"
+      ],
+      "additionalProperties": false,
+      "description": "目标专属HPKE Base密文；接收钥及KEM输出各32字节，认证密文16..262160字节。解密后的JSON最多256KiB，每条正文最多64KiB，1..16条来自源设备已验证接收副本或已验证Service接受证明的本人已发送副本，不含附件或密码状态。"
+    },
+    "HistoryReceiptStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-history-receipt-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "transfer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "package_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "accepted_at_unix_ms": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "transfer_id",
+        "request_sha256",
+        "package_sha256",
+        "authorization_version",
+        "crypto_state_ref",
+        "accepted_at_unix_ms",
+        "expires_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "固定Service key签署的精确迁移接受事实；不证明正文作者或未见状态的新鲜度。到期或已知状态变化阻止释放/首次导入，已下载副本无法远程收回。"
+    },
+    "SignedHistoryReceipt": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "原HistoryReceiptStatement及Service签名；独立域Rockets-IM/POC/history-receipt/v1\\0。"
+    },
+    "HistoryTransferRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "request": {
+          "$ref": "#/$defs/SignedHistoryRequest"
+        },
+        "package": {
+          "$ref": "#/$defs/HistoryPackage"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "request",
+        "package"
+      ],
+      "additionalProperties": false
+    },
+    "HistoryTransferGetRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "transfer_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "transfer_id"
+      ],
+      "additionalProperties": false
+    },
+    "HistoryTransferResult": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/SignedHistoryRequest"
+        },
+        "package": {
+          "$ref": "#/$defs/HistoryPackage"
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedHistoryReceipt"
+        }
+      },
+      "required": [
+        "request",
+        "package",
+        "receipt"
+      ],
+      "additionalProperties": false,
+      "description": "只有源提交或精确目标领取可得此包。提交/原样重试/领取均重新检查双方当前权限、CP、请求有效期及全部原消息的接受证明、精确摘要、可用状态和保留期限。源设备精确等于原header.sender时允许已发送副本，不要求不存在的自身消息事件；否则必须是原recipients中的准确设备且自己的message事件可用，不能按同账号借用发送者身份。任一失败整包拒绝，不修改原流、发送状态或回执。已导入副本不能继续转迁。"
+    },
+    "HistoryTransferResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/HistoryTransferResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 921600
+    },
+    "ConsistencyHeadRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "challenge": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "调用设备新生成的32字节随机challenge，编码为64位小写十六进制；服务不代填、不证明客户端未复用。"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "challenge"
+      ],
+      "additionalProperties": false
+    },
+    "ConsistencyHeadStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-consistency-head-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "actor": {
+          "$ref": "#/$defs/Identity"
+        },
+        "challenge": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "调用设备新生成的32字节随机challenge，编码为64位小写十六进制；服务不代填、不证明客户端未复用。"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/PermissionCheckpoint"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "actor",
+        "challenge",
+        "checkpoint"
+      ],
+      "additionalProperties": false,
+      "description": "Service在当前事务读取完整持久权限检查点，actor必须是当前鉴权设备且为有效成员，外层上下文必须与checkpoint相同。仅表示该Service视图；随机challenge绑定本次请求，不证明全局最新，也不能检测从未交汇的孤立分叉。"
+    },
+    "SignedConsistencyHead": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "原始UTF-8 JSON ConsistencyHeadStatement与64字节Ed25519签名；独立域Rockets-IM/POC/consistency-head/v1后接一个NUL字节，再接原statement_bytes解码字节。客户端须用已固定Service公钥独立验签及核对本机待验证challenge/actor/上下文。不得把此签名CP直接当作已验证MLS状态或替代权限链。",
+      "x-decoded-statement-schema": {
+        "$ref": "#/$defs/ConsistencyHeadStatement"
+      }
+    },
+    "ConsistencyHeadResult": {
+      "type": "object",
+      "properties": {
+        "head": {
+          "$ref": "#/$defs/SignedConsistencyHead"
+        }
+      },
+      "required": [
+        "head"
+      ],
+      "additionalProperties": false
+    },
+    "ConsistencyHeadResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/ConsistencyHeadResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ConsistencyExchangeRequestStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-consistency-exchange-request-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "source": {
+          "$ref": "#/$defs/Identity"
+        },
+        "target": {
+          "$ref": "#/$defs/Identity"
+        },
+        "source_fingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "来源设备 32 字节 Ed25519 公钥的 SHA-256，完整 64 位十六进制。"
+        },
+        "target_fingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "目标设备 32 字节 Ed25519 公钥的 SHA-256，完整 64 位十六进制。"
+        },
+        "challenge": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "目标设备生成的 32 个随机字节；持久保存并绑定本次交换，不证明最新。"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "source",
+        "target",
+        "source_fingerprint",
+        "target_fingerprint",
+        "challenge"
+      ],
+      "additionalProperties": false,
+      "description": "目标设备签名的公开交换请求；双方必须为当前可信成员中的不同设备，完整指纹匹配本机已固定公钥。相同账号的不同设备仍须分别核验。",
+      "x-max-utf8-json-bytes": 16384
+    },
+    "SignedConsistencyExchangeRequest": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "只描述 SignedRecord 外形。必须独立解析原始声明并按固定公钥验签，不能据形状证明信任或渠道独立性。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/ConsistencyExchangeRequestStatement"
+      },
+      "x-signing-domain-utf8": "Rockets-IM/POC/consistency-exchange-request/v1\u0000"
+    },
+    "ConsistencyExchangePackageStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-consistency-exchange-package-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "source": {
+          "$ref": "#/$defs/Identity"
+        },
+        "target": {
+          "$ref": "#/$defs/Identity"
+        },
+        "challenge": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "目标设备生成的 32 个随机字节；持久保存并绑定本次交换，不证明最新。"
+        },
+        "request_sha256": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "按 statement_bytes、signature_bytes 固定顺序紧凑序列化两字段 SignedRecord 的 JSON UTF-8 字节 SHA-256；不重建签名原文。"
+        },
+        "predecessor": {
+          "$ref": "#/$defs/PermissionCheckpoint"
+        },
+        "record": {
+          "$ref": "#/$defs/PermissionRecord"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "source",
+        "target",
+        "challenge",
+        "request_sha256",
+        "predecessor",
+        "record"
+      ],
+      "additionalProperties": false,
+      "description": "来源设备签名的公开单项证据包。record 必须为实际持有端已保存的 accepted 原证明及 Service 回执；来源真实验证索引同时覆盖前驱和后继。接收只使用本机可信前驱验证并对照，不应用外部 MLS、建立新信任或授权历史。",
+      "x-max-utf8-json-bytes": 524288
+    },
+    "SignedConsistencyExchangePackage": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/PayloadBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "只描述 SignedRecord 外形。必须独立解析原始声明并按固定公钥验签，不能据形状证明信任或渠道独立性。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/ConsistencyExchangePackageStatement"
+      },
+      "x-signing-domain-utf8": "Rockets-IM/POC/consistency-exchange-package/v1\u0000"
+    },
+    "ConsistencyExchangeBeginOperation": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "const": "consistency_exchange_begin"
+        },
+        "source": {
+          "$ref": "#/$defs/Identity"
+        },
+        "verified_fingerprint": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+          "description": "逐次核对的来源完整公钥指纹，必须匹配本机已有信任。"
+        },
+        "verification": {
+          "enum": [
+            "manual_in_person",
+            "synthetic_local"
+          ],
+          "description": "人工值仅记录调用者声明；自动化一律 synthetic_local，均不证明全局最新。"
+        }
+      },
+      "required": [
+        "operation",
+        "source",
+        "verified_fingerprint",
+        "verification"
+      ],
+      "additionalProperties": false,
+      "description": "只在已有设备上下文执行；保存请求和检查闸后返回。同参数活动请求精确重试，其他未完成 Q02 检查不能被占用。"
+    },
+    "ConsistencyExchangeExportOperation": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "const": "consistency_exchange_export"
+        },
+        "request": {
+          "$ref": "#/$defs/SignedConsistencyExchangeRequest"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "operation",
+        "request",
+        "change_id"
+      ],
+      "additionalProperties": false,
+      "description": "读取实际持有记录，一请求一 change_id；先重新校验当前双方权限和钥，再返回持久保存的原包。"
+    },
+    "ConsistencyExchangeImportOperation": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "const": "consistency_exchange_import"
+        },
+        "package": {
+          "$ref": "#/$defs/SignedConsistencyExchangePackage"
+        }
+      },
+      "required": [
+        "operation",
+        "package"
+      ],
+      "additionalProperties": false,
+      "description": "验证来源签名、当前双方钥、请求绑定及本机可信前驱；对照结果为 matched、fork_detected 或 insufficient_comparison，freshness 始终 unknown。"
+    },
+    "ConsistencyExchangeCancelOperation": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "const": "consistency_exchange_cancel"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "additionalProperties": false,
+      "description": "取消自己的活动交换并保留 Q02 检查闸、证据及既有暂停；不自动恢复发送。"
+    },
+    "ConsistencyExchangeInspectOperation": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "const": "consistency_exchange_inspect"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "additionalProperties": false,
+      "description": "仅返回公开交换状态、核验声明及计数；不返回秘密。"
+    },
+    "ConsistencyExchangeOperation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ConsistencyExchangeBeginOperation"
+        },
+        {
+          "$ref": "#/$defs/ConsistencyExchangeExportOperation"
+        },
+        {
+          "$ref": "#/$defs/ConsistencyExchangeImportOperation"
+        },
+        {
+          "$ref": "#/$defs/ConsistencyExchangeCancelOperation"
+        },
+        {
+          "$ref": "#/$defs/ConsistencyExchangeInspectOperation"
+        }
+      ],
+      "description": "仅本机 CLI 操作片段，外层仍使用现有设备上下文；没有新增 HTTP 路由或正式 SDK 承诺。各分支以 operation 常量区分。",
+      "x-max-utf8-json-bytes": 1048576,
+      "x-max-active-exchanges": 1,
+      "x-max-exported-packages": 128,
+      "x-max-imported-packages": 128,
+      "x-max-snapshot-bytes": 16777216
+    },
+    "RebuildSuccessorScope": {
+      "type": "object",
+      "properties": {
+        "service": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "account": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "identity_key": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "store_id": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "service",
+        "account",
+        "device",
+        "identity_key",
+        "store_id"
+      ],
+      "additionalProperties": false,
+      "description": "后继服务、账号、设备与独立密码身份和store范围；不是可改变的普通游标。"
+    },
+    "RebuildOldScope": {
+      "type": "object",
+      "properties": {
+        "service": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "旧锚范围标识按原协议验证：UTF-8最多128字节且不含控制字符。"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "旧锚范围标识按原协议验证：UTF-8最多128字节且不含控制字符。"
+        },
+        "device": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "旧锚范围标识按原协议验证：UTF-8最多128字节且不含控制字符。"
+        },
+        "identity_key": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "store_id": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "service",
+        "account",
+        "device",
+        "identity_key",
+        "store_id"
+      ],
+      "additionalProperties": false
+    },
+    "RebuildSourceTrust": {
+      "type": "object",
+      "properties": {
+        "authorizer": {
+          "$ref": "#/$defs/PermissionMember"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/PermissionCheckpoint"
+        },
+        "relay_receipt_key": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        }
+      },
+      "required": [
+        "authorizer",
+        "checkpoint",
+        "relay_receipt_key"
+      ],
+      "additionalProperties": false
+    },
+    "RebuildStreamTrust": {
+      "type": "object",
+      "properties": {
+        "old_scope": {
+          "$ref": "#/$defs/RebuildOldScope"
+        },
+        "anchor_public_key": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "trust": {
+          "$ref": "#/$defs/RebuildSourceTrust"
+        }
+      },
+      "required": [
+        "old_scope",
+        "anchor_public_key",
+        "trust"
+      ],
+      "additionalProperties": false,
+      "description": "fixture设备条目的可选rebuild_trust；仅新空库固定，重启须精确一致，已有库不能补登记。"
+    },
+    "RebuildPlan": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-anchor-rebuild-1"
+        },
+        "rebuild_id": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "old_scope": {
+          "$ref": "#/$defs/RebuildOldScope"
+        },
+        "old_head": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "old_txn": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "old_revision": {
+          "$ref": "#/$defs/U64"
+        },
+        "old_conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "old_group_id": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 172,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+          "contentEncoding": "base64",
+          "x-max-decoded-bytes": 128,
+          "description": "标准带填充 Base64；解码长度及解码后再编码完全相等由输入边界验证。"
+        },
+        "anchor_public_key": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "successor_scope": {
+          "$ref": "#/$defs/RebuildSuccessorScope"
+        },
+        "successor_head": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "successor_client_public_key": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "trust": {
+          "$ref": "#/$defs/RebuildSourceTrust"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "rebuild_id",
+        "old_scope",
+        "old_head",
+        "old_txn",
+        "old_revision",
+        "old_conversation_id",
+        "old_group_id",
+        "anchor_public_key",
+        "successor_scope",
+        "successor_head",
+        "successor_client_public_key",
+        "key_package_sha256",
+        "trust"
+      ],
+      "additionalProperties": false,
+      "description": "原重建计划。新旧同服务同账号，设备、身份、store均不同；新旧会话和真实MLS群不同；完整关系约束由Rust验证。"
+    },
+    "SignedRebuildStream": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。"
+    },
+    "RebuildStreamRequestStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-rebuild-stream-request-1"
+        },
+        "plan_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "successor_scope": {
+          "$ref": "#/$defs/RebuildSuccessorScope"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "initial_cursor": {
+          "const": "0"
+        },
+        "join_proof_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "plan_sha256",
+        "successor_scope",
+        "conversation_id",
+        "stream_id",
+        "initial_cursor",
+        "join_proof_sha256"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 16384
+    },
+    "RebuildStreamBindingStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-rebuild-stream-binding-1"
+        },
+        "plan_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "successor_scope": {
+          "$ref": "#/$defs/RebuildSuccessorScope"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "initial_cursor": {
+          "const": "0"
+        },
+        "join_proof_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "plan_sha256",
+        "successor_scope",
+        "conversation_id",
+        "stream_id",
+        "initial_cursor",
+        "join_proof_sha256",
+        "request_sha256"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 16384
+    },
+    "RebuildStreamRegistration": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "$ref": "#/$defs/RebuildPlan"
+        },
+        "approval": {
+          "$ref": "#/$defs/SignedAnchorRebuild"
+        },
+        "anchor_request": {
+          "$ref": "#/$defs/SignedAnchorRebuild"
+        },
+        "anchor_response": {
+          "$ref": "#/$defs/SignedAnchorRebuild"
+        },
+        "request": {
+          "$ref": "#/$defs/SignedRebuildStreamRequest"
+        },
+        "join_record": {
+          "$ref": "#/$defs/PermissionRecord"
+        }
+      },
+      "required": [
+        "plan",
+        "approval",
+        "anchor_request",
+        "anchor_response",
+        "request",
+        "join_record"
+      ],
+      "additionalProperties": false,
+      "description": "批准和anchor字段沿用原锚签名域。Join记录必须为本库已接受的精确AddDevice。链接证明只证明签发时事实；客户端每次操作仍必须验证独立锚，不能据此声称Relay实时知道取消。"
+    },
+    "RegisterRebuildStreamRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "registration": {
+          "$ref": "#/$defs/RebuildStreamRegistration"
+        }
+      },
+      "required": [
+        "service_id",
+        "registration"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 1048576
+    },
+    "RebuildStreamBindingResult": {
+      "type": "object",
+      "properties": {
+        "binding": {
+          "$ref": "#/$defs/SignedRebuildStreamBinding"
+        }
+      },
+      "required": [
+        "binding"
+      ],
+      "additionalProperties": false
+    },
+    "RebuildStreamBindingResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/RebuildStreamBindingResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "RebuildStreamPullStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-rebuild-stream-pull-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "successor_scope": {
+          "$ref": "#/$defs/RebuildSuccessorScope"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "after_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)(?![\\s\\S])"
+        },
+        "challenge": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "successor_scope",
+        "stream_id",
+        "binding_sha256",
+        "after_seq",
+        "limit",
+        "challenge"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 16384
+    },
+    "RebuildStreamPageStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-rebuild-stream-page-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "successor_scope": {
+          "$ref": "#/$defs/RebuildSuccessorScope"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "binding_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "after_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)(?![\\s\\S])"
+        },
+        "challenge": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "page_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "successor_scope",
+        "stream_id",
+        "binding_sha256",
+        "after_seq",
+        "limit",
+        "challenge",
+        "request_sha256",
+        "page_sha256"
+      ],
+      "additionalProperties": false,
+      "description": "page_sha256为page_bytes解码后原字节的SHA256；声明绑定本次已签名pull摘要、挑战、完整后继范围与原始分页边界。",
+      "x-max-utf8-json-bytes": 16384
+    },
+    "PullRebuildEventsRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "request": {
+          "$ref": "#/$defs/SignedRebuildStreamPull"
+        }
+      },
+      "required": [
+        "service_id",
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "RebuildStreamPageResult": {
+      "type": "object",
+      "properties": {
+        "page_bytes": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 1010348,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+          "contentEncoding": "base64",
+          "x-max-decoded-bytes": 757760,
+          "description": "原PullResult的UTF-8 JSON原字节，规范Base64，解码最多740KiB；不能重编码替代签名摘要。"
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedRebuildStreamPage"
+        }
+      },
+      "required": [
+        "page_bytes",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "RebuildStreamPageResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/RebuildStreamPageResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "SignedRebuildStreamRequest": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/RebuildStreamRequestStatement"
+      },
+      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-request/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+    },
+    "SignedRebuildStreamBinding": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/RebuildStreamBindingStatement"
+      },
+      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-binding/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+    },
+    "SignedRebuildStreamPull": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/RebuildStreamPullStatement"
+      },
+      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-pull/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+    },
+    "SignedRebuildStreamPage": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "保留原始声明字节。request/binding/pull/page使用各自的Rockets-IM/POC/rebuild-stream-<kind>/v1 NUL结尾签名域。摘要为SHA256：rebuild-stream-signed-digest域、u64大端声明长度、原声明、u64大端签名长度、原签名；不重新序列化。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/RebuildStreamPageStatement"
+      },
+      "x-signing-domain-utf8": "Rockets-IM/POC/rebuild-stream-page/v1\u0000",
+      "x-signed-digest-domain-utf8": "Rockets-IM/POC/rebuild-stream-signed-digest/v1\u0000"
+    },
+    "SignedAnchorRebuild": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 10924,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+          "contentEncoding": "base64",
+          "x-max-decoded-bytes": 8192,
+          "description": "标准带填充 Base64；解码长度及解码后再编码完全相等由输入边界验证。"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "原anchor-rebuild批准、旧客户端请求或authority响应；声明最多8KiB，使用各自既有锚签名域，不能作为新流签名。"
+    },
+    "StreamPageStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "RIM-STREAM-PAGE-POC-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "after_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)(?![\\s\\S])"
+        },
+        "page_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "account_id",
+        "device_id",
+        "stream_id",
+        "after_seq",
+        "limit",
+        "page_sha256"
+      ],
+      "additionalProperties": false,
+      "x-max-utf8-json-bytes": 16384,
+      "description": "普通设备流原始分页签名声明。Service、账号与设备取自实例固定配置和已认证设备记录，stream_id 取自该设备持久流。page_sha256 为原 page_bytes 解码字节的 SHA256，包含槽内容、可用性和完整分页边界。after_seq 与 limit 绑定本次已处理请求；无独立 challenge，不作为全局新鲜度或反回滚证明。"
+    },
+    "SignedStreamPage": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "原 StreamPageStatement UTF-8 字节与 Ed25519 签名；客户端先使用已固定 Service 公钥验签并检查本机实例、账号、设备及流归属，再保存页。原始字节不得重新序列化替代。普通流签名不能作为重建后继授权。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/StreamPageStatement"
+      },
+      "x-signing-domain-utf8": "Rockets-IM/POC/stream-page/v1\u0000"
+    },
+    "StreamPageResult": {
+      "type": "object",
+      "properties": {
+        "page_bytes": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 1010348,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+          "contentEncoding": "base64",
+          "x-max-decoded-bytes": 757760,
+          "description": "原PullResult的UTF-8 JSON原字节，规范Base64，解码最多740KiB；不能重编码替代签名摘要。",
+          "x-decoded-page-schema": {
+            "$ref": "#/$defs/PullResult"
+          }
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedStreamPage"
+        }
+      },
+      "required": [
+        "page_bytes",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "StreamPageResultResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/StreamPageResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "SignedMessageClosure": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "Service签名消息封口原字节；声明必须按MessageClosureStatement解析，接收端以预先固定的Service公钥验签。签名输入为独立domain Rockets-IM/POC/message-closure/v1加NUL再拼原statement_bytes；与权限终态/消息接受域互不通用。"
+    },
+    "MessageClosureStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-message-closure-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sender": {
+          "$ref": "#/$defs/Identity"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "replaces_attempt_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Identifier"
+            }
+          ]
+        },
+        "predecessor_closure_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Identifier"
+            }
+          ]
+        },
+        "closure_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "outcome": {
+          "const": "cancelled_before_accept"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "sender",
+        "logical_message_id",
+        "attempt_id",
+        "envelope_sha256",
+        "replaces_attempt_id",
+        "predecessor_closure_id",
+        "closure_id",
+        "outcome"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "replaces_attempt_id": {
+              "type": "null"
+            },
+            "predecessor_closure_id": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "replaces_attempt_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "predecessor_closure_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          }
+        }
+      ],
+      "description": "P1前驱两字段必须显式null，后继两字段必须为String并绑定请求中的replaces_attempt_id及closure_id；本次closure_id是独立新终态标识。声明验证器还须拒绝replaces_attempt_id等于attempt_id，或predecessor_closure_id等于closure_id；这些动态字段比较由运行时执行。sender来自Bearer鉴权设备。envelope_sha256复用message-envelope/v1的原header/payload分段长度摘要，但NULL尝试未保存原信封，Service仅认证请求绑定；不声明已经接收/解密密文、不证明全局最新或排除恶意Service分叉。"
+    },
+    "SignedMessageRejection": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "Service签名state_stale拒绝原字节；声明按MessageRejectionStatement解析，以固定Service公钥验签。输入为独立domain Rockets-IM/POC/message-rejection/v1加NUL再拼原statement_bytes；与其他签名域不可混用。首次submit的409、精确重试409及get/close的原终态保留相同证明；不能把错误包装本身当作已验证的业务终态。"
+    },
+    "MessageRejectionStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-message-rejection-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sender": {
+          "$ref": "#/$defs/Identity"
+        },
+        "logical_message_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "replaces_attempt_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Identifier"
+            }
+          ]
+        },
+        "predecessor_closure_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Identifier"
+            }
+          ]
+        },
+        "closure_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "outcome": {
+          "const": "rejected_final"
+        },
+        "code": {
+          "const": "state_stale"
+        },
+        "required_authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "required_crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "sender",
+        "logical_message_id",
+        "attempt_id",
+        "envelope_sha256",
+        "replaces_attempt_id",
+        "predecessor_closure_id",
+        "closure_id",
+        "outcome",
+        "code",
+        "required_authorization_version",
+        "required_crypto_state_ref"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "replaces_attempt_id": {
+              "type": "null"
+            },
+            "predecessor_closure_id": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "replaces_attempt_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "predecessor_closure_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          }
+        }
+      ],
+      "description": "仅绑定原信封的真实落后state_stale，required版本必须严格大于原头版本；required版本/状态来自首次拒绝同事务的会话及一致权限检查点投影。前驱两字段必填且同时null或String，准确绑定该尝试请求；运行时拒绝自引用尝试及新旧closure_id相同。恢复下界不是权限材料，客户端仍须验证并持久应用权限记录；不证明全局最新或排除恶意Service分叉。"
+    }
+  }
+}

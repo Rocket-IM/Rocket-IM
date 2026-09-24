@@ -1,0 +1,23 @@
+[package]
+name = "rockets-bindings-uniffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "rockets_stage0_uniffi"
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[dependencies]
+rockets-im-sdk = { path = "../im-sdk", version = "=0.1.0-stage0.1" }
+uniffi = "=0.31.0"
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[[bin]]
+name = "rockets-uniffi-bindgen"
+path = "src/bin/bindgen.rs"
+required-features = ["bindgen"]
+

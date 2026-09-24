@@ -1,0 +1,26 @@
+{
+  "name": "@rockets-im/stage0",
+  "version": "0.1.0-stage0.1",
+  "private": true,
+  "description": "Stage 0 browser package: isolated in-memory MLS devices, not a complete IM SDK.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "artifact.json",
+    "licenses"
+  ],
+  "sideEffects": false,
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}

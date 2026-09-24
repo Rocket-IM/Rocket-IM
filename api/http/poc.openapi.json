@@ -1,0 +1,1242 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Rockets-IM 阶段 0 HTTP Relay POC",
+    "version": "rim-poc-1",
+    "description": "仅用于本机合成设备与候选 MLS 的协议验证；不是公开发布 API。HTTP 凭证与密码身份分开：Bearer 绑定单个 service/account/device，可信公钥由测试装置带外提供。正文严格 UTF-8 JSON，禁止重复键和未定义字段。请求上限 1 MiB，超时与重试预算见消息协议草案；本实验不声明 TLS/WSS 验证。 签名权限增量支持remove_member/revoke_device及仅from_join的新账号单设备add_member和同账号新设备add_device；bootstrap仍依赖可信合成检查点，生产身份恢复与Q02分叉/新鲜度尚未闭合。启用权限检查点后，测试set_state/revoke_device/add_control不可覆盖该链。 Service恢复凭证公钥只能由新空库固定，重启不得缺失或换钥；Service自有签名seed与用户E2EE解密私钥分离。 历史迁移只支持本群同账号当前设备的显式已验证接收或已验证接受的发送副本，独立定向加密；公开请求由实验调度器搬运，不包含附件、备份或产品发现/通知。 一致性head只签署当前Service所见完整权限CP并绑定调用设备challenge，不证明全局最新或独立视图之间不存在分叉。"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:{port}",
+      "description": "仅本机环回监听，端口由实验进程选择。",
+      "variables": {
+        "port": {
+          "default": "8766"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "SyntheticDeviceBearer": []
+    }
+  ],
+  "paths": {
+    "/v1/submit_message": {
+      "post": {
+        "operationId": "submit_message",
+        "description": "提交已持久化的不可变信封；替代须绑定封口证明。 已有receipt mode的新接受记录包含acceptance_receipt；Service使用固定公钥对应私钥签名原信封摘要，与接受及所有目标事件同事务提交。签名器失败返回receipt_signer_unavailable/not_recorded且不保留接受。旧无签名记录不补签，精确重试保留原字节。 receipt模式只对原头版本严格落后的新state_stale终态附rejection_receipt，required版本/状态由首次拒绝同事务的会话及一致权限检查点固定。签名器失败或投影不一致返回503/not_recorded并整体回滚。首次及重复409必须完整携带同一证明，get_attempt/close_attempt返回原终态；其他code、future版本及旧无证明拒绝不补签。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/SubmitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/AcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/get_attempt": {
+      "post": {
+        "operationId": "get_attempt",
+        "description": "仅原发送设备读取尝试；not_found 不证明在途请求永远不会提交。 接受证明仅是原接受事实，返回当前availability而不返回正文或原Envelope；取得旧证明不恢复删除、过期或失权内容的访问和迁移权限。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/AttemptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/AttemptResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/close_attempt": {
+      "post": {
+        "operationId": "close_attempt",
+        "description": "封口尚未被 Relay 登记的替代尝试时，必须成对提供当前链尾的 replaces_attempt_id 与 closure_id；接受和封口共用串行事务。可选 envelope_sha256 请求签名封口，值为原信封域分离摘要的64位小写hex，不传Envelope。摘要只绑定鉴权发送者的请求，不证明Service核对了未收到的密文。签名请求无签名器返回503，不降级；旧无证明封口及rejected_final只返回原结果，不补签；逻辑消息已accepted始终优先返回原接受事实。 新签名证明与NULL原尝试、链尾/前驱后继在同一事务保存，签名失败全回滚。签名封口精确重试返回原字节，改摘要/前驱或省略原digest均409；get_attempt可直接恢复原closure_receipt。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/CloseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/AttemptResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/pull_events": {
+      "post": {
+        "operationId": "pull_events",
+        "description": "只补拉自己的设备流；初次 after_seq=0 可省略 stream_id。 Message Event中的可选acceptance_receipt与原接受结果一致；缺失不代表可补签或可推定历史授权。旧消息的已撤销sender即使有Service签名也不在本轮端侧历史允许范围。 预先登记为重建后继的设备始终禁止此普通入口，必须完成唯一流授权后使用pull_rebuild_events。 此旧无签名入口只供未固定 Service 公钥的 legacy_unverified 实验；已固定公钥的客户端须使用 pull_events_signed。 此无签名页也可能包含message_availability；新版Rust裸页入口拒绝这类生命周期声明，只有本次实际验签的普通或后继流入口可以保存。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/PullRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/PullResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/report_delivery": {
+      "post": {
+        "operationId": "report_delivery",
+        "description": "接收端验证并共同落盘后按原事件幂等确认。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/DeliveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/ReceiptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/report_read": {
+      "post": {
+        "operationId": "report_read",
+        "description": "实际阅读后明确报告接受 ID 列表；不能由下载游标推导。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/ReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/ReadResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/get_crypto_dependencies": {
+      "post": {
+        "operationId": "get_crypto_dependencies",
+        "description": "独立有界恢复通道；返回前序控制记录，客户端仍须验证授权与状态连续性。 启用签名权限链的实例返回permission_chain_required，须改取get_permission_changes原证据并独立验证；旧合成控制通道不能替代权限链。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/DependencyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/DependencyResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/submit_permission_change": {
+      "post": {
+        "operationId": "submit_permission_change",
+        "description": "当前设备提交自己的签名权限变更。Service仅用持久前驱检查点的公钥验证，原证据、下一检查点、成员权限和旧事件访问投影在同一事务提交；重复原change_id和原字节返回原结果，失败不推进。 receipt模式的接受决定、签名凭证、权限变更和原Proof共同提交；签名器失败整体回滚。永久closed候选不能迟到接受，已接受精确重试返回原签名凭证。 add_member仅群主发起，必须提供join真实KeyPackage/Welcome，且target公钥匹配已登记有效设备，账号从未加入此群。接受receipt、CP/成员、ever-member账本及一次性KeyPackage/Welcome同事务提交；closed候选不消耗KeyPackage。单次helper完整输入1MiB及get完整材料900KiB限制均在接受前执行。 add_device仅由目标同账号的当前有效旧设备签名，群主不得代签其他账号设备，目标设备须从未入群；不增加重复签名或群主审批。两种Add都只授予当前群加入后的消息范围，不能将本地TrustedRoster版本当作群授权版本或全局账号授权链。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/SubmitPermissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/PermissionAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/get_permission_changes": {
+      "post": {
+        "operationId": "get_permission_changes",
+        "description": "当前有效成员从已验证的检查点版本分页取得已接受原证据链。保留原始签名字节，端侧逐条验证并处理真实Commit；本轮不使用测试控制材料注入或自动信任Relay给出的新版本。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/PermissionChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果；是否接受由 result.outcome 判断。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/PermissionChangesResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/close_permission_change": {
+      "post": {
+        "operationId": "close_permission_change",
+        "description": "只允许原actor凭证提交设备签名封口，与接受共用同一串行事务：已接受返回原accepted凭证，未接受则持久关闭该精确Proof并签发closed凭证。迟到原Proof永久permission_closed，不受过期改变；同ID不同Proof冲突。封口不能撤回已接受业务变更。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/ClosePermissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "返回原Proof及同事务持久化的签名终态凭证；独立验签后读取receipt.statement_bytes中的accepted或closed，响应result本身没有outcome。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/PermissionRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/get_permission_records": {
+      "post": {
+        "operationId": "get_permission_records",
+        "description": "只供当前有效成员按版本取得已接受的原Proof及其同事务保存的Service凭证。先独立验证固定Service公钥与端侧MLS连续性；closed凭证的floor不能直接覆盖本地已验证状态。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/PermissionChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "返回连续已接受的{change,receipt}记录页与真实页尾游标；此分页结果没有outcome，不表示客户端已应用MLS状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/PermissionRecordsResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/get_join_material": {
+      "post": {
+        "operationId": "get_join_material",
+        "description": "领取精确Add接受记录及入群材料。仅原target且当前仍获授权设备可访问；不会给其他成员投递Welcome。旧业务消息保持原接受目标，不向新成员补发。公开权限链仍作为授权metadata可读，不能据此获得旧历史。 add_member与add_device共用，领取时核对原签名动作种类和准确目标；同账号其他设备也不可代领。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/JoinMaterialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "result包含配对的record{change,receipt}和join{key_package,welcome}，完整JSON至多900KiB。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/JoinMaterialResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/submit_history_transfer": {
+      "post": {
+        "operationId": "submit_history_transfer",
+        "description": "仅请求中源设备提交同账号目标专属密文历史包。双设备签名、当前CP和全部原消息可用性验证后，包和Service接受签名同事务保存。精确原header.sender可迁移已发送副本；其他来源必须是原recipient且自己的message事件可用，同账号不构成身份替代。外层JSON键顺序不构成字节变化，原签名声明/密文字节必须一致。精确重试仍先检查权限、CP、到期、原接受证明及摘要。最多128记录，完整helper输入1MiB，响应900KiB。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/HistoryTransferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "result是配对的request/package/receipt，完整JSON最多900KiB。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/HistoryTransferResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/get_history_transfer": {
+      "post": {
+        "operationId": "get_history_transfer",
+        "description": "仅精确目标设备领取原迁移包，逐次重新检查双方当前权限、绑定CP、有效期和全部原消息。源设备必须是准确原sender，或是原recipient且自己的收件事件仍可用；任一删除/过期/失权整包拒绝。不向同账号其他设备或全群投递，不新增消息事件或送达回执。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/HistoryTransferGetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "result是配对的request/package/receipt，完整JSON最多900KiB。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/HistoryTransferResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/get_consistency_head": {
+      "post": {
+        "operationId": "get_consistency_head",
+        "description": "当前有效成员取得绑定调用设备与随机challenge的Service签名完整权限检查点。请求禁止提供actor、checkpoint或版本；使用现有固定Service公钥与当前数据库视图。未配置凭证模式返回receipt_not_enabled，签名器故障返回receipt_signer_unavailable；无新持久记录或迁移。只辅助本机检测已知回滚/同前驱分叉，不证明全局最新或排除孤立分叉。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/ConsistencyHeadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "result.head为原始声明与签名；须先独立验签再读取其完整checkpoint，不能据此直接替换端侧密码状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/ConsistencyHeadResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/register_rebuild_stream": {
+      "post": {
+        "operationId": "register_rebuild_stream",
+        "description": "仅预先固定rebuild_trust的后继设备可登记。真实公共验证器核验新身份签名、批准、锚关联及已接受AddDevice；同一SQLite事务固定唯一流和签名binding并保留入群后队列。精确重试不改流、不清事件、不重置进度；目标仍须当前有效。旧库不可通过重启fixture补授信。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/RegisterRebuildStreamRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "result.head为原始声明与签名；须先独立验签再读取其完整checkpoint，不能据此直接替换端侧密码状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/RebuildStreamBindingResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/pull_rebuild_events": {
+      "post": {
+        "operationId": "pull_rebuild_events",
+        "description": "仅已登记后继使用，签名请求绑定原binding、流、服务、会话、后继范围、游标、limit和挑战。Service核对原消息/回执及入群边界后，在同一事务签署原始页SHA256。page_bytes最多740KiB原字节；签名并不证明全局新鲜或锚尚未取消，客户端仍需每次独立锚门禁。 删除/到期首次终态变化为原目标消息槽追加message_availability事件；目标流由外层签页绑定，旧槽身份和接受事实不变。通知不代表清除已下载副本，不自动生成送达或已读；旧POC客户端不支持该事件时明确拒绝。TTL仍由成功请求事务触发，满事件配额时整事务明确失败，不静默丢通知。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/PullRebuildEventsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "result.head为原始声明与签名；须先独立验签再读取其完整checkpoint，不能据此直接替换端侧密码状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/RebuildStreamPageResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/pull_events_signed": {
+      "post": {
+        "operationId": "pull_events_signed",
+        "description": "普通设备流的签名分页，请求同 pull_events。Service 在同一事务读取已认证设备的流与连续槽，按原始 UTF-8 page_bytes 摘要签署实例、账号、设备、流、after_seq 和 limit；page_bytes 原字节最多 740 KiB。客户端必须使用先前固定的 Service 公钥校验来源与内容后才落盘；已固定公钥的客户端不能退回普通无签名页。没有签名配置返回 receipt_not_enabled，签名器故障返回 receipt_signer_unavailable；不返回无签名替代。此入口不证明全局新鲜度或独立锚状态，预先登记为重建后继的设备始终禁止使用，仍须走 pull_rebuild_events。 删除/到期首次终态变化为原目标消息槽追加message_availability事件；目标流由外层签页绑定，旧槽身份和接受事实不变。通知不代表清除已下载副本，不自动生成送达或已读；旧POC客户端不支持该事件时明确拒绝。TTL仍由成功请求事务触发，满事件配额时整事务明确失败，不静默丢通知。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/PullRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "result.page_bytes 为原始 PullResult JSON 的 Base64；result.receipt 为绑定同一原页字节与已认证主体的 Service 签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/StreamPageResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SyntheticDeviceBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "独立合成设备随机凭证；不得用业务登录成功代替密码身份授权。"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "格式、版本或模式不受支持；通常未创建尝试。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "无有效合成设备凭证。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "PermissionDenied": {
+        "description": "实例、设备、会话或历史访问无权。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "UnsupportedOperation": {
+        "description": "不支持的操作。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "持久化终态、状态或替代冲突、无效游标或明确缺失控制依赖；查看 outcome 和封口信息。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "解码前请求体超限。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "ResourceExhausted": {
+        "description": "有界存储、队列或恢复通道达到限额。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "服务内部故障；不能推断未接受。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "TemporarilyUnavailable": {
+        "description": "临时不可用或持久化结果不明。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "请求 Content-Type 不是 application/json。",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../realtime/message.schema.json#/$defs/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "OpenAPI 3.1.1 官方规范",
+    "url": "https://spec.openapis.org/oas/v3.1.1.html"
+  },
+  "x-error-status": {
+    "invalid_envelope": [
+      400,
+      413,
+      415
+    ],
+    "unsupported_version": 400,
+    "unsupported_mode": 400,
+    "unsupported_crypto_profile": 400,
+    "unauthenticated": 401,
+    "permission_denied": 403,
+    "device_revoked": 403,
+    "unsupported_operation": [
+      404,
+      405
+    ],
+    "state_stale": 409,
+    "state_conflict": 409,
+    "recipient_set_mismatch": 409,
+    "idempotency_conflict": 409,
+    "logical_message_already_accepted": 409,
+    "attempt_closed": 409,
+    "attempt_chain_conflict": 409,
+    "cursor_invalid": 409,
+    "dependency_missing": 409,
+    "resource_exhausted": [
+      429,
+      503
+    ],
+    "outcome_unknown": 503,
+    "temporarily_unavailable": 503,
+    "invalid_permission": 400,
+    "permission_signature": 403,
+    "permission_context": 403,
+    "permission_commit": 403,
+    "permission_expired": 403,
+    "permission_version": 409,
+    "permission_conflict": 409,
+    "permission_replay": 409,
+    "permission_not_enabled": 409,
+    "permission_verifier_unavailable": 503,
+    "permission_chain_required": 409,
+    "permission_closed": 409,
+    "receipt_not_enabled": 409,
+    "receipt_signer_unavailable": 503,
+    "join_not_enabled": 409,
+    "invalid_join_material": 400,
+    "join_identity": 403,
+    "join_material_mismatch": 400,
+    "history_invalid": 400,
+    "history_signature": 403,
+    "history_context": 409,
+    "history_denied": 403,
+    "history_expired": 409,
+    "history_unavailable": 403,
+    "history_conflict": 409
+  }
+}

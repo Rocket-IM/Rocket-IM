@@ -1,0 +1,2 @@
+-keep class io.rocketsim.stage0.** { *; }
+-keep class com.sun.jna.** { *; }
