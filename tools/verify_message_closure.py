@@ -69,7 +69,7 @@ def main():
               "gate_scope": "explicit_opt_in_single_unresolved_send_slot",
               "ratchet_configuration_changed": False,
               "limits": ["synthetic identities and signed-permission fixtures on loopback HTTP with the original Relay server",
-                         "the Rust gate must be explicitly enabled; a controlling host can still use the compatible path without enabling it",
+                         "this matrix explicitly enables the gate; signed-permission first sends now also enable it by default",
                          "signed closure persists before allowing only the exact same-logical successor; at most four successors per logical message; legacy closure and rejected_final remain blocking",
                          "original OpenMLS default ratchet window and retention policy are unchanged",
                          "not a formal SDK network worker or a queue of multiple pending plaintext messages",

@@ -47,6 +47,9 @@ def check_access(store, db, device, statement, service_id, conversation_id):
 
 
 def check_original(db, source, service_id, conversation_id, item):
+    from reclamation_storage import pending_selection
+    if pending_selection(db, item["acceptance_id"]):
+        raise ProtocolError("reclamation_pending", "原内容已进入显式回收计划，禁止新历史迁移", status=409)
     row = db.execute("SELECT header,payload,result,outcome,availability FROM attempts WHERE acceptance_id=?", (item["acceptance_id"],)).fetchone()
     if row is None or row["outcome"] != "accepted" or row["availability"] != "available":
         raise ProtocolError("history_unavailable", "选择中的原消息不可迁移", status=403)

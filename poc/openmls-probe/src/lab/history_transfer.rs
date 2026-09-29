@@ -42,6 +42,13 @@ pub(super) fn request(
     super::wire_types::id(&transfer_id)?;
     public::validate_selection(&selection)?;
     ensure(
+        selection
+            .iter()
+            .all(|s| super::wire_reclaimed::acceptance(state, &s.acceptance_id).is_none()),
+        "history_content_unavailable",
+        "已回收内容不能新建迁移请求",
+    )?;
+    ensure(
         validity.is_none_or(|s| (1..=300).contains(&s)),
         "history_invalid",
         "有效期只能为1到300秒",

@@ -6,6 +6,7 @@ from contract import ProtocolError, encode_json, parse_u64
 from message_lifecycle import set_availability
 from messages import result
 from storage import now_ms, public_subject
+from reclamation_storage import pending_selection, watermarks
 
 MAX_PAGE_BYTES = 900 * 1024 - 512
 
@@ -32,12 +33,22 @@ def event_page(store, db, device, req, max_bytes=MAX_PAGE_BYTES):
         raise ProtocolError("cursor_invalid", "游标不属于当前设备流", status=409)
     pair = (device["account"], device["device"])
     after = parse_u64(req["after_seq"], "after_seq")
-    watermark = db.execute("SELECT COALESCE(MAX(seq),0) FROM events WHERE account=? AND device=?", pair).fetchone()[0]
+    marks = watermarks(db, pair)
+    watermark = marks["high_watermark"]
+    if after < marks["floor"]:
+        from permission_records import require_receipts
+        require_receipts(store)
+        statement = {"protocol_version": "rim-stream-retention-1", "service_id": req["service_id"],
+                     "account_id": pair[0], "device_id": pair[1], "stream_id": stream_id,
+                     "after_seq": req["after_seq"], "limit": req["limit"],
+                     "floor": str(marks["floor"]), "watermark": str(watermark)}
+        raise ProtocolError("cursor_reclaimed", "请求游标早于已确认回收前缀，禁止自动跳过", status=409,
+                            retention_receipt=store.receipt_signer.sign(statement))
     if after > watermark:
         raise ProtocolError("cursor_invalid", "游标超过已提交水位", status=409)
     # 游标先按请求前的已提交水位校验，过期追加完成后再固定本页水位。
     project_expiration(db)
-    watermark = db.execute("SELECT COALESCE(MAX(seq),0) FROM events WHERE account=? AND device=?", pair).fetchone()[0]
+    watermark = watermarks(db, pair)["high_watermark"]
     limit = parse_u64(req["limit"], "limit")
     rows = db.execute("SELECT seq,event_id,content,availability FROM events WHERE account=? AND device=? AND seq>? AND seq<=? ORDER BY seq LIMIT ?",
                       (*pair, after, watermark, limit))
@@ -74,6 +85,8 @@ def save_receipt(store, db, device, row, value, read):
     was_delivered = bool(existing and existing["delivered"])
     was_read = bool(existing and existing["is_read"])
     is_read = read or was_read
+    if pending_selection(db, value["acceptance_id"]) and (not was_delivered or (read and not was_read)):
+        raise ProtocolError("reclamation_conflict", "回收计划已固定终态，不能新增迟到回执", status=409)
     db.execute("INSERT INTO receipts VALUES (?,?,?,?,?) ON CONFLICT(acceptance_id,account,device) DO UPDATE SET delivered=1,is_read=excluded.is_read",
                (value["acceptance_id"], *pair, 1, int(is_read)))
     # 状态通知仅给原消息涉及且当前仍有权的设备；后来加入者不获得旧元数据。

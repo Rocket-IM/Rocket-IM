@@ -25,7 +25,7 @@
     "/v1/submit_message": {
       "post": {
         "operationId": "submit_message",
-        "description": "提交已持久化的不可变信封；替代须绑定封口证明。 已有receipt mode的新接受记录包含acceptance_receipt；Service使用固定公钥对应私钥签名原信封摘要，与接受及所有目标事件同事务提交。签名器失败返回receipt_signer_unavailable/not_recorded且不保留接受。旧无签名记录不补签，精确重试保留原字节。 receipt模式只对原头版本严格落后的新state_stale终态附rejection_receipt，required版本/状态由首次拒绝同事务的会话及一致权限检查点固定。签名器失败或投影不一致返回503/not_recorded并整体回滚。首次及重复409必须完整携带同一证明，get_attempt/close_attempt返回原终态；其他code、future版本及旧无证明拒绝不补签。",
+        "description": "提交已持久化的不可变信封；替代须绑定封口证明。 已有receipt mode的新接受记录包含acceptance_receipt；Service使用固定公钥对应私钥签名原信封摘要，与接受及所有目标事件同事务提交。签名器失败返回receipt_signer_unavailable/not_recorded且不保留接受。旧无签名记录不补签，精确重试保留原字节。 receipt模式只对原头版本严格落后的新state_stale终态附rejection_receipt，required版本/状态由首次拒绝同事务的会话及一致权限检查点固定。签名器失败或投影不一致返回503/not_recorded并整体回滚。首次及重复409必须完整携带同一证明，get_attempt/close_attempt返回原终态；其他code、future版本及旧无证明拒绝不补签。 已存在accepted原尝试的精确只读路径若被无关到期投影的事件容量错误阻断，将完整回滚该投影并返回原接受事实，附lifecycle_projection_pending:true；保留原availability/期限，不伪造投影完成。改字节、新尝试及非容量错误不走此恢复路径。",
         "requestBody": {
           "required": true,
           "content": {
@@ -83,7 +83,7 @@
     "/v1/get_attempt": {
       "post": {
         "operationId": "get_attempt",
-        "description": "仅原发送设备读取尝试；not_found 不证明在途请求永远不会提交。 接受证明仅是原接受事实，返回当前availability而不返回正文或原Envelope；取得旧证明不恢复删除、过期或失权内容的访问和迁移权限。",
+        "description": "仅原发送设备读取尝试；not_found 不证明在途请求永远不会提交。 接受证明仅是原接受事实，返回当前availability而不返回正文或原Envelope；取得旧证明不恢复删除、过期或失权内容的访问和迁移权限。 已存在accepted原尝试的精确只读路径若被无关到期投影的事件容量错误阻断，将完整回滚该投影并返回原接受事实，附lifecycle_projection_pending:true；保留原availability/期限，不伪造投影完成。改字节、新尝试及非容量错误不走此恢复路径。",
         "requestBody": {
           "required": true,
           "content": {
@@ -141,7 +141,7 @@
     "/v1/close_attempt": {
       "post": {
         "operationId": "close_attempt",
-        "description": "封口尚未被 Relay 登记的替代尝试时，必须成对提供当前链尾的 replaces_attempt_id 与 closure_id；接受和封口共用串行事务。可选 envelope_sha256 请求签名封口，值为原信封域分离摘要的64位小写hex，不传Envelope。摘要只绑定鉴权发送者的请求，不证明Service核对了未收到的密文。签名请求无签名器返回503，不降级；旧无证明封口及rejected_final只返回原结果，不补签；逻辑消息已accepted始终优先返回原接受事实。 新签名证明与NULL原尝试、链尾/前驱后继在同一事务保存，签名失败全回滚。签名封口精确重试返回原字节，改摘要/前驱或省略原digest均409；get_attempt可直接恢复原closure_receipt。",
+        "description": "封口尚未被 Relay 登记的替代尝试时，必须成对提供当前链尾的 replaces_attempt_id 与 closure_id；接受和封口共用串行事务。可选 envelope_sha256 请求签名封口，值为原信封域分离摘要的64位小写hex，不传Envelope。摘要只绑定鉴权发送者的请求，不证明Service核对了未收到的密文。签名请求无签名器返回503，不降级；旧无证明封口及rejected_final只返回原结果，不补签；逻辑消息已accepted始终优先返回原接受事实。 新签名证明与NULL原尝试、链尾/前驱后继在同一事务保存，签名失败全回滚。签名封口精确重试返回原字节，改摘要/前驱或省略原digest均409；get_attempt可直接恢复原closure_receipt。 已存在accepted原尝试的精确只读路径若被无关到期投影的事件容量错误阻断，将完整回滚该投影并返回原接受事实，附lifecycle_projection_pending:true；保留原availability/期限，不伪造投影完成。改字节、新尝试及非容量错误不走此恢复路径。",
         "requestBody": {
           "required": true,
           "content": {
@@ -199,7 +199,7 @@
     "/v1/pull_events": {
       "post": {
         "operationId": "pull_events",
-        "description": "只补拉自己的设备流；初次 after_seq=0 可省略 stream_id。 Message Event中的可选acceptance_receipt与原接受结果一致；缺失不代表可补签或可推定历史授权。旧消息的已撤销sender即使有Service签名也不在本轮端侧历史允许范围。 预先登记为重建后继的设备始终禁止此普通入口，必须完成唯一流授权后使用pull_rebuild_events。 此旧无签名入口只供未固定 Service 公钥的 legacy_unverified 实验；已固定公钥的客户端须使用 pull_events_signed。 此无签名页也可能包含message_availability；新版Rust裸页入口拒绝这类生命周期声明，只有本次实际验签的普通或后继流入口可以保存。",
+        "description": "只补拉自己的设备流；初次 after_seq=0 可省略 stream_id。 Message Event中的可选acceptance_receipt与原接受结果一致；缺失不代表可补签或可推定历史授权。旧消息的已撤销sender即使有Service签名也不在本轮端侧历史允许范围。 预先登记为重建后继的设备始终禁止此普通入口，必须完成唯一流授权后使用pull_rebuild_events。 此旧无签名入口只供未固定 Service 公钥的 legacy_unverified 实验；已固定公钥的客户端须使用 pull_events_signed。 此无签名页也可能包含message_availability；新版Rust裸页入口拒绝这类生命周期声明，只有本次实际验签的普通或后继流入口可以保存。 请求游标低于已回收连续前缀时返回409/cursor_reclaimed及绑定原after_seq/limit、设备流的retention_receipt；客户端验签后明确停在缺口，不把它当作空页或跳跃授权。",
         "requestBody": {
           "required": true,
           "content": {
@@ -1011,7 +1011,7 @@
     "/v1/pull_events_signed": {
       "post": {
         "operationId": "pull_events_signed",
-        "description": "普通设备流的签名分页，请求同 pull_events。Service 在同一事务读取已认证设备的流与连续槽，按原始 UTF-8 page_bytes 摘要签署实例、账号、设备、流、after_seq 和 limit；page_bytes 原字节最多 740 KiB。客户端必须使用先前固定的 Service 公钥校验来源与内容后才落盘；已固定公钥的客户端不能退回普通无签名页。没有签名配置返回 receipt_not_enabled，签名器故障返回 receipt_signer_unavailable；不返回无签名替代。此入口不证明全局新鲜度或独立锚状态，预先登记为重建后继的设备始终禁止使用，仍须走 pull_rebuild_events。 删除/到期首次终态变化为原目标消息槽追加message_availability事件；目标流由外层签页绑定，旧槽身份和接受事实不变。通知不代表清除已下载副本，不自动生成送达或已读；旧POC客户端不支持该事件时明确拒绝。TTL仍由成功请求事务触发，满事件配额时整事务明确失败，不静默丢通知。",
+        "description": "普通设备流的签名分页，请求同 pull_events。Service 在同一事务读取已认证设备的流与连续槽，按原始 UTF-8 page_bytes 摘要签署实例、账号、设备、流、after_seq 和 limit；page_bytes 原字节最多 740 KiB。客户端必须使用先前固定的 Service 公钥校验来源与内容后才落盘；已固定公钥的客户端不能退回普通无签名页。没有签名配置返回 receipt_not_enabled，签名器故障返回 receipt_signer_unavailable；不返回无签名替代。此入口不证明全局新鲜度或独立锚状态，预先登记为重建后继的设备始终禁止使用，仍须走 pull_rebuild_events。 删除/到期首次终态变化为原目标消息槽追加message_availability事件；目标流由外层签页绑定，旧槽身份和接受事实不变。通知不代表清除已下载副本，不自动生成送达或已读；旧POC客户端不支持该事件时明确拒绝。TTL仍由成功请求事务触发，满事件配额时整事务明确失败，不静默丢通知。 请求游标低于已回收连续前缀时返回409/cursor_reclaimed及绑定原after_seq/limit、设备流的retention_receipt；客户端验签后明确停在缺口，不把它当作空页或跳跃授权。",
         "requestBody": {
           "required": true,
           "content": {
@@ -1029,6 +1029,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "../realtime/message.schema.json#/$defs/StreamPageResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/confirm_reclaim": {
+      "post": {
+        "operationId": "confirm_reclaim",
+        "description": "显式确认本设备已持久处理的连续前缀并同意回收所选终态内容；同计划必须选择同一有序集合。仅无历史迁移等未决依赖的普通签名权限流可用。全部原发送者/接收目标确认后返回该设备原签名许可，否则pending；精确重试不重复累计。不会因当前成员缩减而跳过离线或撤销目标。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/ConfirmReclaimRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "显式计划状态；只在原持久事务提交后返回。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/ConfirmReclaimResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/finish_reclaim": {
+      "post": {
+        "operationId": "finish_reclaim",
+        "description": "提交本机已经完成回收及适用时独立锚核验的原许可；全部原参与者完成后才事务性清理Relay载荷、保留紧凑事实与单调水位。pending表示仍等待其他参与者，重复完成不再次释放额度。不决定产品TTL，不裁剪权限/密码/迁移历史。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/FinishReclaimRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "显式计划状态；只在原持久事务提交后返回。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/FinishReclaimResponse"
                 }
               }
             }

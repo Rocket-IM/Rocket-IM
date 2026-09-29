@@ -1,6 +1,7 @@
 """不可变尝试、封口和一次性接受；调用方事务共同覆盖事件扇出。"""
 
 import base64
+import hashlib
 import json
 
 from contract import ProtocolError, encode_json, validate_envelope
@@ -27,7 +28,7 @@ def accepted_result(db, key, chain):
 
 
 def check_capacity(db):
-    if db.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] >= MAX_ATTEMPTS:
+    if db.execute("SELECT COUNT(*) FROM attempts WHERE compacted=0").fetchone()[0] >= MAX_ATTEMPTS:
         raise ProtocolError("resource_exhausted", "实验尝试总量已达上限", status=429, retry_after_ms="1000")
 
 
@@ -89,7 +90,9 @@ def submit(store, db, device, req):
     attempt_id = header["attempt_id"]
     previous = find_attempt(db, key, attempt_id)
     if previous is not None:
-        if previous["header"] is not None and (previous["header"] != header_raw or previous["payload"] != payload_raw):
+        payload_matches = (previous["payload_size"] == len(payload_raw)
+                           and previous["payload_sha256"] == hashlib.sha256(payload_raw).hexdigest()) if previous["compacted"] else previous["payload"] == payload_raw
+        if previous["header"] is not None and (previous["header"] != header_raw or not payload_matches):
             raise ProtocolError("idempotency_conflict", "同一尝试不可改变头或密文字节", status=409,
                                 logical_message_id=header["logical_message_id"], attempt_id=attempt_id)
         saved = result(previous)

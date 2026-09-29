@@ -22,6 +22,14 @@ from network_poc.read_faults import CASES as FAULT_CASES
 from network_poc.read_boundaries import CASES as BOUNDARY_CASES
 CASES = MAIN_CASES + FAULT_CASES + BOUNDARY_CASES
 from network_poc.fixture import NetworkLab
+from network_poc.read_anchor_fixture import ReadAnchorLab
+from network_poc.read_anchor_faults import CASES as ANCHOR_FAULT_CASES
+from network_poc.read_anchor_boundaries import CASES as ANCHOR_BOUNDARY_CASES
+
+ANCHOR_CASES = ANCHOR_FAULT_CASES + ANCHOR_BOUNDARY_CASES
+ANCHOR_CASES += [(ident, case) for ident, case in MAIN_CASES if ident in
+                 ("M13.read.lifecycle", "M13.read.prior_event", "M13.read.per_device")]
+ANCHOR_CASES += [(ident, case) for ident, case in FAULT_CASES if ident.startswith("M13-FAULT-report-")]
 
 
 def digest(path):
@@ -49,11 +57,17 @@ def main():
     parser.add_argument("--permission-verifier", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
     parser.add_argument("--receipt-signer", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
     parser.add_argument("--old-binary", type=Path, default=OLD_BINARY)
+    parser.add_argument("--anchor-helper", type=Path, help="启用显式已读锚模式专用矩阵及真实 HTTP")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/network-relay/m13-read")
-    parser.add_argument("--case", action="append", choices=[ident for ident, _ in CASES])
+    parser.add_argument("--case", action="append", choices=sorted({ident for ident, _ in CASES + ANCHOR_CASES}))
     args = parser.parse_args()
+    cases = ANCHOR_CASES if args.anchor_helper else CASES
+    if args.case and not set(args.case) <= {ident for ident, _ in cases}:
+        parser.error("所选场景不属于当前普通/锚模式矩阵")
     artifacts = {name: getattr(args, name).resolve()
-                 for name in ("binary", "permission_verifier", "receipt_signer", "old_binary")}
+                 for name in ("binary", "permission_verifier", "receipt_signer")}
+    artifacts["anchor_helper" if args.anchor_helper else "old_binary"] = (
+        args.anchor_helper or args.old_binary).resolve()
     output = args.output.resolve()
     run_id = str(uuid.uuid4())
     run = output / "runs" / run_id
@@ -62,7 +76,7 @@ def main():
     report = {"run_id": run_id, "status": "RUNNING", "started_at": datetime.now(timezone.utc).isoformat(),
               "scope": "synthetic local explicit reading intent and idempotent read reporting with signed device-stream confirmation via real HTTP and encrypted Rust snapshots",
               "platform": platform.platform(), "python": platform.python_version(), "sqlite": sqlite3.sqlite_version,
-              "selected_cases": args.case or [ident for ident, _ in CASES],
+              "selected_cases": args.case or [ident for ident, _ in cases],
               "artifacts": {name: str(path) for name, path in artifacts.items()},
               "pass_meaning": "scoped gate and recovery evidence only; PASS does not complete a formal SDK or recover existing quarantined messages",
               "reading_scope": "explicit_command_for_verified_and_decrypted_local_message_slots",
@@ -76,6 +90,10 @@ def main():
               "process_count_scope": "Rust CLI, explicit signer and Relay starts; excludes Relay internal signing/verifying helpers",
               "raw_old_key_attack": "NOT_EXECUTED_ACCESS_RESTRICTED", "full_stage0": "NOT_COMPLETE",
               "cases": [], "process_count": 0, "http_count": 0}
+    if args.anchor_helper:
+        report.update(anchor_mode=True, direct_anchor_process_count=0,
+                      independence="synthetic_local; trusted config and authority must not roll back with device")
+        report["limits"][-1] = "no production independent anchor, native-storage equivalence, TLS/WSS, UI or arbitrary power-loss validation"
     write(report_path, report)
     try:
         report["source_sha256"] = source_hashes()
@@ -86,16 +104,21 @@ def main():
             saved.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / relative, saved)
         write(report_path, report)
-        for ident, operation in CASES:
+        for ident, operation in cases:
             if args.case and ident not in args.case:
                 continue
             record = {"id": ident, "status": "RUNNING"}
             report["cases"].append(record)
             write(report_path, report)
             with tempfile.TemporaryDirectory(prefix=ident + "-", dir=output) as temporary:
-                lab = NetworkLab(artifacts["binary"], Path(temporary).resolve(),
-                                 artifacts["permission_verifier"], artifacts["receipt_signer"])
-                lab.old_binary = artifacts["old_binary"]
+                if args.anchor_helper:
+                    lab = ReadAnchorLab(artifacts["binary"], Path(temporary).resolve(),
+                                        artifacts["permission_verifier"], artifacts["receipt_signer"],
+                                        artifacts["anchor_helper"])
+                else:
+                    lab = NetworkLab(artifacts["binary"], Path(temporary).resolve(),
+                                     artifacts["permission_verifier"], artifacts["receipt_signer"])
+                    lab.old_binary = artifacts["old_binary"]
                 lab.case_evidence = {}
                 try:
                     try:
@@ -117,6 +140,9 @@ def main():
                         shutil.copy2(stderr, run / (ident + "-relay.stderr.log"))
                     record["process_count"] = lab.process_count
                     record["http_count"] = lab.http_count
+                    if args.anchor_helper:
+                        record["direct_anchor_process_count"] = lab.helper_process_count
+                        report["direct_anchor_process_count"] += lab.helper_process_count
                     report["process_count"] += lab.process_count
                     report["http_count"] += lab.http_count
                     write(report_path, report)

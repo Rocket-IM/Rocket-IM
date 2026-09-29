@@ -52,6 +52,12 @@ fn receive_copy(f: &Fixture, key: &SigningKey, id: &str, payload: &str) -> Value
     let envelope=call(f,"A",json!({"operation":"wire_send","logical_message_id":id,"attempt_id":"P1","payload":payload}))["envelope"].clone();
     call(
         f,
+        "A",
+        json!({"operation":"wire_accept","logical_message_id":id,"attempt_id":"P1",
+        "acceptance_receipt":acceptance(key,&envelope,id)}),
+    );
+    call(
+        f,
         "B",
         json!({"operation":"wire_receive","header_bytes":envelope["header_bytes"],"payload_bytes":envelope["payload_bytes"],"acceptance_id":id,"acceptance_receipt":acceptance(key,&envelope,id)}),
     );

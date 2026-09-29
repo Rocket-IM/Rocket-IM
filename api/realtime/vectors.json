@@ -1758,6 +1758,151 @@
         "signature_bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
       },
       "expected_code": "invalid_envelope"
+    },
+    {
+      "name": "valid_confirm_reclaim",
+      "kind": "request",
+      "operation": "confirm_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "stream_id": "ST1",
+        "processed_seq": "9007199254740993",
+        "acceptance_ids": [
+          "K1",
+          "K2"
+        ]
+      },
+      "expected_code": null
+    },
+    {
+      "name": "reclaim_numeric_processed",
+      "kind": "request",
+      "operation": "confirm_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "stream_id": "ST1",
+        "processed_seq": 2,
+        "acceptance_ids": [
+          "K1",
+          "K2"
+        ]
+      },
+      "expected_code": "invalid_envelope"
+    },
+    {
+      "name": "reclaim_duplicate_acceptance",
+      "kind": "request",
+      "operation": "confirm_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "stream_id": "ST1",
+        "processed_seq": "9007199254740993",
+        "acceptance_ids": [
+          "K1",
+          "K1"
+        ]
+      },
+      "expected_code": "invalid_envelope"
+    },
+    {
+      "name": "reclaim_unsorted_acceptance",
+      "kind": "request",
+      "operation": "confirm_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "stream_id": "ST1",
+        "processed_seq": "9007199254740993",
+        "acceptance_ids": [
+          "K2",
+          "K1"
+        ]
+      },
+      "expected_code": "invalid_envelope"
+    },
+    {
+      "name": "reclaim_empty_acceptance",
+      "kind": "request",
+      "operation": "confirm_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "stream_id": "ST1",
+        "processed_seq": "9007199254740993",
+        "acceptance_ids": []
+      },
+      "expected_code": "invalid_envelope"
+    },
+    {
+      "name": "reclaim_batch_overflow",
+      "kind": "request",
+      "operation": "confirm_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "stream_id": "ST1",
+        "processed_seq": "9007199254740993",
+        "acceptance_ids": [
+          "K00",
+          "K01",
+          "K02",
+          "K03",
+          "K04",
+          "K05",
+          "K06",
+          "K07",
+          "K08",
+          "K09",
+          "K10",
+          "K11",
+          "K12",
+          "K13",
+          "K14",
+          "K15",
+          "K16"
+        ]
+      },
+      "expected_code": "invalid_envelope"
+    },
+    {
+      "name": "valid_finish_reclaim_shape_only",
+      "kind": "request",
+      "operation": "finish_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "receipt": {
+          "statement_bytes": "eyJwcm90b2NvbF92ZXJzaW9uIjoicmltLW1lc3NhZ2UtcmVjbGFpbS0xIiwic2VydmljZV9pZCI6IlMxIiwiY29udmVyc2F0aW9uX2lkIjoiRzEiLCJwbGFuX2lkIjoiR0MxIiwiYWNjb3VudF9pZCI6IkEiLCJkZXZpY2VfaWQiOiJBMSIsInN0cmVhbV9pZCI6IlNUMSIsInByb2Nlc3NlZF9zZXEiOiI5MDA3MTk5MjU0NzQwOTkzIiwibWVzc2FnZXMiOlt7ImFjY2VwdGFuY2VfaWQiOiJLMSIsImVudmVsb3BlX3NoYTI1NiI6Ijg2MmRkN2Q5ODU5MzlhZDA1Y2VhOWU2YjU4YzkwMWVlNzNiNzFmYTFiNGYyODczMzBlYjUyMmNiZjk5NjA4MTAiLCJhdmFpbGFiaWxpdHkiOiJkZWxldGVkIiwicmVjaXBpZW50cyI6W3siYWNjb3VudF9pZCI6IkEiLCJkZXZpY2VfaWQiOiJBMiJ9LHsiYWNjb3VudF9pZCI6IkIiLCJkZXZpY2VfaWQiOiJCMSJ9XX1dfQ==",
+          "signature_bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      },
+      "expected_code": null
+    },
+    {
+      "name": "finish_reclaim_unknown_receipt_field",
+      "kind": "request",
+      "operation": "finish_reclaim",
+      "value": {
+        "service_id": "S1",
+        "conversation_id": "G1",
+        "plan_id": "GC1",
+        "receipt": {
+          "statement_bytes": "eyJwcm90b2NvbF92ZXJzaW9uIjoicmltLW1lc3NhZ2UtcmVjbGFpbS0xIiwic2VydmljZV9pZCI6IlMxIiwiY29udmVyc2F0aW9uX2lkIjoiRzEiLCJwbGFuX2lkIjoiR0MxIiwiYWNjb3VudF9pZCI6IkEiLCJkZXZpY2VfaWQiOiJBMSIsInN0cmVhbV9pZCI6IlNUMSIsInByb2Nlc3NlZF9zZXEiOiI5MDA3MTk5MjU0NzQwOTkzIiwibWVzc2FnZXMiOlt7ImFjY2VwdGFuY2VfaWQiOiJLMSIsImVudmVsb3BlX3NoYTI1NiI6Ijg2MmRkN2Q5ODU5MzlhZDA1Y2VhOWU2YjU4YzkwMWVlNzNiNzFmYTFiNGYyODczMzBlYjUyMmNiZjk5NjA4MTAiLCJhdmFpbGFiaWxpdHkiOiJkZWxldGVkIiwicmVjaXBpZW50cyI6W3siYWNjb3VudF9pZCI6IkEiLCJkZXZpY2VfaWQiOiJBMiJ9LHsiYWNjb3VudF9pZCI6IkIiLCJkZXZpY2VfaWQiOiJCMSJ9XX1dfQ==",
+          "signature_bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+          "unexpected": true
+        }
+      },
+      "expected_code": "invalid_envelope"
     }
   ],
   "permission_shape_notice": "权限证据样例仅检验编码和字段；合成零签名不代表密码验签通过。真实签名/Commit由Rust及HTTP联合用例验证。",
@@ -2579,5 +2724,63 @@
       },
       "expected_code": "rebuild_stream_context"
     }
-  ]
+  ],
+  "message_reclaim_vector": {
+    "description": "仅固定编码，零签名是占位且必须验签失败；不是Service许可或有效MLS。",
+    "statement": {
+      "protocol_version": "rim-message-reclaim-1",
+      "service_id": "S1",
+      "conversation_id": "G1",
+      "plan_id": "GC1",
+      "account_id": "A",
+      "device_id": "A1",
+      "stream_id": "ST1",
+      "processed_seq": "9007199254740993",
+      "messages": [
+        {
+          "acceptance_id": "K1",
+          "envelope_sha256": "862dd7d985939ad05cea9e6b58c901ee73b71fa1b4f287330eb522cbf9960810",
+          "availability": "deleted",
+          "recipients": [
+            {
+              "account_id": "A",
+              "device_id": "A2"
+            },
+            {
+              "account_id": "B",
+              "device_id": "B1"
+            }
+          ]
+        }
+      ]
+    },
+    "utf8_text": "{\"protocol_version\":\"rim-message-reclaim-1\",\"service_id\":\"S1\",\"conversation_id\":\"G1\",\"plan_id\":\"GC1\",\"account_id\":\"A\",\"device_id\":\"A1\",\"stream_id\":\"ST1\",\"processed_seq\":\"9007199254740993\",\"messages\":[{\"acceptance_id\":\"K1\",\"envelope_sha256\":\"862dd7d985939ad05cea9e6b58c901ee73b71fa1b4f287330eb522cbf9960810\",\"availability\":\"deleted\",\"recipients\":[{\"account_id\":\"A\",\"device_id\":\"A2\"},{\"account_id\":\"B\",\"device_id\":\"B1\"}]}]}",
+    "statement_sha256": "f94c6c52d2ad9595a9de823312dcc62a1f171c349851cc97680406332ac66bb7",
+    "signing_domain_utf8": "Rocket-IM/POC/message-reclaim/v1\u0000",
+    "receipt": {
+      "statement_bytes": "eyJwcm90b2NvbF92ZXJzaW9uIjoicmltLW1lc3NhZ2UtcmVjbGFpbS0xIiwic2VydmljZV9pZCI6IlMxIiwiY29udmVyc2F0aW9uX2lkIjoiRzEiLCJwbGFuX2lkIjoiR0MxIiwiYWNjb3VudF9pZCI6IkEiLCJkZXZpY2VfaWQiOiJBMSIsInN0cmVhbV9pZCI6IlNUMSIsInByb2Nlc3NlZF9zZXEiOiI5MDA3MTk5MjU0NzQwOTkzIiwibWVzc2FnZXMiOlt7ImFjY2VwdGFuY2VfaWQiOiJLMSIsImVudmVsb3BlX3NoYTI1NiI6Ijg2MmRkN2Q5ODU5MzlhZDA1Y2VhOWU2YjU4YzkwMWVlNzNiNzFmYTFiNGYyODczMzBlYjUyMmNiZjk5NjA4MTAiLCJhdmFpbGFiaWxpdHkiOiJkZWxldGVkIiwicmVjaXBpZW50cyI6W3siYWNjb3VudF9pZCI6IkEiLCJkZXZpY2VfaWQiOiJBMiJ9LHsiYWNjb3VudF9pZCI6IkIiLCJkZXZpY2VfaWQiOiJCMSJ9XX1dfQ==",
+      "signature_bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+    }
+  },
+  "stream_retention_vector": {
+    "description": "固定编码与无损大整数，零签名仅占位且验签必须失败；不授权跳游标。",
+    "statement": {
+      "protocol_version": "rim-stream-retention-1",
+      "service_id": "S1",
+      "account_id": "A",
+      "device_id": "A1",
+      "stream_id": "ST1",
+      "after_seq": "9007199254740992",
+      "limit": "100",
+      "floor": "9007199254740993",
+      "watermark": "9007199254740994"
+    },
+    "utf8_text": "{\"protocol_version\":\"rim-stream-retention-1\",\"service_id\":\"S1\",\"account_id\":\"A\",\"device_id\":\"A1\",\"stream_id\":\"ST1\",\"after_seq\":\"9007199254740992\",\"limit\":\"100\",\"floor\":\"9007199254740993\",\"watermark\":\"9007199254740994\"}",
+    "statement_sha256": "5589ecb6795218362b4408c2f28cf6e8ca76692e9af6dfea7739f70ae8ef9498",
+    "signing_domain_utf8": "Rocket-IM/POC/stream-retention/v1\u0000",
+    "receipt": {
+      "statement_bytes": "eyJwcm90b2NvbF92ZXJzaW9uIjoicmltLXN0cmVhbS1yZXRlbnRpb24tMSIsInNlcnZpY2VfaWQiOiJTMSIsImFjY291bnRfaWQiOiJBIiwiZGV2aWNlX2lkIjoiQTEiLCJzdHJlYW1faWQiOiJTVDEiLCJhZnRlcl9zZXEiOiI5MDA3MTk5MjU0NzQwOTkyIiwibGltaXQiOiIxMDAiLCJmbG9vciI6IjkwMDcxOTkyNTQ3NDA5OTMiLCJ3YXRlcm1hcmsiOiI5MDA3MTk5MjU0NzQwOTk0In0=",
+      "signature_bytes": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+    }
+  }
 }

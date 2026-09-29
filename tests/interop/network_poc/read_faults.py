@@ -26,10 +26,12 @@ def _observed_rust(lab, operation, *, expected_exit=0, **fields):
                "account": identity("b1")["account_id"], "device": "b1",
                "operation": operation, **fields}
     process = subprocess.Popen([str(lab.binary)], stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                               env=lab.environment("b1") if hasattr(lab, "environment") else None)
     lab.process_count += 1
     evidence = _record(lab, "rust_process", operation=operation, pid=process.pid,
-                       failpoint=fields.get("failpoint"), expected_exit_code=expected_exit)
+                       failpoint=fields.get("failpoint"), expected_exit_code=expected_exit,
+                       anchor_configured="b1" in getattr(lab, "configs", {}))
     try:
         stdout, stderr = process.communicate(json.dumps(request), timeout=30)
     except BaseException:

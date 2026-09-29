@@ -54,6 +54,9 @@ pub(super) struct DeviceState {
     pub wire_rejections: Option<super::wire_rejections::Rejections>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wire_reads: Option<super::wire_reads::Reads>,
+    // 新顶层字段使旧程序拒绝紧凑状态，不能把回收原件误认为从未发送或接收。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wire_reclamation: Option<super::wire_reclaim_types::State>,
     #[serde(default)]
     pub wire_sync: super::wire_sync::SyncState,
     #[serde(default)]
@@ -123,6 +126,7 @@ impl DeviceState {
             wire_closures: None,
             wire_rejections: None,
             wire_reads: None,
+            wire_reclamation: None,
             wire_sync: super::wire_sync::SyncState::default(),
             permissions: super::permission_state::PermissionState::default(),
             history_transfers: super::history_state::HistoryState::default(),

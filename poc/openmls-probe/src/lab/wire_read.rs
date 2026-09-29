@@ -41,6 +41,21 @@ pub(super) fn mark(state: &mut DeviceState, event_ids: Vec<String>) -> Result<Va
             "read_invalid",
             "同批消息事件不能重复",
         )?;
+        if let Some(target) = super::wire_reclaimed::read_target(state, &id)? {
+            let original = state
+                .wire_reads
+                .as_ref()
+                .and_then(|r| r.records.get(&target.acceptance_id))
+                .ok_or_else(|| LabError::new("payload_reclaimed", "已回收正文不能首次阅读"))?;
+            ensure(
+                wire_reads::same_message(&original.target, &target)
+                    && original.confirmation.is_some(),
+                "read_state",
+                "紧凑阅读事实不一致",
+            )?;
+            targets.insert(target.acceptance_id.clone(), target);
+            continue;
+        }
         let (stored, target) = wire_reads::message(state, &id)?;
         let saved = state
             .wire_reads

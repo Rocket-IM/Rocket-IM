@@ -243,7 +243,7 @@ class HistoryTransferTests(unittest.TestCase):
             db.execute("UPDATE meta SET value='rim-poc-storage-4' WHERE key='schema'")
         self.store = Store(self.path, self.fixture, self.verifier, self.signer)
         with self.store.transaction() as db:
-            self.assertEqual(self.store.meta(db, "schema"), "rim-poc-storage-6")
+            self.assertEqual(self.store.meta(db, "schema"), "rim-poc-storage-7")
             self.assertEqual([tuple(row) for row in db.execute("SELECT * FROM device_public_keys")], before)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM join_materials").fetchone()[0], 1)
         self.assertEqual(self.count(), 0)

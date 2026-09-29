@@ -18,11 +18,12 @@ ORDER = [0, 1, 4, 6, 3, 7, 5, 2, 8]
 def original_load(lab, page_limit):
     old_program(lab, enabled=False)
     enable(lab)
-    old_program(lab)
     lab.case_evidence["previous_failed_logical_schedule"] = ORDER
     packets = {}
     for position, index in enumerate(ORDER):
         record = prepare(lab, index)
+        if position == 0:
+            old_program(lab)
         packets[index] = record
         # 先尝试生成所有未来消息；拒绝来自Rust，不由Python预先隐藏请求。
         for later in ORDER[position + 1:]:

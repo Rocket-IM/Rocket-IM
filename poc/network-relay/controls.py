@@ -122,11 +122,14 @@ def add_control(store, db, req):
 
 
 def stats(db):
+    from reclamation_storage import retained_stats, watermarks
     values = {"attempts": "SELECT COUNT(*) FROM attempts", "accepted": "SELECT COUNT(*) FROM attempts WHERE outcome='accepted'",
               "events": "SELECT COUNT(*) FROM events", "message_events": "SELECT COUNT(*) FROM events WHERE json_extract(content,'$.type')='message'",
               "receipts": "SELECT COUNT(*) FROM receipts", "controls": "SELECT COUNT(*) FROM controls"}
     value = {key: str(db.execute(sql).fetchone()[0]) for key, sql in values.items()}
+    value.update(retained_stats(db))
     value["streams"] = [{"account_id": row["account"], "device_id": row["device"], "stream_id": row["stream_id"],
-                         "watermark": str(db.execute("SELECT COALESCE(MAX(seq),0) FROM events WHERE account=? AND device=?", (row["account"], row["device"])).fetchone()[0])}
+                         "watermark": str(watermarks(db, (row["account"], row["device"]))["high_watermark"]),
+                         "floor": str(watermarks(db, (row["account"], row["device"]))["floor"])}
                         for row in db.execute("SELECT account,device,stream_id FROM devices ORDER BY account,device")]
     return value

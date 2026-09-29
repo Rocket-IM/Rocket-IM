@@ -19,10 +19,20 @@ pub(super) enum Statement {
     RebuildBinding(Box<crate::rebuild_stream::BindingStatement>),
     RebuildPage(Box<crate::rebuild_stream::PageStatement>),
     StreamPage(Box<crate::stream_page::PageStatement>),
+    Reclamation(Box<crate::message_reclamation::Statement>),
+    Retention(Box<crate::message_reclamation::RetentionStatement>),
 }
 impl Statement {
     pub(super) fn domain(&self) -> Result<&'static [u8], PermissionError> {
         match self {
+            Self::Reclamation(s) => {
+                s.validate()?;
+                Ok(crate::message_reclamation::SIGNING_DOMAIN)
+            }
+            Self::Retention(s) => {
+                s.validate()?;
+                Ok(crate::message_reclamation::RETENTION_DOMAIN)
+            }
             Self::MessageRejection(s) => {
                 s.validate()?;
                 Ok(crate::message_rejection::SIGNING_DOMAIN)

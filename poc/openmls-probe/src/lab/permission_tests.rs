@@ -98,8 +98,13 @@ fn signed_permission_prepare_is_persistent_and_apply_advances_both_peers() {
             "2"
         );
     }
-    let sent = f.send("A", "after_signed_change");
-    f.receive("B", &sent["envelope"]);
+    // 已验证设备签名仍不能替代 Service 回执信任，默认发送门明确拒绝。
+    f.fails(
+        "A",
+        json!({"operation":"wire_send","logical_message_id":"after_signed_change",
+        "attempt_id":"P1","payload":"test"}),
+        "receipt_pin_required",
+    );
     f.fails(
         "B",
         json!({"operation":"wire_configure","conversation_id":"G1","authorization_version":"99"}),

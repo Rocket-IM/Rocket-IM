@@ -4,7 +4,7 @@ mod boundaries;
 #[path = "wire_rejection_chain_tests.rs"]
 mod chain;
 #[path = "wire_rejection_test_support.rs"]
-mod support;
+pub(super) mod support;
 use super::wire_send_order_test_support::*;
 use super::{codec, wire_tests::Fixture};
 use crate::{message_rejection, permission::receipts::SignedRecord};

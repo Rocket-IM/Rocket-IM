@@ -66,6 +66,22 @@ pub(super) fn receive(
         acceptance_id.as_deref(),
         acceptance_receipt.as_ref(),
     )?;
+    if let Some(result) = super::wire_reclaimed::receive(
+        state,
+        &header,
+        &raw_header,
+        &ciphertext,
+        acceptance_id.as_deref(),
+    )? {
+        return Ok(result);
+    }
+    if let Some(id) = &acceptance_id {
+        ensure(
+            super::wire_reclaimed::acceptance(state, id).is_none(),
+            "acceptance_conflict",
+            "接受ID已属于已回收消息",
+        )?;
+    }
     if let Some(record) = state.wire.inbox.get_mut(&key) {
         if record.envelope == envelope {
             if let Some(incoming) = &acceptance_id {

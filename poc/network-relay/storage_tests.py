@@ -124,6 +124,7 @@ class StoreTests(unittest.TestCase):
         with self.store.transaction() as db:
             db.executemany("INSERT INTO events(account,device,seq,event_id,content) VALUES ('B','B1',?,?,?)",
                            [(i, f"full_{i}", '{"type":"fixture"}') for i in range(1, 10001)])
+            db.execute("UPDATE stream_watermarks SET high_watermark=10000 WHERE account='B' AND device='B1'")
         self.assert_code("resource_exhausted", "submit_message", {"envelope": envelope()})
         self.assertEqual(self.call("get_attempt", key())["outcome"], "not_found")
         self.assertEqual(self.pull(device="A2")["watermark"], "0")

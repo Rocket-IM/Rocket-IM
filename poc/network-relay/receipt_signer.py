@@ -11,6 +11,7 @@ from receipt_contract import (validate_consistency_head, validate_message_accept
 from history_contract import validate_history_receipt
 from rebuild_stream_contract import validate_binding, validate_page_receipt
 from stream_page_contract import validate_stream_page_receipt
+from reclamation_contract import validate_reclaim_receipt, validate_retention_receipt
 
 
 def unavailable():
@@ -58,6 +59,8 @@ class ReceiptSigner:
                      "rim-rebuild-stream-binding-1": validate_binding,
                      "rim-rebuild-stream-page-1": validate_page_receipt,
                      "RIM-STREAM-PAGE-POC-1": validate_stream_page_receipt,
+                     "rim-message-reclaim-1": validate_reclaim_receipt,
+                     "rim-stream-retention-1": validate_retention_receipt,
                      "rim-consistency-head-1": validate_consistency_head}.get(statement.get("protocol_version"))
         if validator is None:
             raise unavailable()

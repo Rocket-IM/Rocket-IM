@@ -29,6 +29,10 @@ pub(super) fn preflight(
             | super::Operation::WireDownloadSigned { .. }
             | super::Operation::WireDownload { .. }
             | super::Operation::WireProcess
+            | super::Operation::WireReclaimRequest { .. }
+            | super::Operation::WireReclaim { .. }
+            | super::Operation::WireRetention { .. }
+            | super::Operation::WireSend { .. }
     ) {
         return Ok(());
     }
@@ -41,7 +45,42 @@ pub(super) fn preflight(
         .ok_or_else(|| LabError::new("anchor_state", "已登记设备缺少完整快照"))?;
     super::rebuild_state::guard(&metadata, &request.operation)?;
     super::wire_stream_source::preflight(&metadata, &request.operation)?;
+    if matches!(
+        request.operation,
+        super::Operation::WireReclaimRequest { .. }
+            | super::Operation::WireReclaim { .. }
+            | super::Operation::WireRetention { .. }
+            | super::Operation::WireSend { .. }
+    ) {
+        super::wire_send_order::preflight(&metadata, &request.operation)?;
+        super::consistency_state::guard(&metadata, &request.operation)?;
+        super::permissions::guard(&metadata, &request.operation)?;
+    }
     match &request.operation {
+        super::Operation::WireSend { .. } => {
+            super::wire_send_order::preflight_send(&metadata, &request.operation)?;
+        }
+        super::Operation::WireReclaimRequest {
+            plan_id,
+            acceptance_ids,
+        } => {
+            super::wire_reclaim::request(&metadata, plan_id.clone(), acceptance_ids.clone())?;
+        }
+        super::Operation::WireReclaim { receipt } => {
+            super::wire_reclaim::execute(&mut metadata, receipt.clone())?;
+        }
+        super::Operation::WireRetention {
+            receipt,
+            after_seq,
+            limit,
+        } => {
+            super::wire_reclaim::retention(
+                &metadata,
+                receipt.clone(),
+                after_seq.clone(),
+                limit.clone(),
+            )?;
+        }
         super::Operation::RebuildStreamPull { limit } => {
             rebuild_stream::validate_pull(&metadata, limit)?;
         }

@@ -97,7 +97,7 @@ class LifecycleBackfillTests(QuotaFixture):
         result = self.run_backfill()
         self.assertEqual((result["scope_count"], result["appended_count"], result["skipped_count"], result["pending_count"]), ("10", "9", "1", "0"))
         after = self.snapshot()
-        for name in before.keys() - {"events", "lifecycle_backfill"}:
+        for name in before.keys() - {"events", "lifecycle_backfill", "stream_watermarks"}:
             self.assertEqual(before[name], after[name], name)
         self.assertEqual(after["events"][:len(before["events"])], before["events"])
         self.control({"action": "set_availability", "acceptance_id": third["acceptance_id"], "availability": "deleted"})
@@ -176,7 +176,7 @@ class LifecycleBackfillTests(QuotaFixture):
         self.assert_failure_unchanged("lifecycle_backfill_untrusted")
         with self.store.transaction() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM permission_checkpoint").fetchone()[0], 0)
-            self.assertEqual(self.store.meta(db, "schema"), "rim-poc-storage-6")
+            self.assertEqual(self.store.meta(db, "schema"), "rim-poc-storage-7")
 
     def test_missing_or_inconsistent_authorization_chain_fails_closed(self):
         self.accept()
@@ -278,9 +278,9 @@ class LifecycleBackfillTests(QuotaFixture):
                     db.execute("UPDATE meta SET value=? WHERE key='schema'", (old,))
                 store = Store(path, fixture())
                 with store.transaction() as db:
-                    self.assertEqual(store.meta(db, "schema"), "rim-poc-storage-6")
+                    self.assertEqual(store.meta(db, "schema"), "rim-poc-storage-7")
                     self.assertEqual(db.execute("SELECT COUNT(*) FROM lifecycle_backfill").fetchone()[0], 0)
-        for mutation in ("UPDATE meta SET value='rim-poc-storage-7' WHERE key='schema'", "DROP TABLE lifecycle_backfill"):
+        for mutation in ("UPDATE meta SET value='rim-poc-storage-8' WHERE key='schema'", "DROP TABLE lifecycle_backfill"):
             with self.store.transaction() as db:
                 db.execute(mutation)
             before = self.snapshot()
@@ -289,4 +289,4 @@ class LifecycleBackfillTests(QuotaFixture):
             self.assertEqual(self.snapshot(), before)
             if "UPDATE" in mutation:
                 with self.store.transaction() as db:
-                    db.execute("UPDATE meta SET value='rim-poc-storage-6' WHERE key='schema'")
+                    db.execute("UPDATE meta SET value='rim-poc-storage-7' WHERE key='schema'")

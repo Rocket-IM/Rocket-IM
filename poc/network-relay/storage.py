@@ -148,9 +148,12 @@ class Store:
             if self.meta(db, "service_id") != fixture["service_id"]:
                 raise ValueError("已有数据库服务实例不匹配")
             from permissions import install_schema
-            self.permission_enabled = install_schema(db, self.meta(db, "schema"), fixture.get("permission_checkpoint"), not tables, receipt_key, fixture["devices"])
+            previous_schema = self.meta(db, "schema")
+            self.permission_enabled = install_schema(db, previous_schema, fixture.get("permission_checkpoint"), not tables, receipt_key, fixture["devices"])
             from rebuild_stream_storage import install
             install(db, fixture, not tables)
+            from reclamation_storage import install as install_reclamation
+            install_reclamation(db, previous_schema)
             db.commit()
         self.path.chmod(0o600)
 
@@ -203,13 +206,18 @@ class Store:
 
     @staticmethod
     def append_event(db, pair, event, acceptance_id=None):
-        if db.execute("SELECT COUNT(*) FROM events").fetchone()[0] >= MAX_EVENTS:
+        from reclamation_storage import watermarks
+        if db.execute("SELECT COUNT(*) FROM events WHERE compacted=0").fetchone()[0] >= MAX_EVENTS:
             raise ProtocolError("resource_exhausted", "实验事件总量已达上限", status=429, retry_after_ms="1000")
-        seq = db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events WHERE account=? AND device=?", pair).fetchone()[0]
-        if seq > MAX_STREAM_EVENTS:
+        marks = watermarks(db, pair)
+        seq = marks["high_watermark"] + 1
+        if db.execute("SELECT COUNT(*) FROM events WHERE account=? AND device=? AND compacted=0", pair).fetchone()[0] >= MAX_STREAM_EVENTS:
             raise ProtocolError("resource_exhausted", "设备事件流已达实验上限", status=429, retry_after_ms="1000")
+        if seq > (1 << 63) - 1:
+            raise ProtocolError("resource_exhausted", "SQLite设备流序号已达整数上限", status=429)
         db.execute("INSERT INTO events(account,device,seq,event_id,content,acceptance_id) VALUES (?,?,?,?,?,?)",
                    (*pair, seq, identifier(), encode_json(event).decode(), acceptance_id))
+        db.execute("UPDATE stream_watermarks SET high_watermark=? WHERE account=? AND device=?", (seq, *pair))
 
     @staticmethod
     def members(db):

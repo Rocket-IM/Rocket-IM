@@ -4,13 +4,14 @@ use crate::{
     crypto::{
         anchor::database as anchor_db,
         contract::{
-            receive_sequence, validate_id, Action, DownloadOutcome, DownloadRequest, Fault, Request,
+            receive_sequence, validate_id, DownloadOutcome, DownloadRequest, Fault, Request,
         },
         model::{self, Envelope},
+        preflight,
         query::{self, Meta},
         schema::corrupt,
     },
-    model::{revision, Error, Fault as SqlFault, Result},
+    model::{Error, Fault as SqlFault, Result},
     transaction,
 };
 use rusqlite::{params, Transaction, TransactionBehavior};
@@ -36,37 +37,7 @@ impl Store {
                     return Err(Error::new("crypto_pending", true));
                 }
                 let meta = query::load(tx, &self.scope)?;
-                if meta.conversation.is_none() {
-                    return Err(Error::new("crypto_no_group", false));
-                }
-                let mut cursor = revision(&meta.download_cursor)?;
-                let mut additions = Vec::new();
-                for record in &request.records {
-                    let envelope = &record.envelope;
-                    if envelope.service != self.scope.service
-                        || Some(&envelope.conversation) != meta.conversation.as_ref()
-                    {
-                        return Err(Error::new("crypto_scope_mismatch", false));
-                    }
-                    if let Some(old) = meta
-                        .downloads
-                        .iter()
-                        .find(|v| v.summary.sequence == record.sequence)
-                    {
-                        if old.envelope != *envelope {
-                            return Err(Error::new("download_sequence_conflict", false));
-                        }
-                        continue;
-                    }
-                    if revision(&record.sequence)? != cursor.checked_add(1).ok_or_else(corrupt)? {
-                        return Err(Error::new("download_gap", false));
-                    }
-                    if meta.downloads.len() + additions.len() >= query::LIMIT {
-                        return Err(Error::new("crypto_limit", false));
-                    }
-                    cursor += 1;
-                    additions.push(record);
-                }
+                let (cursor, additions) = preflight::download(&meta, &self.scope, request)?;
                 for record in &additions {
                     insert(tx, &record.sequence, &record.envelope)?;
                     if request.fault == Fault::AfterSql {
@@ -116,18 +87,7 @@ impl Store {
                     return Err(Error::new("crypto_pending", true));
                 }
                 let meta = query::load(tx, &self.scope)?;
-                Ok(meta
-                    .downloads
-                    .into_iter()
-                    .find(|v| v.summary.sequence == sequence)
-                    .map(|record| Request {
-                        request_id: request_id.into(),
-                        action: Action::Receive {
-                            sequence: sequence.into(),
-                            envelope: record.envelope,
-                        },
-                        fault,
-                    }))
+                Ok(preflight::process(&meta, request_id, sequence, fault))
             },
         );
         self.finish(result, false)?

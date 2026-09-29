@@ -48,6 +48,10 @@ fn accepted_past_message_survives_restart_without_rolling_back_current_send_ratc
     let receipt = acceptance(&key, &old, "K1");
     remove(&f, &key, "removeC", "C");
     let before = f.send("B", "current_before");
+    f.call(
+        "B",
+        super::super::super::wire_send_order_test_support::accept(&before, &key, "currentK"),
+    );
     f.receive("A", &before["envelope"]);
     let state_before = f.call("B", json!({"operation":"wire_inspect"}));
     assert_eq!(

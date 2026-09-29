@@ -225,10 +225,24 @@ pub(super) fn validate(state: &DeviceState) -> Result<(), LabError> {
         "阅读记录为空或超过槽位上限",
     )?;
     for (key, intent) in &reads.records {
-        let (_, target) = checked(
-            "read_state",
-            message(state, &intent.target.message_event_id),
-        )?;
+        let target =
+            match super::wire_reclaimed::read_target(state, &intent.target.message_event_id)? {
+                Some(target) => {
+                    ensure(
+                        intent.confirmation.is_some(),
+                        "read_state",
+                        "已回收消息不能保留未确认阅读",
+                    )?;
+                    target
+                }
+                None => {
+                    checked(
+                        "read_state",
+                        message(state, &intent.target.message_event_id),
+                    )?
+                    .1
+                }
+            };
         ensure(
             key == &intent.target.acceptance_id && target == intent.target,
             "read_state",

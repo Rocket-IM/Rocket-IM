@@ -179,9 +179,10 @@ fn send_order_accounts_are_independent_and_accepted_retry_does_not_release_new_p
 
 #[test]
 fn send_order_corrupt_multi_pending_is_rejected_before_execution_without_cleanup() {
-    let (f, _) = setup();
+    let f = Fixture::new();
     f.send("A", "M1");
     f.send("A", "M2");
+    pin(&f, &SigningKey::from_bytes(&[74; 32]));
     alter_invalid(&f, "A", |state| {
         state.wire_send_order = Some(Policy::AcceptanceSerialV1 {
             conversation_id: "G1".into(),
@@ -280,7 +281,7 @@ fn send_order_accept_stays_available_under_original_permission_and_consistency_g
 fn send_order_blocked_and_original_retry_do_not_call_create_message() {
     use super::wire_send_probe::{calls, reset};
     let (f, key) = setup();
-    enable(&f, "A");
+    // 不显式启用：计数同时覆盖默认首发策略。
     reset();
     let first = f.send("A", "M1");
     assert_eq!(calls(), 1);

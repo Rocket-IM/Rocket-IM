@@ -2,9 +2,11 @@
 use super::*;
 
 #[test]
-fn closure_requires_opt_in_and_legacy_snapshot_shape_stays_absent() {
-    let (f, key) = setup();
+fn closure_requires_gate_for_legacy_outbox_and_snapshot_shape_stays_absent() {
+    let f = super::super::wire_tests::Fixture::new();
+    let key = SigningKey::from_bytes(&[74; 32]);
     f.send("A", "M1");
+    pin(&f, &key);
     let state = serde_json::to_value(load(&f, "A")).unwrap();
     assert!(state.get("wire_closures").is_none());
     let request = json!({"service_id":"S1","conversation_id":"G1","logical_message_id":"M1","attempt_id":"P1","envelope_sha256":"a".repeat(64)});

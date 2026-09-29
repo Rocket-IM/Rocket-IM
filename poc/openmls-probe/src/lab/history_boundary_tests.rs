@@ -24,8 +24,10 @@ fn with_device(
 fn two_past_epochs_are_retained_and_third_transition_expires_unseen_message() {
     let (f, key) = setup_devices(&["A", "B", "C", "D", "E"]);
     let kept = f.send("A", "kept")["envelope"].clone();
-    let expired = f.send("A", "expired")["envelope"].clone();
     let kept_receipt = acceptance(&key, &kept, "K1");
+    f.call("A", json!({"operation":"wire_accept","logical_message_id":"kept","attempt_id":"P1","acceptance_receipt":kept_receipt}));
+    let expired = f.send("A", "expired")["envelope"].clone();
+    f.call("A", json!({"operation":"wire_accept","logical_message_id":"expired","attempt_id":"P1","acceptance_receipt":acceptance(&key,&expired,"K2")}));
     remove(&f, &key, "removeC", "C");
     remove(&f, &key, "removeD", "D");
     assert_eq!(
@@ -63,6 +65,7 @@ fn two_past_epochs_are_retained_and_third_transition_expires_unseen_message() {
 fn old_pending_candidate_does_not_gain_deleted_past_keys_after_policy_upgrade() {
     let (f, key) = setup_devices(&["A", "B", "C", "D"]);
     let unavailable = f.send("B", "before_upgrade")["envelope"].clone();
+    f.call("B", json!({"operation":"wire_accept","logical_message_id":"before_upgrade","attempt_id":"P1","acceptance_receipt":acceptance(&key,&unavailable,"K1")}));
     let proof = prepare(&f, "A", "old_candidate");
     with_device(&f, "A", |state| {
         let provider = permission_state::provider_from(

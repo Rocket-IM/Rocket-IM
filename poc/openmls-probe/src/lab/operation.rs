@@ -164,6 +164,18 @@ pub(super) enum Operation {
         pending_limit: Option<usize>,
     },
     WireInspect,
+    WireReclaimRequest {
+        plan_id: String,
+        acceptance_ids: Vec<String>,
+    },
+    WireReclaim {
+        receipt: crate::permission::receipts::SignedRecord,
+    },
+    WireRetention {
+        receipt: crate::permission::receipts::SignedRecord,
+        after_seq: String,
+        limit: String,
+    },
     WireRead {
         event_ids: Vec<String>,
     },

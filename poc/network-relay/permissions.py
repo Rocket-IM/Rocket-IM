@@ -10,7 +10,7 @@ from join_materials import existing_join, install_join_schema, prepare_join, req
 from storage import replace_members, revoke_device, subject
 from synchronization import MAX_PAGE_BYTES
 
-SCHEMA_VERSION = "rim-poc-storage-6"
+SCHEMA_VERSION = "rim-poc-storage-7"
 PERMISSION_SCHEMA = """
 CREATE TABLE permission_checkpoint (singleton INTEGER PRIMARY KEY CHECK(singleton=1),
     initial_version TEXT NOT NULL, checkpoint TEXT NOT NULL);
@@ -27,7 +27,7 @@ CREATE TABLE permission_resolutions (change_id TEXT PRIMARY KEY, actor_account T
 
 
 def install_schema(db, old_version, fixture_checkpoint, new_database, receipt_key=None, fixture_devices=()):
-    if old_version not in {"rim-poc-1", "rim-poc-storage-2", "rim-poc-storage-3", "rim-poc-storage-4", "rim-poc-storage-5", SCHEMA_VERSION}:
+    if old_version not in {"rim-poc-1", "rim-poc-storage-2", "rim-poc-storage-3", "rim-poc-storage-4", "rim-poc-storage-5", "rim-poc-storage-6", SCHEMA_VERSION}:
         raise ValueError("不支持该实验数据库版本")
     if not db.in_transaction:
         db.execute("BEGIN IMMEDIATE")
@@ -59,15 +59,13 @@ def install_schema(db, old_version, fixture_checkpoint, new_database, receipt_ke
         if old_version in {"rim-poc-1", "rim-poc-storage-2", "rim-poc-storage-3", "rim-poc-storage-4"}:
             from history_transfers import HISTORY_SCHEMA
             db.execute(HISTORY_SCHEMA)
-        if old_version != SCHEMA_VERSION:
+        if old_version not in {"rim-poc-storage-6", SCHEMA_VERSION}:
             from lifecycle_backfill import install
             install(db)
-            db.execute("UPDATE meta SET value=? WHERE key='schema'", (SCHEMA_VERSION,))
         else:
             from lifecycle_backfill import validate_schema
             validate_schema(db)
-        if not new_database:
-            db.commit()
+        db.execute("UPDATE meta SET value=? WHERE key='schema'", (SCHEMA_VERSION,))
         return has_checkpoint
     except BaseException:
         db.rollback()

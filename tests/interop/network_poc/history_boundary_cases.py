@@ -118,6 +118,8 @@ def message_signer_atomicity(lab):
         saved.rename(lab.receipt_key)
     lab.restart()
     check(lab.submit(packet) == accepted, "重启后接受签名不是原字节")
+    lab.rust("a1", "wire_accept", logical_message_id="message_signer_failure", attempt_id="P1",
+             acceptance_receipt=accepted["acceptance_receipt"])
     advance(lab, "advance_after_message_acceptance")
     receive_record(lab, "b1", (packet, accepted))
     communicate(lab, "after_message_signer_restored")

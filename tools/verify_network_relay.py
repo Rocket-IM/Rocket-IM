@@ -164,7 +164,7 @@ def needs_permissions(ident):
 
 def needs_signed_pages(ident):
     # 生命周期声明必须来自本次验证的签名页，不能用无签名的普通收发装置。
-    return ident == "M11" or ident.startswith(("R", "H", "J", "D", "X", "S", "F", "E"))
+    return ident in ("M11", "P04") or ident.startswith(("R", "H", "J", "D", "X", "S", "F", "E"))
 
 
 def build(binary, output):

@@ -11,6 +11,11 @@ pub(super) fn reject(
     attempt: String,
     proof: SignedRecord,
 ) -> Result<Value, LabError> {
+    if let Some(result) =
+        super::wire_reclaimed::terminal(state, &message, &attempt, &proof, "rejected")?
+    {
+        return Ok(result);
+    }
     ensure(
         state.wire_send_order.is_some(),
         "rejection_required",

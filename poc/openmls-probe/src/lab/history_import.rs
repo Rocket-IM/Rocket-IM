@@ -101,6 +101,12 @@ pub(super) fn import(
     let mut summaries = Vec::new();
     for (copy, selected) in body.records.into_iter().zip(&statement.selection) {
         let (key, summary) = stored::validate_copy(state, &statement, &copy, selected)?;
+        ensure(
+            super::wire_reclaimed::message(state, &key).is_none()
+                && super::wire_reclaimed::acceptance(state, &selected.acceptance_id).is_none(),
+            "history_content_unavailable",
+            "本机已明确回收选定内容，迁移不能复活正文",
+        )?;
         if let Some(native) = state.wire.inbox.get(&key) {
             ensure(
                 native.envelope == copy.envelope

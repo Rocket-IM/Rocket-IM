@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M03：显式启用 Rust 单未决发送槽的持久顺序约束验证。"""
+"""M03：默认首发/显式启用的单未决门、旧 outbox 和恢复契约验证。"""
 
 import argparse
 from datetime import datetime, timezone
@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OLD_BINARY = ROOT / "dist/network-relay/m12-sequence/artifacts/default/openmls-state-lab"
 sys.path.insert(0, str(ROOT / "tests/interop"))
 from network_poc.send_order_cases import CASES
+from network_poc.send_order_compatibility import DEFAULT_CASES, COMPATIBILITY_CASES
 from network_poc.fixture import NetworkLab
 
 
@@ -46,26 +47,35 @@ def main():
     parser.add_argument("--permission-verifier", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
     parser.add_argument("--receipt-signer", type=Path, required=True, help="明确指定本轮构建产物；不默认复用历史程序")
     parser.add_argument("--old-binary", type=Path, default=OLD_BINARY)
+    parser.add_argument("--activation", choices=("default", "explicit"), default="default")
+    parser.add_argument("--legacy-binary", type=Path, help="修改前同命名域程序；提供时运行旧 outbox/隔离兼容验证")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/network-relay/m03-send-order")
-    parser.add_argument("--case", action="append", choices=[ident for ident, _ in CASES])
+    parser.add_argument("--case", action="append", choices=[ident for ident, _ in CASES + DEFAULT_CASES + COMPATIBILITY_CASES])
     args = parser.parse_args()
+    cases = CASES + (DEFAULT_CASES if args.activation == "default" else [])
+    if args.legacy_binary:
+        cases += COMPATIBILITY_CASES
+    if args.case and not set(args.case) <= {ident for ident, _ in cases}:
+        parser.error("所选场景需要 --activation default 或 --legacy-binary")
     artifacts = {name: getattr(args, name).resolve()
                  for name in ("binary", "permission_verifier", "receipt_signer", "old_binary")}
+    if args.legacy_binary:
+        artifacts["legacy_binary"] = args.legacy_binary.resolve()
     output = args.output.resolve()
     run_id = str(uuid.uuid4())
     run = output / "runs" / run_id
     run.mkdir(parents=True)
     report_path = run / "report.json"
     report = {"run_id": run_id, "status": "RUNNING", "started_at": datetime.now(timezone.utc).isoformat(),
-              "scope": "synthetic local M03 opt-in Rust persistent single-unresolved-send-slot gate with real HTTP and encrypted snapshots",
+              "scope": "synthetic local M03 Rust persistent single-unresolved-send-slot gate with real HTTP and encrypted snapshots",
               "platform": platform.platform(), "python": platform.python_version(), "sqlite": sqlite3.sqlite_version,
-              "selected_cases": args.case or [ident for ident, _ in CASES],
+              "selected_cases": args.case or [ident for ident, _ in cases],
               "artifacts": {name: str(path) for name, path in artifacts.items()},
               "pass_meaning": "scoped gate and recovery evidence only; PASS does not complete a formal SDK or recover existing quarantined messages",
-              "gate_scope": "explicit_opt_in_single_unresolved_send_slot",
+              "gate_scope": args.activation + "_single_unresolved_send_slot",
               "ratchet_configuration_changed": False,
               "limits": ["synthetic identities and signed-permission fixtures on loopback HTTP with the original Relay server",
-                         "the Rust gate must be explicitly enabled; a controlling host can still use the compatible path without enabling it",
+                         "default activation is tested only with signed permission trust; unsigned mechanism probes are outside this contract",
                          "the next send advances only after the accepted proof is durably persisted; rejection or closure without trusted terminal recovery remains blocking",
                          "original OpenMLS default ratchet window and retention policy are unchanged",
                          "not a formal SDK network worker or a queue of multiple pending plaintext messages",
@@ -77,9 +87,13 @@ def main():
     write(report_path, report)
     try:
         report["source_sha256"] = source_hashes()
+        for name in report["source_sha256"]:
+            archived = run / "source" / name
+            archived.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / name, archived)
         report["artifact_sha256"] = {name: digest(path) for name, path in artifacts.items()}
         write(report_path, report)
-        for ident, operation in CASES:
+        for ident, operation in cases:
             if args.case and ident not in args.case:
                 continue
             record = {"id": ident, "status": "RUNNING"}
@@ -89,6 +103,8 @@ def main():
                 lab = NetworkLab(artifacts["binary"], Path(temporary).resolve(),
                                  artifacts["permission_verifier"], artifacts["receipt_signer"])
                 lab.old_binary = artifacts["old_binary"]
+                lab.send_order_activation = args.activation
+                lab.legacy_binary = artifacts.get("legacy_binary")
                 lab.case_evidence = {}
                 try:
                     try:

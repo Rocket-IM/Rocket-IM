@@ -54,11 +54,20 @@ mod wire_read;
 mod wire_read_tests;
 mod wire_reads;
 mod wire_receive;
+mod wire_reclaim;
+mod wire_reclaim_compact;
+#[cfg(test)]
+mod wire_reclaim_tests;
+mod wire_reclaim_types;
+mod wire_reclaim_validate;
+mod wire_reclaimed;
 mod wire_reject;
 #[cfg(test)]
 mod wire_rejection_tests;
 mod wire_rejections;
 mod wire_send_order;
+#[cfg(test)]
+mod wire_send_order_default_tests;
 #[cfg(test)]
 mod wire_send_order_test_support;
 #[cfg(test)]
@@ -236,7 +245,10 @@ fn execute_state(
     // 已读诊断只观察持久状态，不因读取而提交独立的一致性冲突。
     let read_diagnostic = matches!(
         request.operation,
-        Operation::WireReadPending | Operation::WireReadInspect
+        Operation::WireReadPending
+            | Operation::WireReadInspect
+            | Operation::WireReclaimRequest { .. }
+            | Operation::WireRetention { .. }
     );
     if !read_diagnostic && consistency_state::preflight(&mut state)? {
         // 发现的是与本次业务输入无关的有效冲突；先持久暂停再拒绝输出新密文。
@@ -261,6 +273,7 @@ fn execute_state(
         return Ok(json!({"ok":true,"result":cached.result}));
     }
     let is_wire_read = matches!(request.operation, Operation::WireRead { .. });
+    let is_wire_reclaim = matches!(request.operation, Operation::WireReclaim { .. });
     let is_wire_terminal = matches!(
         request.operation,
         Operation::WireClose { .. } | Operation::WireReject { .. }
@@ -272,6 +285,8 @@ fn execute_state(
             | Operation::WireReadPending
             | Operation::WireReadInspect
             | Operation::WireInspect
+            | Operation::WireReclaimRequest { .. }
+            | Operation::WireRetention { .. }
             | Operation::WireSlotInspect { .. }
             | Operation::PermissionInspect
             | Operation::HistoryInspect
@@ -315,6 +330,7 @@ fn execute_state(
     if should_save
         && !(is_wire_terminal && result["duplicate"] == true)
         && !(is_wire_read && result["marked_count"] == 0)
+        && !(is_wire_reclaim && result["duplicate"] == true)
     {
         locked.save(&mut state, request.failpoint)?;
     }
@@ -477,6 +493,16 @@ fn perform(state: &mut DeviceState, operation: Operation) -> Result<Value, LabEr
             wire::configure(state, conversation_id, authorization_version)
         }
         Operation::WireInspect => wire::inspect(state),
+        Operation::WireReclaimRequest {
+            plan_id,
+            acceptance_ids,
+        } => wire_reclaim::request(state, plan_id, acceptance_ids),
+        Operation::WireReclaim { receipt } => wire_reclaim::execute(state, receipt),
+        Operation::WireRetention {
+            receipt,
+            after_seq,
+            limit,
+        } => wire_reclaim::retention(state, receipt, after_seq, limit),
         Operation::WireRead { event_ids } => wire_read::mark(state, event_ids),
         Operation::WireReadPending => Ok(wire_read::pending(state)),
         Operation::WireReadInspect => Ok(wire_read::inspect(state)),

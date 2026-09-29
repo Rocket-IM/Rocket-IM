@@ -12,7 +12,7 @@ use super::{
         validate_id, Action, Candidate, Fault, Inspect, Outcome, Preparation, Prepared,
         ReceiveValue, Request, Reservation, Scope,
     },
-    query, schema,
+    query,
 };
 use crate::{
     model::{Error, Fault as SqlFault, Result},
@@ -114,83 +114,12 @@ impl Store {
                     return Err(Error::new("crypto_pending", true));
                 }
                 let meta = query::load(tx, &self.scope)?;
-                if let Some(old) = meta
-                    .results
-                    .iter()
-                    .find(|item| item.request_id == request.request_id)
+                if let Some(outcome) =
+                    super::preflight::request(&meta, &self.scope, request, &input_hash)?
                 {
-                    if old.input_hash != input_hash {
-                        return Err(Error::new("crypto_request_conflict", false));
-                    }
-                    let mut outcome = old.outcome.clone();
-                    outcome.cached = true;
                     anchor_db::complete(tx, self.anchor.as_ref(), "execute", &outcome)?;
                     return Ok(Reserved::Cached(outcome));
                 }
-                if let Action::Receive { sequence, envelope } = &request.action {
-                    if let Some(value) =
-                        query::receive::cached(&meta, &self.scope, sequence, envelope, &input_hash)?
-                    {
-                        anchor_db::complete(tx, self.anchor.as_ref(), "execute", &value)?;
-                        return Ok(Reserved::Cached(value));
-                    }
-                }
-                if let Action::Send {
-                    attempt_id,
-                    message_id,
-                    ..
-                } = &request.action
-                {
-                    if let Some(old) = meta
-                        .outbox
-                        .iter()
-                        .find(|item| &item.attempt_id == attempt_id)
-                    {
-                        if &old.message_id != message_id || old.input_hash != input_hash {
-                            return Err(Error::new("crypto_attempt_conflict", false));
-                        }
-                        let result = meta
-                            .results
-                            .iter()
-                            .find(|item| item.request_id == old.request_id)
-                            .ok_or_else(schema::corrupt)?;
-                        let mut outcome = result.outcome.clone();
-                        outcome.cached = true;
-                        anchor_db::complete(tx, self.anchor.as_ref(), "execute", &outcome)?;
-                        return Ok(Reserved::Cached(outcome));
-                    }
-                    if meta
-                        .outbox
-                        .iter()
-                        .any(|item| &item.message_id == message_id)
-                    {
-                        return Err(Error::new("crypto_message_conflict", false));
-                    }
-                    if meta.outbox.len() >= query::LIMIT {
-                        return Err(Error::new("crypto_limit", false));
-                    }
-                }
-                match &request.action {
-                    Action::Initialize {} if meta.identity.is_some() => {
-                        return Err(Error::new("crypto_already_initialized", false))
-                    }
-                    Action::CreateGroup { .. } if meta.conversation.is_some() => {
-                        return Err(Error::new("crypto_already_grouped", false))
-                    }
-                    Action::CreateGroup { .. } if meta.identity.is_none() => {
-                        return Err(Error::new("crypto_not_initialized", false))
-                    }
-                    Action::Send { .. } if meta.conversation.is_none() => {
-                        return Err(Error::new("crypto_no_group", false))
-                    }
-                    _ => {}
-                }
-                if meta.results.len() >= query::LIMIT {
-                    return Err(Error::new("crypto_limit", false));
-                }
-                crate::model::revision(&meta.revision)?
-                    .checked_add(1)
-                    .ok_or_else(schema::corrupt)?;
                 let reservation = Reservation {
                     request_id: request.request_id.clone(),
                     operation: request.action.operation().into(),

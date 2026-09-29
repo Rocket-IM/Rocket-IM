@@ -92,16 +92,21 @@ impl AnchoredClient {
         fault: AnchorFault,
         rebuilding: bool,
     ) -> Result<Gate> {
-        let input = crate::crypto::model::hash(
+        let input_hash = crate::crypto::model::hash(
             &serde_json::to_vec(&input).map_err(|_| error("encoding_failed"))?,
         );
+        let operation = if rebuilding {
+            None
+        } else {
+            Some(
+                serde_json::from_value::<crate::crypto::preflight::Input>(input)
+                    .map_err(|_| error("anchor_input_invalid"))?,
+            )
+        };
         let txn = protocol::random_hex()?;
-        let gate = self.inner.database.call(move |store| {
-            if rebuilding {
-                store.anchor_begin_rebuild(&txn, &input)
-            } else {
-                store.anchor_begin(&txn, &input)
-            }
+        let gate = self.inner.database.call(move |store| match operation {
+            Some(operation) => store.anchor_begin_checked(&txn, &input_hash, &operation),
+            None => store.anchor_begin_rebuild(&txn, &input_hash),
         })?;
         pause(
             fault,

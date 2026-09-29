@@ -19,6 +19,7 @@ OPERATIONS = frozenset({
     "submit_permission_change", "get_permission_changes", "close_permission_change", "get_permission_records", "get_join_material",
     "submit_history_transfer", "get_history_transfer", "get_consistency_head",
     "register_rebuild_stream", "pull_rebuild_events",
+    "confirm_reclaim", "finish_reclaim",
 })
 
 
@@ -184,6 +185,9 @@ def validate_request(operation, value):
     """验证操作形状，不改变数据或建立尝试终态；身份以 Bearer 主体为准。"""
     if operation not in OPERATIONS:
         raise ProtocolError("unsupported_operation", "不支持此操作", status=404)
+    if operation in {"confirm_reclaim", "finish_reclaim"}:
+        from reclamation_contract import validate_reclamation_request
+        return validate_reclamation_request(operation, value)
     if operation in {"register_rebuild_stream", "pull_rebuild_events"}:
         from rebuild_stream_contract import validate_operation
         return validate_operation(operation, value)

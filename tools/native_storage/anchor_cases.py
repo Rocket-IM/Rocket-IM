@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 
 from anchor_faults import ANCHOR_KILLS, AUTHORITY_FAILURES, CRYPTO_KILLS, FaultCases
+from anchor_preflight_cases import PREFLIGHT_CASES, PreflightCases
 from anchor_support import (Fixture, download, execute, metrics, process, recover,
                             rejected, send_action, snapshot, status, success)
 from crypto_support import CryptoProbe, committed, failure
@@ -15,6 +16,7 @@ from receive_support import check_message, committed as received_commit
 from support import require, sha
 
 CASE_NAMES = (
+    *PREFLIGHT_CASES,
     "normal_send_download_process_restart", "cached_operations_still_anchored",
     "whole_database_rollback", "download_only_rollback", "prebind_v3_rollback",
     "wrong_scope", "wrong_anchor_key", "wrong_client_key", "missing_config",
@@ -25,8 +27,10 @@ CASE_NAMES = (
 )
 
 
-class Cases(Fixture, FaultCases):
+class Cases(Fixture, FaultCases, PreflightCases):
     def run(self, name):
+        if name in PREFLIGHT_CASES:
+            return self.preflight_rejection(name)
         if name in ANCHOR_KILLS or name in CRYPTO_KILLS:
             return self.killed_send(name)
         if name in AUTHORITY_FAILURES:

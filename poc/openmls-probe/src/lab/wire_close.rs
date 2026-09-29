@@ -19,6 +19,9 @@ pub(super) fn request(
     attempt: String,
 ) -> Result<Value, LabError> {
     enabled(state)?;
+    if let Some(result) = super::wire_reclaimed::close_request(state, &message, &attempt)? {
+        return Ok(result);
+    }
     let key = wire_closures::key(state, &message, &attempt)?;
     ensure(
         super::wire_rejections::receipt(state, &key).is_none(),
@@ -55,6 +58,11 @@ pub(super) fn close(
     proof: SignedRecord,
 ) -> Result<Value, LabError> {
     enabled(state)?;
+    if let Some(result) =
+        super::wire_reclaimed::terminal(state, &message, &attempt, &proof, "closed")?
+    {
+        return Ok(result);
+    }
     let key = wire_closures::key(state, &message, &attempt)?;
     let fact = wire_closures::verify_record(state, &key, &proof)?;
     ensure(

@@ -94,6 +94,8 @@ class QuotaFixture(unittest.TestCase):
             db.executemany("INSERT INTO events(account,device,seq,event_id,content) VALUES (?,?,?,?,?)",
                            ((*pair, seq, f"quota_fixture_{device}_{seq}", content)
                             for seq in range(previous + 1, last_seq + 1)))
+            # 合成占额必须同步原持久H；业务读取不再用MAX(seq)修补缺失账本。
+            db.execute("UPDATE stream_watermarks SET high_watermark=? WHERE account=? AND device=?", (last_seq, *pair))
 
     def seed_streams(self, counts):
         for device, count in counts.items():

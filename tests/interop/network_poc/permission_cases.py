@@ -143,12 +143,14 @@ def device_revocation(lab):
 
 
 def offline_chain(lab):
+    # 默认发送需要固定 Service 回执信任；权限补齐也必须走精确签名恢复入口。
+    from .permission_recovery_cases import accept, recover, records
     one = prepare(lab, "chain_remove")["change"]
-    submit(lab, one)
-    apply(lab, one, ("a1", "a2"))
+    first_record = accept(lab, one)
+    recover(lab, first_record, "a1", "a2")
     two = prepare(lab, "chain_revoke", REVOKE_A2)["change"]
-    submit(lab, two)
-    apply(lab, two, ("a1",))
+    second_record = accept(lab, two)
+    recover(lab, second_record, "a1")
     packet = lab.prepare("after_two_changes")
     lab.submit(packet)
     page = lab.pull("b1")
@@ -161,15 +163,15 @@ def offline_chain(lab):
                            "to_state_ref": lab.rust("a1", "wire_inspect")["crypto_state_ref"], "limit": "1"},
                            expected=409)
     check(old_channel["code"] == "permission_chain_required", "签名模式必须明确引导验证权限链")
-    first = changes(lab, limit="1")
-    check(first["changes"] == [one] and first["next_after_version"] == "2" and first["has_more"],
+    first = records(lab, limit="1")
+    check(first["records"] == [first_record] and first["next_after_version"] == "2" and first["has_more"],
           "权限分页没有按实际返回证据推进")
-    apply(lab, one, ("b1",))
-    apply(lab, one, ("b1",))
-    last = changes(lab, after=first["next_after_version"], limit="1")
-    check(last["changes"] == [two] and last["next_after_version"] == "3" and not last["has_more"],
+    recover(lab, first_record, "b1")
+    recover(lab, first_record, "b1")
+    last = records(lab, after=first["next_after_version"], limit="1")
+    check(last["records"] == [second_record] and last["next_after_version"] == "3" and not last["has_more"],
           "独立权限链缺失后继")
-    apply(lab, two, ("b1",))
+    recover(lab, second_record, "b1")
     processed = lab.rust("b1", "wire_process")
     check(len(processed["deliveries"]) == 1 and processed["sync"]["pending_count"] == 0,
           "补全权限链后没有恢复待处理消息")

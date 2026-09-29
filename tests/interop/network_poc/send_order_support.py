@@ -14,17 +14,23 @@ def snapshot(lab, device="a1"):
 
 def inspect(lab):
     state = lab.rust("a1", "wire_inspect")
+    check("send_order" in state, "Rust首发没有持久启用默认发送门")
     check(state["send_order"]["policy"] == "acceptance_serial_v1"
           and state["send_order"]["conversation_id"] == "G1", "持久门禁范围丢失")
     return state
 
 
 def enable(lab):
-    reply = lab.rust("a1", "wire_send_order_enable")
-    state = inspect(lab)
-    check(state["send_order"]["pending"] is None and state["outbox_count"] == 0,
-          "首次启用不是空发送范围")
+    automatic = getattr(lab, "send_order_activation", "explicit") == "default"
+    reply = None if automatic else lab.rust("a1", "wire_send_order_enable")
+    state = lab.rust("a1", "wire_inspect")
+    check(state["outbox_count"] == 0, "首次启用不是空发送范围")
+    if automatic:
+        check("send_order" not in state, "首发前已有显式门禁，不能证明默认策略")
+    else:
+        check(state["send_order"]["pending"] is None, "首次启用存在未决记录")
     lab.case_evidence.update(enable={"reply": reply, "state": state}, targets={},
+                            activation="default_first_send" if automatic else "explicit",
                             submitted=[], created=[], blocked=[],
                             generation_basis="not exported; logical labels are not MLS generations; rejected new requests do not enter an outbound queue",
                             ratchet_configuration_changed=False)

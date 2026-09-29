@@ -2,9 +2,11 @@
 use super::*;
 
 #[test]
-fn rejection_opt_in_and_unknown_attempt_are_explicit_and_old_snapshot_omits_marker() {
-    let (f, key) = setup();
+fn rejection_legacy_outbox_and_unknown_attempt_are_explicit_and_old_snapshot_omits_marker() {
+    let f = super::super::wire_tests::Fixture::new();
+    let key = SigningKey::from_bytes(&[74; 32]);
     let sent = f.send("B", "M1");
+    pin(&f, &key);
     let (_, cp) = advance(&f, &key, "C");
     assert!(serde_json::to_value(load(&f, "B"))
         .unwrap()

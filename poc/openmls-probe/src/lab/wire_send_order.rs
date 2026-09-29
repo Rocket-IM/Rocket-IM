@@ -1,4 +1,4 @@
-//! 显式启用的单未决发送门；只复用原 outbox 与已验签接受事实，不另存明文队列。
+//! 签名权限路径默认使用单未决发送门；只复用原 outbox 与已验签接受事实。
 
 use super::{
     checked, ensure,
@@ -83,6 +83,53 @@ pub(super) fn preflight(state: &DeviceState, operation: &Operation) -> Result<()
     )
 }
 
+pub(super) fn preflight_send(state: &DeviceState, operation: &Operation) -> Result<(), LabError> {
+    // 元数据预检只检查已启用的发送门；首次启用仍与首份密文共同提交。
+    // 原件和紧凑终态的重试由原入口核验，不能被另一个未决逻辑消息挡住。
+    if let Operation::WireSend {
+        logical_message_id,
+        attempt_id,
+        payload,
+        replaces_attempt_id,
+        closure_id,
+    } = operation
+    {
+        if state.wire_send_order.is_some() {
+            let sender = wire_types::Device {
+                account_id: state.context.account.clone(),
+                device_id: state.context.device.clone(),
+            };
+            let logical = wire_types::logical_key(
+                &state.context.service,
+                &wire::configuration(state)?.conversation_id,
+                &sender,
+                logical_message_id,
+            )?;
+            let key = checked(
+                "key_encoding",
+                serde_json::to_string(&(&logical, attempt_id)),
+            )?;
+            if !state.wire.outbox.contains_key(&key)
+                && !state
+                    .wire
+                    .outbox
+                    .values()
+                    .any(|r| r.logical_key == logical && r.acceptance_receipt.is_some())
+                && super::wire_reclaimed::message(state, &logical).is_none()
+            {
+                check_new_attempt(
+                    state,
+                    &logical,
+                    payload,
+                    replaces_attempt_id.as_deref(),
+                    closure_id.as_deref(),
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn enable(state: &mut DeviceState) -> Result<Value, LabError> {
     if state.wire_send_order.is_none() {
         let conversation_id = wire::configuration(state)?.conversation_id.clone();
@@ -114,6 +161,22 @@ pub(super) fn enable(state: &mut DeviceState) -> Result<Value, LabError> {
 
 /// 已有 key 在调用点复用原字节；新后继只消费同内容当前尾的签名终态。
 pub(super) fn new_attempt(
+    state: &mut DeviceState,
+    logical: &str,
+    payload: &str,
+    replaces: Option<&str>,
+    closure: Option<&str>,
+) -> Result<(), LabError> {
+    // 旧原件在调用点先幂等返回；只有空发送范围才能自动采用新策略。
+    // 与首份密文共用快照提交，失败不留下半启用标记。未固定回执钥明确失败。
+    if state.wire_send_order.is_none() && state.permissions.checkpoint.is_some() {
+        enable(state)?;
+    }
+    check_new_attempt(state, logical, payload, replaces, closure)
+}
+
+/// 不恢复provider或执行MLS，预约前与真正发送共用同一门检查。
+fn check_new_attempt(
     state: &DeviceState,
     logical: &str,
     payload: &str,
@@ -121,6 +184,7 @@ pub(super) fn new_attempt(
     closure: Option<&str>,
 ) -> Result<(), LabError> {
     if state.wire_send_order.is_none() {
+        // 无权限信任的早期密码机制实验保留；不属于可靠消息支持路径。
         return Ok(());
     }
     let Some((key, tail)) = super::wire_closures::pending(state) else {

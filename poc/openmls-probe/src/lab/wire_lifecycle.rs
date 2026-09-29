@@ -109,7 +109,26 @@ pub(super) fn plan(state: &DeviceState, incoming: &[Slot]) -> Result<Plan, LabEr
                 )?;
             }
             // 首次下载已经不可用的槽没有原正文头，只能信任已验证的 Service 声明。
-            None if target.availability != Availability::Available => {}
+            None if target.availability != Availability::Available => {
+                if let Some(fact) = state
+                    .wire_reclamation
+                    .as_ref()
+                    .and_then(|r| r.slots.get(&seq))
+                {
+                    let message = super::wire_reclaimed::acceptance(state, &fact.acceptance_id)
+                        .ok_or_else(|| {
+                            LabError::new("lifecycle_target_invalid", "紧凑目标缺少消息事实")
+                        })?;
+                    ensure(
+                        fact.kind == "message"
+                            && fact.acceptance_id == claim.acceptance_id
+                            && message.attempt_id == claim.attempt_id
+                            && message.availability == claim.availability,
+                        "lifecycle_target_invalid",
+                        "生命周期声明与已回收消息绑定冲突",
+                    )?;
+                }
+            }
             _ => {
                 return Err(LabError::new(
                     "lifecycle_target_invalid",

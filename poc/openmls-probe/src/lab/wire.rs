@@ -90,6 +90,10 @@ pub(super) fn inspect(state: &DeviceState) -> Result<Value, LabError> {
     if state.wire_send_order.is_some() {
         result["send_order"] = super::wire_send_order::summary(state)?;
     }
+    if let Some(reclamation) = &state.wire_reclamation {
+        result["reclamation"] = reclamation.summary()?;
+        result["sync"]["active_slot_count"] = json!(super::wire_reclaimed::active_slots(state));
+    }
     Ok(result)
 }
 
@@ -141,6 +145,16 @@ pub(super) fn send(
     };
     let key = header.attempt_key()?;
     let logical_key = header.logical_key()?;
+    if let Some(result) = super::wire_reclaimed::send(
+        state,
+        &logical_key,
+        &attempt_id,
+        &payload,
+        replaces_attempt_id.as_deref(),
+        closure_id.as_deref(),
+    )? {
+        return Ok(result);
+    }
     ensure(
         !state.wire.outbox.iter().any(|(other_key, record)| {
             record.logical_key == logical_key
@@ -200,6 +214,7 @@ pub(super) fn send(
     }
     let mut group = state.group()?;
     ensure(group.is_active(), "device_revoked", "本机不在当前群中")?;
+    let config = configuration(state)?;
     ensure(
         state_ref(&group)? == config.crypto_state_ref && members(state, &group)? == config.members,
         "state_stale",

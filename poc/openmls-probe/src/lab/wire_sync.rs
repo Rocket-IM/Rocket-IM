@@ -129,6 +129,25 @@ fn download_with_source(
                 return Ok(json!({"status":"stream_conflict","sync":state.wire_sync.summary()}));
             }
         } else {
+            if state.wire_reclamation.is_some() {
+                if let Some(Event::Message {
+                    acceptance_id,
+                    envelope,
+                    ..
+                }) = &slot.event
+                {
+                    let header = super::wire_types::Header::parse(&bytes(
+                        &envelope.header_bytes,
+                        16 * 1024,
+                    )?)?;
+                    ensure(
+                        super::wire_reclaimed::message(state, &header.logical_key()?).is_none()
+                            && super::wire_reclaimed::acceptance(state, acceptance_id).is_none(),
+                        "payload_reclaimed",
+                        "已回收消息不能通过新槽重新落盘原密文",
+                    )?;
+                }
+            }
             ensure(
                 seq == cursor + new_count + 1,
                 "cursor_invalid",
@@ -164,7 +183,7 @@ fn download_with_source(
         .count();
     ensure(
         pending + new_count as usize <= state.wire_sync.pending_limit
-            && state.wire_sync.slots.len() + new_count as usize <= 10_000,
+            && super::wire_reclaimed::active_slots(state) + new_count as usize <= 10_000,
         "resource_exhausted",
         "待处理队列或设备流记录已满",
     )?;
@@ -270,8 +289,15 @@ pub(super) fn process(state: &mut DeviceState) -> Result<Value, LabError> {
     let deliveries: Vec<_> = state
         .wire_sync
         .slots
-        .values()
-        .filter_map(|slot| {
+        .iter()
+        .filter_map(|(seq, slot)| {
+            if state
+                .wire_reclamation
+                .as_ref()
+                .is_some_and(|r| r.slots.contains_key(seq))
+            {
+                return None;
+            }
             let result = slot.result.as_ref()?;
             (result["status"] == "valid").then(|| {
                 json!({"acceptance_id":result["acceptance_id"],

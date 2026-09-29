@@ -22,6 +22,35 @@ fn send_attempt(
     op["operation"] = json!("wire_send");
     call(f, device, op)["envelope"].clone()
 }
+// 仅构造历史多原件快照：暂存旧 outbox，以当前密码状态生成真实新密文后合回旧格式。
+// 不回退 provider，不进入公开实现；真实旧程序兼容由 HTTP 联合场景另行验证。
+fn legacy_send_attempt(
+    f: &Fixture,
+    device: &str,
+    id: &str,
+    attempt: &str,
+    replaces: Option<&str>,
+) -> Value {
+    let mut old_outbox = Default::default();
+    let mut old_tails = Default::default();
+    mutate(f, device, |state| {
+        assert!(state.wire_send_order.is_none());
+        old_outbox = std::mem::take(&mut state.wire.outbox);
+        old_tails = std::mem::take(&mut state.wire.tails);
+    });
+    let envelope = send_attempt(f, device, id, attempt, None);
+    mutate(f, device, |state| {
+        let record = state.wire.outbox.values_mut().next().unwrap();
+        record.replaces_attempt_id = replaces.map(str::to_owned);
+        record.closure_id = replaces.map(|old| format!("closed{old}"));
+        old_outbox.append(&mut state.wire.outbox);
+        old_tails.append(&mut state.wire.tails);
+        state.wire.outbox = old_outbox;
+        state.wire.tails = old_tails;
+        state.wire_send_order = None;
+    });
+    envelope
+}
 fn assert_only_acceptance_changed(mut before: Value, mut after: Value) {
     for value in [&mut before, &mut after] {
         for record in value["wire"]["outbox"]
@@ -75,8 +104,8 @@ fn past_acceptance_is_persisted_without_reencrypting_and_sent_copy_uses_existing
 #[test]
 fn late_accepted_attempt_blocks_other_cached_and_new_attempts_and_preserves_first_fact() {
     let (f, key) = fixture();
-    let first = send_attempt(&f, "B", "late", "P1", None);
-    let second = send_attempt(&f, "B", "late", "P2", Some("P1"));
+    let first = legacy_send_attempt(&f, "B", "late", "P1", None);
+    let second = legacy_send_attempt(&f, "B", "late", "P2", Some("P1"));
     let before = future_state(&f, "B");
     let receipt = acceptance(&key, &first, "lateK");
     ack(&f, "B", "late", "P1", &receipt);
@@ -102,7 +131,7 @@ fn late_accepted_attempt_blocks_other_cached_and_new_attempts_and_preserves_firs
         ack_op("late", "P1", &acceptance(&key, &first, "newK")),
         "acceptance_conflict",
     );
-    let other = send_attempt(&f, "B", "another", "P1", None);
+    let other = legacy_send_attempt(&f, "B", "another", "P1", None);
     fail(
         &f,
         "B",
@@ -198,7 +227,7 @@ fn pending_or_removed_sender_can_record_old_acceptance_without_restoring_access(
 #[test]
 fn old_outbox_without_receipt_stays_unaccepted_and_export_rejects_ambiguous_ids() {
     let (f, key) = fixture();
-    let envelope = send_attempt(&f, "B", "legacySent", "P1", None);
+    let envelope = legacy_send_attempt(&f, "B", "legacySent", "P1", None);
     mutate(&f, "B", |s| {
         let mut value = serde_json::to_value(&s.wire).unwrap();
         for record in value["outbox"].as_object_mut().unwrap().values_mut() {
@@ -233,14 +262,14 @@ fn old_outbox_without_receipt_stays_unaccepted_and_export_rejects_ambiguous_ids(
 #[test]
 fn importing_own_sent_copy_checks_native_attempts_but_does_not_mark_them_accepted() {
     let (f, key) = fixture();
-    let first = send_attempt(&f, "B2", "native", "P1", None);
+    let first = legacy_send_attempt(&f, "B2", "native", "P1", None);
     let receipt = acceptance(&key, &first, "nativeK");
     call(
         &f,
         "B",
         json!({"operation":"wire_receive","header_bytes":first["header_bytes"],"payload_bytes":first["payload_bytes"],"acceptance_id":"nativeK","acceptance_receipt":receipt}),
     );
-    let second = send_attempt(&f, "B2", "native", "P2", Some("P1"));
+    let second = legacy_send_attempt(&f, "B2", "native", "P2", Some("P1"));
     let request = begin(&f, "nativeT", select(&f, &["nativeK"]));
     let package = export(&f, &request);
     let before = future_state(&f, "B2");

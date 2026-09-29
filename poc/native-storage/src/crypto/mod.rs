@@ -5,6 +5,7 @@ mod db_thread;
 mod engine;
 pub mod model;
 mod operations;
+mod preflight;
 #[cfg(feature = "protected-storage")]
 mod protected;
 mod query;

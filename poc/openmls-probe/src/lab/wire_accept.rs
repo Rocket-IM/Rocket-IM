@@ -17,6 +17,11 @@ pub(super) fn accept(
 ) -> Result<Value, LabError> {
     wire_types::id(&message)?;
     wire_types::id(&attempt)?;
+    if let Some(result) =
+        super::wire_reclaimed::terminal(state, &message, &attempt, &receipt, "accepted")?
+    {
+        return Ok(result);
+    }
     let config = wire::configuration(state)?;
     let sender = Device {
         account_id: state.context.account.clone(),
@@ -44,6 +49,11 @@ pub(super) fn accept(
         .as_ref()
         .ok_or_else(|| LabError::new("receipt_pin_required", "缺少固定Service回执钥"))?;
     let accepted = message_acceptance::verify(pin, &receipt)?;
+    ensure(
+        super::wire_reclaimed::acceptance(state, &accepted.acceptance_id).is_none(),
+        "acceptance_conflict",
+        "接受ID已属于已回收消息",
+    )?;
     ensure(
         header.sender == sender
             && header.service_id == state.context.service

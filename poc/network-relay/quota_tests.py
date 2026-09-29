@@ -1,9 +1,13 @@
 """实际原阈值的容量拒绝与事务补证；合成占额不代表自然流量、密码或生产容量。"""
 
 from copy import deepcopy
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from contract import ProtocolError
 from quota_test_support import QuotaFixture
+import server
+from storage import Store
 from test_support import envelope, key
 
 
@@ -65,6 +69,58 @@ class QuotaTests(QuotaFixture):
         self.assertEqual(self.call("get_attempt", key("stream_full"))["outcome"], "not_found")
         self.reopen()
         self.reject_unchanged("submit_message", request, "设备事件流已达实验上限", inserted_events=1)
+
+    def test_expiration_at_full_stream_preserves_original_retry_with_explicit_pending(self):
+        request = self.message("expiration_blocks_original")
+        with patch("messages.now_ms", return_value=1000):
+            accepted = self.call("submit_message", request)
+        self.seed_stream("B1", 10000)
+        before = self.snapshot()
+        self.assertEqual((len(before["attempts"]), len(before["events"])), (1, 10004))
+        deadline = int(accepted["expires_at_unix_ms"])
+        operations = (("submit_message", request),
+                      ("get_attempt", key("expiration_blocks_original")),
+                      ("close_attempt", key("expiration_blocks_original")))
+        append_event = Store.append_event
+
+        for reopened in (False, True):
+            if reopened:
+                self.reopen()
+            for operation, value in operations:
+                with self.subTest(operation=operation, reopened=reopened):
+                    # 直接业务入口仍可精确重试；差异来自原 Handler 的到期投影顺序。
+                    self.assertEqual(self.call(operation, value), accepted)
+                    handler = object.__new__(server.Handler)
+                    handler.server = SimpleNamespace(store=self.store, controls=self.controller)
+                    handler.path = "/v1/" + operation
+                    handler.request_body = Mock(return_value=("synthetic-A1-token", value))
+                    handler.response = Mock()
+                    dispatch = Mock(wraps=server.DISPATCH[operation])
+                    with patch.dict(server.DISPATCH, {operation: dispatch}), \
+                            patch("synchronization.now_ms", return_value=deadline - 1):
+                        handler.do_POST()
+                    self.assertEqual(dispatch.call_count, 2)
+                    handler.response.assert_called_once_with(200, {"ok": True, "result": accepted})
+                    self.assertEqual(self.snapshot(), before)
+                    dispatch.reset_mock()
+                    handler.response.reset_mock()
+                    inserted = []
+
+                    def observe(db, pair, event, acceptance_id=None):
+                        append_event(db, pair, event, acceptance_id)
+                        inserted.append((pair, event["type"], event["availability"]))
+
+                    # 原 Handler/鉴权/事务/投影均实际执行；仅替换传输边界与时钟，不启动 HTTP。
+                    with patch.dict(server.DISPATCH, {operation: dispatch}), \
+                            patch("synchronization.now_ms", return_value=deadline), \
+                            patch.object(Store, "append_event", side_effect=observe):
+                        handler.do_POST()
+                    dispatch.assert_called_once()
+                    handler.response.assert_called_once_with(200, {"ok": True, "result": {
+                        **accepted, "lifecycle_projection_pending": True}})
+                    self.assertEqual(inserted, [(("A", "A2"), "message_availability", "expired")])
+                    self.assertEqual(self.snapshot(), before)
+                    self.assertEqual(self.call(operation, value), accepted)
 
     def test_global_events_full_mid_fanout_rolls_back_two_inserted_targets(self):
         self.seed_streams({"A1": 10000, "A2": 9999, "B1": 9999, "B2": 10000, "C1": 10000, "C2": 10000})

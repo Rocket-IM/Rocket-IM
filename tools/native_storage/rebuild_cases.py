@@ -86,15 +86,24 @@ class Cases(RebuildFixture, FaultCases):
             material = self.approve(prepared)
             self.activate(candidate, material)
             before = success(candidate.request("inspect"))["snapshot"]
+            anchor = success(candidate.request("status"))
             envelope = self.old_history["incoming"]
             rejected_reply = execute(candidate, "reject-old-history", {"op": "receive", "sequence": "1", "envelope": envelope})
-            error = rejected(rejected_reply)
+            error = failure(rejected_reply, "crypto_scope_mismatch", paused=False)
+            metrics(rejected_reply)
             downloaded = candidate.request("download", request={"records": [{"sequence": "1", "envelope": envelope}], "fault": "none"})
-            download_error = rejected(downloaded)
+            download_error = failure(downloaded, "crypto_scope_mismatch", paused=False)
+            metrics(downloaded)
             after = success(candidate.request("inspect"))["snapshot"]
             require(after == before, "旧历史入口拒绝仍写入消息或推进双游标")
             require(after["inbox"] == after["downloads"] == [] and after["download_cursor"] == after["processed_cursor"] == "0", "旧历史进入新范围")
+            require(success(candidate.request("status")) == anchor, "旧范围拒绝消耗新范围预约")
+        with self.probe() as restarted, self.source.probe() as source:
+            require(success(restarted.request("inspect"))["snapshot"] == before,
+                    "拒绝后重启改变新范围业务状态")
+            exchange = self.bidirectional(restarted, source)
         return {"receive_error": error, "download_error": download_error,
+                "new_scope_healthy_after_restart": True, "exchange": exchange,
                 "same_new_snapshot": True, "preserved_old_database_sha256": self.original_hash}
 
     def duplicate_prepare_approval_activation(self):

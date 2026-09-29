@@ -11,7 +11,7 @@ pub(super) fn sign(body: &Value, key: &SigningKey, domain: &[u8]) -> SignedRecor
         signature_bytes: codec::encode(&key.sign(&input).to_bytes()),
     }
 }
-pub(super) fn advance(f: &Fixture, key: &SigningKey, removed: &str) -> (Value, Value) {
+pub(in crate::lab) fn advance(f: &Fixture, key: &SigningKey, removed: &str) -> (Value, Value) {
     let change:Proof=serde_json::from_value(f.call("A",json!({"operation":"permission_prepare","change_id":format!("remove{removed}"),"action":{"kind":"remove_member","account_id":removed}}))["change"].clone()).unwrap();
     let state = load(f, "A");
     let (next, s) =
@@ -23,13 +23,18 @@ pub(super) fn advance(f: &Fixture, key: &SigningKey, removed: &str) -> (Value, V
     apply(f, "A", &record);
     (record, serde_json::to_value(next).unwrap())
 }
-pub(super) fn apply(f: &Fixture, device: &str, record: &Value) {
+pub(in crate::lab) fn apply(f: &Fixture, device: &str, record: &Value) {
     f.call(
         device,
         json!({"operation":"permission_recover","record":record}),
     );
 }
-pub(super) fn body(sent: &Value, cp: &Value, id: &str, previous: Option<(&str, &str)>) -> Value {
+pub(in crate::lab) fn body(
+    sent: &Value,
+    cp: &Value,
+    id: &str,
+    previous: Option<(&str, &str)>,
+) -> Value {
     let raw = codec::decode(sent["envelope"]["header_bytes"].as_str().unwrap()).unwrap();
     let payload = codec::decode(sent["envelope"]["payload_bytes"].as_str().unwrap()).unwrap();
     let header: Value = serde_json::from_slice(&raw).unwrap();
@@ -39,16 +44,16 @@ pub(super) fn body(sent: &Value, cp: &Value, id: &str, previous: Option<(&str, &
         "replaces_attempt_id":previous.map(|(attempt,_)|attempt),"predecessor_closure_id":previous.map(|(_,closure)|closure),
         "closure_id":id,"outcome":"rejected_final","code":"state_stale","required_authorization_version":cp["authorization_version"],"required_crypto_state_ref":cp["crypto_state_ref"]})
 }
-pub(super) fn rejection(body: &Value, key: &SigningKey) -> Value {
+pub(in crate::lab) fn rejection(body: &Value, key: &SigningKey) -> Value {
     json!({"operation":"wire_reject","logical_message_id":body["logical_message_id"],"attempt_id":body["attempt_id"],"rejection_receipt":sign(body,key,message_rejection::SIGNING_DOMAIN)})
 }
-pub(super) fn successor(attempt: &str, previous: &str, closure: &str) -> Value {
+pub(in crate::lab) fn successor(attempt: &str, previous: &str, closure: &str) -> Value {
     json!({"operation":"wire_send","logical_message_id":"M1","attempt_id":attempt,"payload":"synthetic test content","replaces_attempt_id":previous,"closure_id":closure})
 }
-pub(super) fn next() -> Value {
+pub(in crate::lab) fn next() -> Value {
     json!({"operation":"wire_send","logical_message_id":"M2","attempt_id":"P1","payload":"synthetic test content"})
 }
-pub(super) fn close(f: &Fixture, key: &SigningKey, attempt: &str, id: &str) -> Value {
+pub(in crate::lab) fn close(f: &Fixture, key: &SigningKey, attempt: &str, id: &str) -> Value {
     let request = f.call(
         "B",
         json!({"operation":"wire_close_request","logical_message_id":"M1","attempt_id":attempt}),

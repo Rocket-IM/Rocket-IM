@@ -7,13 +7,14 @@ import secrets
 import shutil
 import uuid
 
-from anchor_support import execute, snapshot, status
-from crypto_support import digest, execute as crypto_execute, send_action, success
+from anchor_support import execute, process, snapshot, status
+from crypto_support import digest, execute as crypto_execute, failure, send_action, success
 from protected_support import CryptoProbe, Fixture
 from rebuild_support import committed, metrics, rejected
 from support import require, sha
 
 CASE_NAMES = (
+    "deterministic_rejection_keeps_anchor_healthy",
     "restart_identity_messages", "locked_cold", "locked_warm", "missing_key_cold",
     "missing_key_warm", "wrong_storage_key", "trust_client_seed", "trust_anchor_public_key",
     "trust_program", "trust_scope_binding", "locator_scope_binding", "locator_item_missing",
@@ -41,6 +42,30 @@ class Cases:
         fixture = Fixture(self.binaries, directory, self.commands)
         self.fixtures.append(fixture)
         return fixture
+
+    def deterministic_rejection_keeps_anchor_healthy(self):
+        fixture = self.fixture()
+        fixture.bootstrap()
+        with fixture.peer() as peer:
+            with fixture.probe() as client:
+                fixture.setup(client, peer)
+                before, anchor = snapshot(client), status(client)
+                missing = process(client, 1)
+                failure(missing, "download_not_found", paused=False)
+                metrics(missing)
+                grouped = execute(client, "duplicate-group", fixture.group)
+                failure(grouped, "crypto_already_grouped", paused=False)
+                metrics(grouped)
+                require(snapshot(client) == before and status(client) == anchor,
+                        "受保护普通拒绝改变业务或锚状态")
+            with fixture.probe() as reopened:
+                require(snapshot(reopened) == before and status(reopened) == anchor,
+                        "受保护普通拒绝后重开改变状态")
+                envelope = committed(execute(reopened, "after-refusal", send_action()), "send")
+                success(peer.request("peer_receive", envelope=envelope))
+                status(reopened)
+        return {"zero_crypto_calls_on_rejection": True, "anchor_unchanged": True,
+                "protected_restart_send": True}
 
     def run(self, name):
         require(name in CASE_NAMES, "未知保护场景")

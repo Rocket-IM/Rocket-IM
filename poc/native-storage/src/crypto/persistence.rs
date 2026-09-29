@@ -12,7 +12,7 @@ use crate::{
 };
 use rusqlite::{params, Transaction};
 
-pub(super) fn input_hash(request: &Request) -> Result<String> {
+pub(in crate::crypto) fn input_hash(request: &Request) -> Result<String> {
     Ok(model::hash(query::serialized(&request.action)?.as_bytes()))
 }
 

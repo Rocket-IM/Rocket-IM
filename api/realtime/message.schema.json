@@ -350,6 +350,10 @@
         },
         "acceptance_receipt": {
           "$ref": "#/$defs/SignedMessageAcceptance"
+        },
+        "lifecycle_projection_pending": {
+          "const": true,
+          "description": "仅已存在accepted原尝试的精确只读重试：到期投影因事件容量不足被完整回滚，返回原持久接受事实。原availability和expires_at保持，不能据此认为到期投影已完成或内容重新可用。未触发时省略。"
         }
       },
       "required": [
@@ -815,6 +819,9 @@
         },
         "rejection_receipt": {
           "$ref": "#/$defs/SignedMessageRejection"
+        },
+        "retention_receipt": {
+          "$ref": "#/$defs/SignedStreamRetention"
         }
       },
       "required": [
@@ -3340,6 +3347,333 @@
         }
       ],
       "description": "仅绑定原信封的真实落后state_stale，required版本必须严格大于原头版本；required版本/状态来自首次拒绝同事务的会话及一致权限检查点投影。前驱两字段必填且同时null或String，准确绑定该尝试请求；运行时拒绝自引用尝试及新旧closure_id相同。恢复下界不是权限材料，客户端仍须验证并持久应用权限记录；不证明全局最新或排除恶意Service分叉。"
+    },
+    "ReclaimMessage": {
+      "type": "object",
+      "properties": {
+        "acceptance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "availability": {
+          "enum": [
+            "deleted",
+            "expired"
+          ]
+        },
+        "recipients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "acceptance_id",
+        "envelope_sha256",
+        "availability",
+        "recipients"
+      ],
+      "additionalProperties": false,
+      "description": "原接受时有序唯一目标集合；按acceptance_id排序，来源与原头/接受证明一致。"
+    },
+    "MessageReclaimStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-message-reclaim-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "plan_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "processed_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ReclaimMessage"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "conversation_id",
+        "plan_id",
+        "account_id",
+        "device_id",
+        "stream_id",
+        "processed_seq",
+        "messages"
+      ],
+      "additionalProperties": false,
+      "description": "仅普通签名权限流的显式回收许可。Service已记录原发送者及全部原recipients对同一计划的持久处理前缀与回收同意；仍需Rust核对本地终态、原件和无未决/历史迁移依赖。签名不证明恶意客户端实际处理或全局新鲜度。声明原UTF-8最多16KiB。"
+    },
+    "SignedMessageReclaim": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "保留原声明字节及Ed25519签名，不重编码替代验签原文。",
+      "x-statement-schema": {
+        "$ref": "#/$defs/MessageReclaimStatement"
+      },
+      "x-signing-domain-utf8": "Rocket-IM/POC/message-reclaim/v1\u0000"
+    },
+    "ConfirmReclaimRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "plan_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "processed_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "acceptance_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "plan_id",
+        "stream_id",
+        "processed_seq",
+        "acceptance_ids"
+      ],
+      "additionalProperties": false,
+      "description": "acceptance_ids须按字典序排序且唯一；身份来自Bearer。固定plan/device请求只能精确重试，processed_seq不是下载、送达或已读游标。"
+    },
+    "FinishReclaimRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "plan_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedMessageReclaim"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "plan_id",
+        "receipt"
+      ],
+      "additionalProperties": false,
+      "description": "仅在本机完整回收提交、适用时锚Finish核验后报告；必须是本设备原许可。全部参与者完成后Relay才在同一事务移除载荷并保存紧凑证明。"
+    },
+    "ConfirmReclaimResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "pending"
+            },
+            "plan_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "status",
+            "plan_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "ready"
+            },
+            "plan_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "receipt": {
+              "$ref": "#/$defs/SignedMessageReclaim"
+            }
+          },
+          "required": [
+            "status",
+            "plan_id",
+            "receipt"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "FinishReclaimResult": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "pending",
+            "complete"
+          ]
+        },
+        "plan_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "status",
+        "plan_id"
+      ],
+      "additionalProperties": false
+    },
+    "ConfirmReclaimResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/ConfirmReclaimResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "FinishReclaimResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/FinishReclaimResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "StreamRetentionStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-stream-retention-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "after_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "limit": {
+          "$ref": "#/$defs/U64",
+          "description": "原请求limit，1—100"
+        },
+        "floor": {
+          "$ref": "#/$defs/U64"
+        },
+        "watermark": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "account_id",
+        "device_id",
+        "stream_id",
+        "after_seq",
+        "limit",
+        "floor",
+        "watermark"
+      ],
+      "additionalProperties": false,
+      "description": "绑定本次被拒绝的请求、设备及流。必须after_seq<floor<=watermark；floor为已回收连续前缀末序号。仅声明Service当前提供的边界，不能把floor赋给本机下载/处理游标，不证明全局新鲜度。"
+    },
+    "SignedStreamRetention": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "x-statement-schema": {
+        "$ref": "#/$defs/StreamRetentionStatement"
+      },
+      "x-signing-domain-utf8": "Rocket-IM/POC/stream-retention/v1\u0000"
     }
   }
 }
