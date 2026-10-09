@@ -20,8 +20,12 @@ from network_poc.reclamation_fixture import ReclamationLab, ReclamationAnchorLab
 from network_poc.reclamation_cases import CASES as MAIN_CASES
 from network_poc.reclamation_boundaries import CASES as BOUNDARY_CASES
 from network_poc.reclamation_faults import CASES as FAULT_CASES, ANCHOR_CASES
+from network_poc.reclamation_preparation_cases import CASES as PREPARATION_CASES
+from network_poc.reclamation_preparation_faults import ANCHOR_CASES as PREPARATION_ANCHOR_CASES
+from network_poc.reclamation_preparation_legacy import CASES as LEGACY_CASES
 
 CASES = MAIN_CASES + BOUNDARY_CASES + FAULT_CASES
+PREPARATION_CASES += LEGACY_CASES
 
 
 def digest(path):
@@ -50,10 +54,15 @@ def main():
                             help="显式指定本轮构建程序，禁止把旧运行算作当前实现")
     parser.add_argument("--anchor-helper", type=Path, help="选择独立锚矩阵；使用本轮锚helper")
     parser.add_argument("--old-binary", type=Path, help="显式旧版真实程序，只读验证拒绝新回收快照")
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/network-relay/m12-reclamation")
-    parser.add_argument("--case", action="append", choices=sorted({ident for ident, _ in CASES + ANCHOR_CASES}))
+    parser.add_argument("--legacy-binary", type=Path, help="真实 build5，构造旧 v1 applied 与从未持久的历史计划")
+    parser.add_argument("--suite", choices=("reclamation", "preparation"), default="reclamation")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--case", action="append", choices=sorted({ident for ident, _ in
+                        CASES + ANCHOR_CASES + PREPARATION_CASES + PREPARATION_ANCHOR_CASES}))
     args = parser.parse_args()
     cases = ANCHOR_CASES if args.anchor_helper else CASES
+    if args.suite == "preparation":
+        cases = PREPARATION_ANCHOR_CASES if args.anchor_helper else PREPARATION_CASES
     if args.case and not set(args.case) <= {ident for ident, _ in cases}:
         parser.error("所选场景不属于当前普通/锚模式")
     artifacts = {name: getattr(args, name).resolve()
@@ -62,8 +71,13 @@ def main():
         artifacts["anchor_helper"] = args.anchor_helper.resolve()
     if args.old_binary:
         artifacts["old_binary"] = args.old_binary.resolve()
+    if args.legacy_binary:
+        artifacts["legacy_binary"] = args.legacy_binary.resolve()
     run_id = str(uuid.uuid4())
-    output = args.output.resolve()
+    default_output = ROOT / "dist/network-relay/m12-reclamation"
+    if args.suite == "preparation":
+        default_output /= "durable-preparation"
+    output = (args.output or default_output).resolve()
     run = output / "runs" / run_id
     run.mkdir(parents=True)
     report_path = run / "report.json"
@@ -71,6 +85,7 @@ def main():
         "scope": "Explicit selected terminal-message reclamation in original Rust snapshots and loopback HTTP/SQLite Relay",
         "platform": platform.platform(), "python": platform.python_version(), "sqlite": sqlite3.sqlite_version,
         "selected_cases": args.case or [ident for ident, _ in cases], "anchor_mode": bool(args.anchor_helper),
+        "suite": args.suite,
         "artifacts": {key: str(path) for key, path in artifacts.items()},
         "pass_meaning": "Only named assertions; refused reclamation remains blocked, not a recovered capacity claim",
         "limits": ["Synthetic local identities, explicit host orchestration and real MLS/signatures",
@@ -80,7 +95,13 @@ def main():
                    "No formal SDK/Go Service, target-platform capacity or arbitrary power-loss validation"],
         "process_count_scope": "Rust CLI, explicit signer and Relay starts; excludes Relay internal helpers",
         "full_M12": "NOT_COMPLETE", "full_stage0": "NOT_COMPLETE",
-        "cases": [], "process_count": 0, "http_count": 0, "direct_anchor_process_count": 0}
+        "cases": [], "process_count": 0, "http_count": 0, "direct_anchor_process_count": 0,
+        "host_process_count": 0}
+    if args.suite == "preparation":
+        report["scope"] = "Durable local preparation, bounded list/recover, fresh host processes and fixed confirm encoding"
+        report["limits"] += ["Local query commands keep anchor Reserve/journal/Finish and may advance anchor revision",
+                             "Fresh host input isolation is not an OS filesystem security boundary",
+                             "Legacy never-persisted lost requests remain an observed limitation"]
     if args.anchor_helper:
         report["independence"] = "synthetic_local; device restoration excludes trusted config and authority"
     write(report_path, report)
@@ -112,14 +133,16 @@ def main():
                        if args.anchor_helper else ReclamationLab(*arguments))
                 lab.case_evidence = {}
                 lab.old_binary = artifacts.get("old_binary")
+                lab.legacy_binary = artifacts.get("legacy_binary")
                 try:
                     try:
                         lab.initialize(permissions=True)
                         operation(lab)
                     finally:
                         lab.close()
-                    record["status"] = "PASS"
-                    print("PASS " + ident, flush=True)
+                    record["status"] = lab.case_evidence.get("outcome", "PASS")
+                    record["verification"] = "PASS"
+                    print(record["status"] + " " + ident, flush=True)
                 except Exception as error:
                     record.update(status="FAIL", error=str(error))
                     (run / (ident + "-failure.log")).write_text(traceback.format_exc())
@@ -134,6 +157,8 @@ def main():
                         report[name] += record[name]
                     record["direct_anchor_process_count"] = getattr(lab, "helper_process_count", 0)
                     report["direct_anchor_process_count"] += record["direct_anchor_process_count"]
+                    record["host_process_count"] = len(lab.case_evidence.get("host_processes", []))
+                    report["host_process_count"] += record["host_process_count"]
                     write(report_path, report)
         report["status"] = "PASS_SCOPED"
     except Exception as error:

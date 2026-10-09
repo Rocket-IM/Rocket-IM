@@ -143,9 +143,16 @@ pub(super) fn apply(
             );
         }
     }
-    compacted
-        .plans
-        .insert(plan_id, compact::Plan { receipt, result });
+    // 同一计划先在候选账本中完成替换，原1024计划边界不能临时双计。
+    let request_json = compacted.prepared.remove(&plan_id).map(|p| p.request_json);
+    compacted.plans.insert(
+        plan_id,
+        compact::Plan {
+            receipt,
+            result,
+            request_json,
+        },
+    );
     compacted.budget()?;
     // 下列状态只会随外层完整快照原子保存；失败不会交付成功或半份回收结果。
     for candidate in candidates {

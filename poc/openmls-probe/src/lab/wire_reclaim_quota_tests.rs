@@ -128,6 +128,7 @@ fn full_compact_proof_budgets_reject_complete_candidate_before_any_original_remo
             serde_json::from_value(permit(&f, &key, device, &sent, "R1", "deleted")).unwrap();
         let mut ledger = State::default();
         let filler = Plan {
+            request_json: None,
             receipt: receipt.clone(),
             result: json!(null),
         };
@@ -136,6 +137,7 @@ fn full_compact_proof_budgets_reject_complete_candidate_before_any_original_remo
                 ledger.plans.insert(
                     "F".into(),
                     Plan {
+                        request_json: None,
                         receipt: receipt.clone(),
                         result: json!("x".repeat(BYTE_LIMIT)),
                     },

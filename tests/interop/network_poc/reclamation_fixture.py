@@ -22,7 +22,23 @@ def snapshot(lab, device):
     return {"bytes": len(content), "sha256": digest(content)}
 
 
-class ReclamationLab(NetworkLab):
+class PreparedRequest(dict):
+    """保留 Rust 保存的原编码，HTTP 发送不能由宿主重新排序。"""
+
+    def __init__(self, result):
+        super().__init__(result["request"])
+        self.request_json = result["request_json"]
+        check(json.loads(self.request_json) == self, "保存的请求编码与字段不一致")
+
+
+class ReclamationHTTP:
+    def http(self, device, operation, fields, **options):
+        if operation == "confirm_reclaim" and isinstance(fields, PreparedRequest):
+            options.setdefault("raw", fields.request_json.encode())
+        return super().http(device, operation, fields, **options)
+
+
+class ReclamationLab(ReclamationHTTP, NetworkLab):
     def raw_rust(self, device, operation, **fields):
         request = {"directory": str(self.directory / device), "service": self.service,
                    "account": identity(device)["account_id"], "device": device,
@@ -56,7 +72,7 @@ class ReclamationLab(NetworkLab):
         return reply["result"] if reply["ok"] else reply["error"]
 
 
-class ReclamationAnchorLab(ReadAnchorLab):
+class ReclamationAnchorLab(ReclamationHTTP, ReadAnchorLab):
     pass
 
 
@@ -174,11 +190,18 @@ def prepare_requests(lab, records, plan="plan-1"):
     for device in DEVICES:
         before = snapshot(lab, device)
         result = lab.rust(device, "wire_reclaim_request", plan_id=plan, acceptance_ids=selected)
-        check(snapshot(lab, device) == before, "导出回收请求改写快照")
-        request = result["request"]
+        saved = snapshot(lab, device)
+        check(result["status"] == "prepared" and not result["duplicate"] and saved != before,
+              "首次准备没有原子保存固定请求")
+        repeated = lab.rust(device, "wire_reclaim_request", plan_id=plan, acceptance_ids=selected)
+        check(repeated["duplicate"] and repeated["request_json"] == result["request_json"]
+              and snapshot(lab, device) == saved, "精确准备重试改写了请求或快照")
+        request = PreparedRequest(result)
         check(request["acceptance_ids"] == selected and request["plan_id"] == plan,
               "本机回收请求未保持精确选择")
         requests[device] = request
+        lab.case_evidence.setdefault("preparations", []).append({"device": device,
+            "plan_id": plan, "before": before, "after": saved, "request_json": request.request_json})
     lab.case_evidence.setdefault("plans", []).append({"plan_id": plan, "requests": requests})
     return requests
 

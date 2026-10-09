@@ -35,7 +35,7 @@ pub(super) fn source(state: &DeviceState) -> Result<(&str, &str), LabError> {
     Ok((pin, stream))
 }
 
-fn selection(ids: &[String]) -> Result<(), LabError> {
+pub(super) fn selection(ids: &[String]) -> Result<(), LabError> {
     ensure(
         !ids.is_empty()
             && ids.len() <= message_reclamation::MAX_MESSAGES
@@ -271,41 +271,11 @@ pub(super) fn candidate(
 }
 
 pub(super) fn request(
-    state: &DeviceState,
+    state: &mut DeviceState,
     plan_id: String,
     acceptance_ids: Vec<String>,
 ) -> Result<Value, LabError> {
-    let (_, stream) = source(state)?;
-    wire_types::id(&plan_id)?;
-    selection(&acceptance_ids)?;
-    if let Some(plan) = state
-        .wire_reclamation
-        .as_ref()
-        .and_then(|r| r.plans.get(&plan_id))
-    {
-        let statement = message_reclamation::verify(source(state)?.0, &plan.receipt)?;
-        ensure(
-            statement
-                .messages
-                .iter()
-                .map(|m| &m.acceptance_id)
-                .eq(acceptance_ids.iter()),
-            "reclaim_conflict",
-            "原计划ID不能用于另一选择",
-        )?;
-        return Ok(json!({"request":http_request(&statement),"duplicate":true}));
-    }
-    for id in &acceptance_ids {
-        candidate(state, id, &plan_id, None)?;
-    }
-    Ok(json!({"request":{"service_id":state.context.service,
-        "conversation_id":super::wire::configuration(state)?.conversation_id,"plan_id":plan_id,
-        "stream_id":stream,"processed_seq":state.wire_sync.processed_cursor.to_string(),"acceptance_ids":acceptance_ids}}))
-}
-fn http_request(statement: &message_reclamation::Statement) -> Value {
-    json!({"service_id":statement.service_id,"conversation_id":statement.conversation_id,"plan_id":statement.plan_id,
-        "stream_id":statement.stream_id,"processed_seq":statement.processed_seq,
-        "acceptance_ids":statement.messages.iter().map(|m| &m.acceptance_id).collect::<Vec<_>>()})
+    super::wire_reclaim_preparation::prepare(state, plan_id, acceptance_ids)
 }
 pub(super) fn retention(
     state: &DeviceState,
@@ -358,6 +328,7 @@ pub(super) fn execute(state: &mut DeviceState, receipt: SignedRecord) -> Result<
         result["duplicate"] = json!(true);
         return Ok(result);
     }
+    super::wire_reclaim_preparation::permit(state, &statement)?;
     let mut candidates = Vec::new();
     for permit in &statement.messages {
         candidates.push(candidate(

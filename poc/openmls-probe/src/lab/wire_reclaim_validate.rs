@@ -114,14 +114,20 @@ pub(super) fn validate(state: &DeviceState) -> Result<(), LabError> {
         return Ok(());
     };
     ensure(
-        compacted.version == 1
+        ((compacted.version == 1
+            && compacted.prepared.is_empty()
+            && compacted.plans.values().all(|p| p.request_json.is_none())
             && !compacted.messages.is_empty()
-            && !compacted.plans.is_empty()
+            && !compacted.plans.is_empty())
+            || (compacted.version == 2
+                && (!compacted.prepared.is_empty()
+                    || compacted.plans.values().any(|p| p.request_json.is_some()))))
             && state.wire_sync.source_verified,
         "reclaim_state",
         "紧凑状态版本、来源或账本无效",
     )?;
     compacted.budget()?;
+    super::wire_reclaim_preparation::validate(state)?;
     let pin = state
         .permissions
         .recovery

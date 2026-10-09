@@ -3,6 +3,8 @@
 mod boundaries;
 #[path = "wire_reclaim_chain_tests.rs"]
 mod chain;
+#[path = "wire_reclaim_preparation_tests.rs"]
+mod preparation;
 #[path = "wire_reclaim_quota_tests.rs"]
 mod quota;
 #[path = "wire_reclaim_test_support.rs"]
@@ -165,6 +167,7 @@ fn compact_proof_budget_counts_full_plan_results_and_signatures() {
     state.plans.insert(
         "R".into(),
         Plan {
+            request_json: None,
             receipt: empty.clone(),
             result: json!("x".repeat(BYTE_LIMIT)),
         },
@@ -175,6 +178,7 @@ fn compact_proof_budget_counts_full_plan_results_and_signatures() {
         state.plans.insert(
             format!("R{i}"),
             Plan {
+                request_json: None,
                 receipt: empty.clone(),
                 result: json!(null),
             },

@@ -56,6 +56,8 @@ mod wire_reads;
 mod wire_receive;
 mod wire_reclaim;
 mod wire_reclaim_compact;
+mod wire_reclaim_preparation;
+mod wire_reclaim_recovery;
 #[cfg(test)]
 mod wire_reclaim_tests;
 mod wire_reclaim_types;
@@ -248,6 +250,8 @@ fn execute_state(
         Operation::WireReadPending
             | Operation::WireReadInspect
             | Operation::WireReclaimRequest { .. }
+            | Operation::WireReclaimList { .. }
+            | Operation::WireReclaimRecover { .. }
             | Operation::WireRetention { .. }
     );
     if !read_diagnostic && consistency_state::preflight(&mut state)? {
@@ -274,6 +278,7 @@ fn execute_state(
     }
     let is_wire_read = matches!(request.operation, Operation::WireRead { .. });
     let is_wire_reclaim = matches!(request.operation, Operation::WireReclaim { .. });
+    let is_reclaim_prepare = matches!(request.operation, Operation::WireReclaimRequest { .. });
     let is_wire_terminal = matches!(
         request.operation,
         Operation::WireClose { .. } | Operation::WireReject { .. }
@@ -285,7 +290,8 @@ fn execute_state(
             | Operation::WireReadPending
             | Operation::WireReadInspect
             | Operation::WireInspect
-            | Operation::WireReclaimRequest { .. }
+            | Operation::WireReclaimList { .. }
+            | Operation::WireReclaimRecover { .. }
             | Operation::WireRetention { .. }
             | Operation::WireSlotInspect { .. }
             | Operation::PermissionInspect
@@ -294,7 +300,9 @@ fn execute_state(
             | Operation::ConsistencyExchangeInspect
             | Operation::SignAuthorization { .. }
     );
-    if should_save {
+    // 准备只保存固定公开请求，沿原诊断的Q02守卫；不附带MLS读取或迁移索引写入。
+    // 这使锚预约前的纯元数据候选与实际保存有相同预算，不以额外索引字节制造未决预约。
+    if should_save && !is_reclaim_prepare {
         consistency_state::record_current(&mut state)?;
     }
     let consistency_result = matches!(
@@ -304,7 +312,7 @@ fn execute_state(
             | Operation::ConsistencyResume { .. }
     );
     let mut result = perform(&mut state, request.operation)?;
-    if should_save {
+    if should_save && !is_reclaim_prepare {
         consistency_state::record_current(&mut state)?;
     }
     if consistency_result {
@@ -331,6 +339,7 @@ fn execute_state(
         && !(is_wire_terminal && result["duplicate"] == true)
         && !(is_wire_read && result["marked_count"] == 0)
         && !(is_wire_reclaim && result["duplicate"] == true)
+        && !(is_reclaim_prepare && result["duplicate"] == true)
     {
         locked.save(&mut state, request.failpoint)?;
     }
@@ -497,6 +506,11 @@ fn perform(state: &mut DeviceState, operation: Operation) -> Result<Value, LabEr
             plan_id,
             acceptance_ids,
         } => wire_reclaim::request(state, plan_id, acceptance_ids),
+        Operation::WireReclaimList {
+            after_plan_id,
+            limit,
+        } => wire_reclaim_recovery::list(state, after_plan_id, limit),
+        Operation::WireReclaimRecover { plan_id } => wire_reclaim_recovery::recover(state, plan_id),
         Operation::WireReclaim { receipt } => wire_reclaim::execute(state, receipt),
         Operation::WireRetention {
             receipt,

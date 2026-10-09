@@ -30,6 +30,8 @@ pub(super) fn preflight(
             | super::Operation::WireDownload { .. }
             | super::Operation::WireProcess
             | super::Operation::WireReclaimRequest { .. }
+            | super::Operation::WireReclaimList { .. }
+            | super::Operation::WireReclaimRecover { .. }
             | super::Operation::WireReclaim { .. }
             | super::Operation::WireRetention { .. }
             | super::Operation::WireSend { .. }
@@ -48,6 +50,8 @@ pub(super) fn preflight(
     if matches!(
         request.operation,
         super::Operation::WireReclaimRequest { .. }
+            | super::Operation::WireReclaimList { .. }
+            | super::Operation::WireReclaimRecover { .. }
             | super::Operation::WireReclaim { .. }
             | super::Operation::WireRetention { .. }
             | super::Operation::WireSend { .. }
@@ -64,7 +68,16 @@ pub(super) fn preflight(
             plan_id,
             acceptance_ids,
         } => {
-            super::wire_reclaim::request(&metadata, plan_id.clone(), acceptance_ids.clone())?;
+            super::wire_reclaim::request(&mut metadata, plan_id.clone(), acceptance_ids.clone())?;
+        }
+        super::Operation::WireReclaimList {
+            after_plan_id,
+            limit,
+        } => {
+            super::wire_reclaim_recovery::list(&metadata, after_plan_id.clone(), limit.clone())?;
+        }
+        super::Operation::WireReclaimRecover { plan_id } => {
+            super::wire_reclaim_recovery::recover(&metadata, plan_id.clone())?;
         }
         super::Operation::WireReclaim { receipt } => {
             super::wire_reclaim::execute(&mut metadata, receipt.clone())?;

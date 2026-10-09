@@ -67,7 +67,7 @@ fn selected_unsettled_local_dependencies_cannot_be_reclaimed() {
         };
         let before = serde_json::to_vec(&state).unwrap();
         assert_eq!(
-            wire_reclaim::request(&state, "R1".into(), vec!["K1".into()])
+            wire_reclaim::request(&mut state, "R1".into(), vec!["K1".into()])
                 .unwrap_err()
                 .code,
             expected

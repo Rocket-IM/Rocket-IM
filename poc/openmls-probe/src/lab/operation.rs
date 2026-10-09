@@ -168,6 +168,13 @@ pub(super) enum Operation {
         plan_id: String,
         acceptance_ids: Vec<String>,
     },
+    WireReclaimList {
+        after_plan_id: Option<String>,
+        limit: String,
+    },
+    WireReclaimRecover {
+        plan_id: String,
+    },
     WireReclaim {
         receipt: crate::permission::receipts::SignedRecord,
     },

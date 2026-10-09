@@ -73,6 +73,14 @@ pub(super) struct SlotFact {
 pub(super) struct Plan {
     pub receipt: SignedRecord,
     pub result: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_json: Option<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Prepared {
+    pub request_json: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -82,6 +90,9 @@ pub(super) struct State {
     pub messages: BTreeMap<String, Message>,
     pub slots: BTreeMap<u64, SlotFact>,
     pub plans: BTreeMap<String, Plan>,
+    // 空字段不改变v1原字节；首次准备才升级v2，完成后也不降级。
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub prepared: BTreeMap<String, Prepared>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -90,6 +101,7 @@ impl Default for State {
             messages: BTreeMap::new(),
             slots: BTreeMap::new(),
             plans: BTreeMap::new(),
+            prepared: BTreeMap::new(),
         }
     }
 }
@@ -99,7 +111,7 @@ impl State {
         ensure(
             self.messages.len() <= MESSAGE_LIMIT
                 && self.slots.len() <= SLOT_LIMIT
-                && self.plans.len() <= PLAN_LIMIT
+                && self.plans.len() + self.prepared.len() <= PLAN_LIMIT
                 && bytes <= BYTE_LIMIT,
             "resource_exhausted",
             "回收证明或计划账本达到独立硬预算",
@@ -107,10 +119,14 @@ impl State {
         Ok(bytes)
     }
     pub fn summary(&self) -> Result<Value, LabError> {
-        Ok(
-            json!({"version":self.version,"message_count":self.messages.len(),
+        let mut result = json!({"version":self.version,"message_count":self.messages.len(),
             "slot_count":self.slots.len(),"plan_count":self.plans.len(),"proof_bytes":self.budget()?,
-            "message_limit":MESSAGE_LIMIT,"slot_limit":SLOT_LIMIT,"plan_limit":PLAN_LIMIT,"byte_limit":BYTE_LIMIT}),
-        )
+            "message_limit":MESSAGE_LIMIT,"slot_limit":SLOT_LIMIT,"plan_limit":PLAN_LIMIT,"byte_limit":BYTE_LIMIT});
+        if self.version == 2 {
+            result["prepared_count"] = json!(self.prepared.len());
+            result["plan_count"] = json!(self.plans.len() + self.prepared.len());
+            result["applied_count"] = json!(self.plans.len());
+        }
+        Ok(result)
     }
 }

@@ -266,17 +266,26 @@ def sender_no_candidate(lab):
     before, rows = snapshot(lab, "a1"), database(lab)
     check(all(row["availability"] == "available" and row["compacted"] == 0 for row in rows["attempts"]),
           "无候选负例出现了可回收终态")
-    request = lab.rust("a1", "wire_reclaim_request", plan_id="no-legal-candidate",
-                       acceptance_ids=[original["acceptance_id"]])["request"]
-    error = lab.http("a1", "confirm_reclaim", request, expected=409)
-    check(error["code"] == "reclamation_pending" and database(lab) == rows
-          and snapshot(lab, "a1") == before, "缺少终态的满额内容被错误回收")
+    prepared = raw_command(lab, "a1", "wire_reclaim_request", plan_id="no-legal-candidate",
+                           acceptance_ids=[original["acceptance_id"]])
+    if prepared["ok"]:
+        result = prepared["result"]
+        check(result["status"] == "prepared" and not result["duplicate"], "首次准备状态错误")
+        error = lab.http("a1", "confirm_reclaim", {}, raw=result["request_json"].encode(), expected=409)
+        check(error["code"] == "reclamation_pending", "缺少终态的满额内容取得了回收许可")
+    else:
+        error = prepared["error"]
+        check(error["code"] == "resource_exhausted" and snapshot(lab, "a1") == before,
+              "准备配额失败没有保留原快照")
+    blocked = snapshot(lab, "a1")
+    check(database(lab) == rows, "缺少终态的满额内容被错误回收")
     lab.restart()
     require_budget_error(raw_command(lab, "a1", failed_operation, **fields))
-    check(database(lab) == rows and snapshot(lab, "a1") == before, "重启或重复操作释放了不可回收容量")
+    check(database(lab) == rows and snapshot(lab, "a1") == blocked, "重启或重复操作释放了不可回收容量")
     lab.case_evidence.update(progress="ACTUAL_FULL_AVAILABLE_CONTENT_REMAINS_BLOCKED",
         full_snapshot=before, accepted_messages=len(rows["attempts"]), failure_operation=failed_operation,
-        reclamation_error=error, final_wire=lab.rust("a1", "wire_inspect"))
+        reclamation_error=error, preparation_saved=prepared["ok"], blocked_snapshot=blocked,
+        final_wire=lab.rust("a1", "wire_inspect"))
 
 
 CASES = [("M12.reclaim.roundtrip", roundtrip), ("M12.reclaim.sender_budget", sender_budget),
