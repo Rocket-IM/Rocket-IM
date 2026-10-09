@@ -15,6 +15,12 @@ use std::fmt::Display;
 pub mod authorization;
 
 #[cfg(unix)]
+pub mod device_registration;
+
+#[cfg(unix)]
+pub mod identity_trust;
+
+#[cfg(unix)]
 pub mod permission;
 
 #[cfg(unix)]

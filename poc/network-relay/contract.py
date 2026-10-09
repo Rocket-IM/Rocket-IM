@@ -20,6 +20,7 @@ OPERATIONS = frozenset({
     "submit_history_transfer", "get_history_transfer", "get_consistency_head",
     "register_rebuild_stream", "pull_rebuild_events",
     "confirm_reclaim", "finish_reclaim",
+    "begin_device_registration", "complete_device_registration",
 })
 
 
@@ -185,6 +186,9 @@ def validate_request(operation, value):
     """验证操作形状，不改变数据或建立尝试终态；身份以 Bearer 主体为准。"""
     if operation not in OPERATIONS:
         raise ProtocolError("unsupported_operation", "不支持此操作", status=404)
+    if operation in {"begin_device_registration", "complete_device_registration"}:
+        from registration_contract import validate_request as validate_registration_request
+        return validate_registration_request(operation, value)
     if operation in {"confirm_reclaim", "finish_reclaim"}:
         from reclamation_contract import validate_reclamation_request
         return validate_reclamation_request(operation, value)

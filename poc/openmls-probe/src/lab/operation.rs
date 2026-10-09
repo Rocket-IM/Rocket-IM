@@ -7,6 +7,29 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Operation {
     Init,
+    IdentityTrustObserve {
+        identity: crate::identity_trust::DeviceIdentity,
+    },
+    IdentityTrustPrepare {
+        target: crate::permission::Identity,
+        purpose: crate::identity_trust::Purpose,
+    },
+    IdentityTrustConfirm {
+        display: crate::identity_trust::Display,
+        independent_identity: crate::identity_trust::DeviceIdentity,
+        verification: crate::consistency_exchange::Verification,
+    },
+    IdentityTrustReset {
+        display: crate::identity_trust::Display,
+        independent_identity: crate::identity_trust::DeviceIdentity,
+        verification: crate::consistency_exchange::Verification,
+    },
+    IdentityTrustInspect {
+        target: Option<crate::permission::Identity>,
+    },
+    DeviceRegistrationProve {
+        challenge_bytes: String,
+    },
     Create {
         peers: Vec<Peer>,
     },

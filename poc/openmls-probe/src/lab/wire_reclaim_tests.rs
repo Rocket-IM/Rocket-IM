@@ -20,6 +20,35 @@ use std::fs;
 use support::*;
 
 #[test]
+fn identity_change_keeps_compact_terminal_query_without_releasing_new_ciphertext() {
+    let (f, key, sent, payload) = fixture(false, "deleted");
+    f.call(
+        "A",
+        json!({"operation":"wire_reclaim","receipt":permit(&f,&key,"A",&sent,"R1","deleted")}),
+    );
+    let replacement = super::state::DeviceState::new(super::Context {
+        service: "S1".into(),
+        account: "B".into(),
+        device: "B".into(),
+    })
+    .unwrap();
+    f.call("A", json!({"operation":"identity_trust_observe","identity":super::identity_state::own(&replacement)}));
+    let before = serde_json::to_vec(&load(&f, "A")).unwrap();
+    let terminal = f.call("A", json!({"operation":"wire_send","logical_message_id":"M1","attempt_id":"P1","payload":payload}));
+    assert_eq!(terminal["payload_reclaimed"], true);
+    assert!(terminal.get("envelope").is_none());
+    assert!(serde_json::to_vec(&load(&f, "A")).unwrap() == before);
+    let before = fs::read(f.root.join("A/state.enc")).unwrap();
+    reject(
+        &f,
+        "A",
+        json!({"operation":"wire_send","logical_message_id":"M2","attempt_id":"P1","payload":"synthetic new"}),
+        "identity_changed",
+    );
+    assert_eq!(fs::read(f.root.join("A/state.enc")).unwrap(), before);
+}
+
+#[test]
 fn actual_plaintext_and_all_message_ciphertext_copies_are_removed_with_immutable_provider() {
     for terminal in ["deleted", "expired"] {
         for read in [false, true] {

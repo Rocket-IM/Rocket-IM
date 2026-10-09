@@ -3,7 +3,7 @@
   "info": {
     "title": "Rocket-IM 阶段 0 HTTP Relay POC",
     "version": "rim-poc-1",
-    "description": "仅用于本机合成设备与候选 MLS 的协议验证；不是公开发布 API。HTTP 凭证与密码身份分开：Bearer 绑定单个 service/account/device，可信公钥由测试装置带外提供。正文严格 UTF-8 JSON，禁止重复键和未定义字段。请求上限 1 MiB，超时与重试预算见消息协议草案；本实验不声明 TLS/WSS 验证。 签名权限增量支持remove_member/revoke_device及仅from_join的新账号单设备add_member和同账号新设备add_device；bootstrap仍依赖可信合成检查点，生产身份恢复与Q02分叉/新鲜度尚未闭合。启用权限检查点后，测试set_state/revoke_device/add_control不可覆盖该链。 Service恢复凭证公钥只能由新空库固定，重启不得缺失或换钥；Service自有签名seed与用户E2EE解密私钥分离。 历史迁移只支持本群同账号当前设备的显式已验证接收或已验证接受的发送副本，独立定向加密；公开请求由实验调度器搬运，不包含附件、备份或产品发现/通知。 一致性head只签署当前Service所见完整权限CP并绑定调用设备challenge，不证明全局最新或独立视图之间不存在分叉。"
+    "description": "仅用于本机合成设备与候选 MLS 的协议验证；不是公开发布 API。HTTP 凭证与密码身份分开：Bearer 绑定单个 service/account/device，可信公钥由测试装置带外提供。正文严格 UTF-8 JSON，禁止重复键和未定义字段。请求上限 1 MiB，超时与重试预算见消息协议草案；本实验不声明 TLS/WSS 验证。 签名权限增量支持remove_member/revoke_device及仅from_join的新账号单设备add_member和同账号新设备add_device；bootstrap仍依赖可信合成检查点，生产身份恢复与Q02分叉/新鲜度尚未闭合。启用权限检查点后，测试set_state/revoke_device/add_control不可覆盖该链。 Service恢复凭证公钥只能由新空库固定，重启不得缺失或换钥；Service自有签名seed与用户E2EE解密私钥分离。 历史迁移只支持本群同账号当前设备的显式已验证接收或已验证接受的发送副本，独立定向加密；公开请求由实验调度器搬运，不包含附件、备份或产品发现/通知。 一致性head只签署当前Service所见完整权限CP并绑定调用设备challenge，不证明全局最新或独立视图之间不存在分叉。 Q01新增两步设备私钥持有注册；联系人独立核验与发送/密钥分发门禁由Rust持有，仍使用合成业务token和外部可信核验输入，不成为真实登录或现实身份认证。"
   },
   "servers": [
     {
@@ -1145,6 +1145,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "../realtime/message.schema.json#/$defs/FinishReclaimResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/begin_device_registration": {
+      "post": {
+        "operationId": "begin_device_registration",
+        "description": "由Bearer确定设备主体，生成并持久保存绑定实例/账号/设备/身份钥/用途/原有效期的随机挑战。同registration_id准确重试返回原件，换钥冲突；旧装置公钥不补成私钥持有证明。注册账本总128条、每设备32条、2MiB有界预留；不扩大原消息/回收限额。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/BeginDeviceRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "持久化成功结果；未提交不得返回成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/BeginDeviceRegistrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/complete_device_registration": {
+      "post": {
+        "operationId": "complete_device_registration",
+        "description": "核对已保存挑战原文、当前主体及期限，通过Rust严格Ed25519验签后，同事务绑定公钥、消费挑战并保存准确proof/result。成功原件精确重试返回原结果，即使期限已过；当前撤权仍先拒绝。改绑、公钥跨设备复用或挑战冲突拒绝，失败不消费。PoP不创建联系人核验、群/历史权限，不改变原Bearer密文与元数据访问边界。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/CompleteDeviceRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "持久化成功结果；未提交不得返回成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/CompleteDeviceRegistrationResponse"
                 }
               }
             }

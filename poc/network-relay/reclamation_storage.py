@@ -40,7 +40,7 @@ def install(db, previous_schema):
                       "WHERE e.seq>w.high_watermark").fetchone():
             raise ValueError("设备流高水位低于已存事件，拒绝反推修补")
         return
-    if previous_schema == "rim-poc-storage-7":
+    if previous_schema in {"rim-poc-storage-7", "rim-poc-storage-8"}:
         raise ValueError("回收版本标记缺失，禁止重新生成高水位")
     if db.execute("SELECT 1 FROM events e WHERE NOT EXISTS (SELECT 1 FROM devices d WHERE d.account=e.account AND d.device=e.device)").fetchone():
         raise ValueError("旧事件不属于任何已登记设备，拒绝迁移")

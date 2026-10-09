@@ -38,6 +38,36 @@ fn cp(f: &Fixture) -> Value {
 }
 fn init(f: &Fixture, key: &SigningKey, device: &str) -> Value {
     let identity = call(f, device, json!({"operation":"init"}));
+    // 合成控制器读取各实际持有端的公开对象，再走同一核验入口；授权锚不替代核验。
+    for member in cp(f)["members"].as_array().unwrap() {
+        let old_device = member["device_id"].as_str().unwrap();
+        let public = {
+            let locked = LockedDevice::open(&f.root.join(old_device)).unwrap();
+            let state = locked
+                .load(&Context {
+                    service: "S1".into(),
+                    account: member["account_id"].as_str().unwrap().into(),
+                    device: old_device.into(),
+                })
+                .unwrap()
+                .unwrap();
+            state.public_identity()
+        };
+        crate::lab::identity_test_support::verify(
+            &f.root.join(old_device),
+            "S1",
+            public["account"].as_str().unwrap(),
+            old_device,
+            &identity,
+        );
+        crate::lab::identity_test_support::verify(
+            &f.root.join(device),
+            "S1",
+            identity["account"].as_str().unwrap(),
+            device,
+            &public,
+        );
+    }
     let (initial, mut records) = {
         let locked = LockedDevice::open(&f.root.join("A")).unwrap();
         let state = locked
@@ -245,6 +275,7 @@ fn owner_pin_and_legacy_authorization_cannot_replace_same_account_group_authoriz
 fn device_anchor_mode_is_immutable_and_cannot_skip_exact_self_add_device() {
     let (f, key) = setup();
     let identity = call(&f, "B2", json!({"operation":"init"}));
+    crate::lab::identity_test_support::verify(&f.root.join("B"), "S1", "B", "B", &identity);
     let anchor = json!({"checkpoint":cp(&f),"relay_receipt_key":codec::encode(key.verifying_key().as_bytes())});
     fail(
         &f,

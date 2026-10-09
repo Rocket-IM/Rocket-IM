@@ -59,6 +59,14 @@ class NetworkLab:
         self.receipt_signer = receipt_signer
         self.receipt_key = self.directory / "relay-receipt.key"
 
+    def verify_fixture_identities(self):
+        """显式交换合成设备的原公开对象；旧 pin/checkpoint 不作为核验依据。"""
+        from .first_trust_session import verify_all
+        check(all(value.get("identity_trust_version") == "1" and value.get("identity_trust_strict") is True
+                  for value in self.public.values()),
+              "当前 fixture 要求显式 Q01 严格能力；旧程序必须使用已归档旧 fixture")
+        verify_all(self)
+
     def relay_key(self, operation, **fields):
         result = subprocess.run([str(self.receipt_signer)], input=json.dumps(
             {"operation": operation, "key_path": str(self.receipt_key), **fields}),
@@ -108,6 +116,7 @@ class NetworkLab:
             require_current_namespace(self.receipt_signer, b"Rocket-IM/POC/permission-receipt/v1")
         for device in ACCOUNTS:
             self.public[device] = self.rust(device, "init")
+        self.verify_fixture_identities()
         self.authorize_fixture_peer("a1", "a2")
         self.authorize_fixture_peer("a2", "a1")
         peers = [{"account": ACCOUNTS[d], "device": d,
@@ -157,6 +166,7 @@ class NetworkLab:
                 self.public[device] = self.rust(device, "init")
                 self.fixture["devices"].append({**identity(device), "token": self.tokens[device],
                                                 "signature_key": self.public[device]["signature_key"]})
+            self.verify_fixture_identities()
         self.fixture_path = self.directory / "fixture.json"
         self.fixture_path.write_text(json.dumps(self.fixture))
         self.fixture_path.chmod(0o600)

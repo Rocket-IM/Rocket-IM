@@ -14,10 +14,20 @@ fn fixture() -> (Fixture, SigningKey, Value) {
     let member =
         json!({"account_id":"D","device_id":"D","signature_key":identity["signature_key"]});
     for device in ["A", "B", "C"] {
+        crate::lab::identity_test_support::verify(
+            &f.root.join(device),
+            "S1",
+            device,
+            device,
+            &identity,
+        );
         f.call(
             device,
             json!({"operation":"permission_pin_member","member":member}),
         );
+    }
+    for public in &f.identities {
+        crate::lab::identity_test_support::verify(&f.root.join("D"), "S1", "D", "D", public);
     }
     f.call(
         "D",

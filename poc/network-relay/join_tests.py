@@ -188,7 +188,7 @@ class JoinTests(unittest.TestCase):
         self.make_schema3()
         self.store = Store(self.path, self.fixture, self.verifier, self.signer)
         with self.store.transaction() as db:
-            self.assertEqual(self.store.meta(db, "schema"), "rim-poc-storage-7")
+            self.assertEqual(self.store.meta(db, "schema"), "rim-poc-storage-8")
             self.assertEqual(self.store.meta(db, "join_enabled"), "0")
             self.assertIsNone(db.execute("SELECT 1 FROM device_public_keys WHERE account='D'").fetchone())
         self.assert_code("join_not_enabled", self.submit)

@@ -13,6 +13,16 @@ mod history_export;
 mod history_import;
 mod history_state;
 mod history_transfer;
+mod identity_gate;
+mod identity_preflight;
+mod identity_records;
+mod identity_session;
+mod identity_state;
+#[cfg(test)]
+mod identity_test_support;
+#[cfg(test)]
+mod identity_tests;
+pub use identity_session::Session;
 mod messaging;
 mod operation;
 mod permission_admission;
@@ -200,6 +210,10 @@ struct Request {
 /// 一次调用只处理一个请求；成功输出只包含密文、公开材料和非秘密摘要。
 /// failpoint 只用于该实验二进制，直接结束进程来验证原子提交边界。
 pub fn execute(input: &str) -> Result<Value, LabError> {
+    Session::single()?.execute(input)
+}
+
+fn execute_session(input: &str, session: &mut Session) -> Result<Value, LabError> {
     ensure(input.len() <= 1024 * 1024, "input_limit", "请求超过 1 MiB")?;
     let request: Request = checked("invalid_request", serde_json::from_str(input))?;
     let context = Context {
@@ -210,17 +224,19 @@ pub fn execute(input: &str) -> Result<Value, LabError> {
     for id in [&context.service, &context.account, &context.device] {
         codec::valid_id(id)?;
     }
+    session.activate(request.directory.clone(), context.clone())?;
     let locked = LockedDevice::open(&request.directory)?;
     if let Some(path) = std::env::var_os("RIM_ROLLBACK_ANCHOR_CONFIG") {
-        return rollback::execute(&PathBuf::from(path), &locked, request, context);
+        return rollback::execute(&PathBuf::from(path), &locked, request, context, session);
     }
-    execute_locked(&locked, request, context)
+    execute_locked(&locked, request, context, session)
 }
 
 fn execute_locked(
     locked: &LockedDevice,
     request: Request,
     context: Context,
+    session: &mut Session,
 ) -> Result<Value, LabError> {
     if matches!(
         request.operation,
@@ -233,33 +249,46 @@ fn execute_locked(
         None if matches!(request.operation, Operation::Init) => DeviceState::new(context)?,
         None => return Err(LabError::new("not_initialized", "设备尚未初始化")),
     };
-    execute_state(locked, request, state)
+    execute_state(locked, request, state, session)
 }
 
 fn execute_state(
     locked: &LockedDevice,
     request: Request,
     mut state: DeviceState,
+    session: &mut Session,
 ) -> Result<Value, LabError> {
     rebuild_state::guard(&state, &request.operation)?;
     wire_send_order::preflight(&state, &request.operation)?;
     wire_stream_source::preflight(&state, &request.operation)?;
     // 已读诊断只观察持久状态，不因读取而提交独立的一致性冲突。
-    let read_diagnostic = matches!(
+    let identity_metadata = matches!(
         request.operation,
-        Operation::WireReadPending
-            | Operation::WireReadInspect
-            | Operation::WireReclaimRequest { .. }
-            | Operation::WireReclaimList { .. }
-            | Operation::WireReclaimRecover { .. }
-            | Operation::WireRetention { .. }
+        Operation::IdentityTrustObserve { .. }
+            | Operation::IdentityTrustPrepare { .. }
+            | Operation::IdentityTrustConfirm { .. }
+            | Operation::IdentityTrustReset { .. }
+            | Operation::IdentityTrustInspect { .. }
+            | Operation::DeviceRegistrationProve { .. }
     );
+    let read_diagnostic = identity_metadata
+        || matches!(
+            request.operation,
+            Operation::WireReadPending
+                | Operation::WireReadInspect
+                | Operation::WireReclaimRequest { .. }
+                | Operation::WireReclaimList { .. }
+                | Operation::WireReclaimRecover { .. }
+                | Operation::WireRetention { .. }
+        );
     if !read_diagnostic && consistency_state::preflight(&mut state)? {
         // 发现的是与本次业务输入无关的有效冲突；先持久暂停再拒绝输出新密文。
         locked.save(&mut state, request.failpoint)?;
     }
     consistency_state::guard(&state, &request.operation)?;
     permissions::guard(&state, &request.operation)?;
+    identity_records::preflight(&state, session, &request.operation)?;
+    identity_gate::check(&state, &request.operation)?;
     let request_digest = digest(&checked(
         "request_encoding",
         serde_json::to_vec(&request.operation),
@@ -286,6 +315,9 @@ fn execute_state(
     let should_save = !matches!(
         request.operation,
         Operation::Inspect
+            | Operation::IdentityTrustPrepare { .. }
+            | Operation::IdentityTrustInspect { .. }
+            | Operation::DeviceRegistrationProve { .. }
             | Operation::WireCloseRequest { .. }
             | Operation::WireReadPending
             | Operation::WireReadInspect
@@ -302,7 +334,7 @@ fn execute_state(
     );
     // 准备只保存固定公开请求，沿原诊断的Q02守卫；不附带MLS读取或迁移索引写入。
     // 这使锚预约前的纯元数据候选与实际保存有相同预算，不以额外索引字节制造未决预约。
-    if should_save && !is_reclaim_prepare {
+    if should_save && !is_reclaim_prepare && !identity_metadata {
         consistency_state::record_current(&mut state)?;
     }
     let consistency_result = matches!(
@@ -311,8 +343,8 @@ fn execute_state(
             | Operation::ConsistencyObserveFork { .. }
             | Operation::ConsistencyResume { .. }
     );
-    let mut result = perform(&mut state, request.operation)?;
-    if should_save && !is_reclaim_prepare {
+    let mut result = perform(&mut state, request.operation, session)?;
+    if should_save && !is_reclaim_prepare && !identity_metadata {
         consistency_state::record_current(&mut state)?;
     }
     if consistency_result {
@@ -340,13 +372,18 @@ fn execute_state(
         && !(is_wire_read && result["marked_count"] == 0)
         && !(is_wire_reclaim && result["duplicate"] == true)
         && !(is_reclaim_prepare && result["duplicate"] == true)
+        && !(identity_metadata && result["duplicate"] == true)
     {
         locked.save(&mut state, request.failpoint)?;
     }
     Ok(json!({"ok":true,"result":result}))
 }
 
-fn perform(state: &mut DeviceState, operation: Operation) -> Result<Value, LabError> {
+fn perform(
+    state: &mut DeviceState,
+    operation: Operation,
+    session: &mut Session,
+) -> Result<Value, LabError> {
     match operation {
         Operation::AnchorInspect
         | Operation::AnchorResume
@@ -397,6 +434,41 @@ fn perform(state: &mut DeviceState, operation: Operation) -> Result<Value, LabEr
                 right,
             },
         ),
+        Operation::IdentityTrustObserve { identity } => identity_records::observe(state, identity),
+        Operation::IdentityTrustPrepare { target, purpose } => {
+            identity_records::prepare(state, session, target, purpose)
+        }
+        Operation::IdentityTrustConfirm {
+            display,
+            independent_identity,
+            verification,
+        } => identity_records::confirm(
+            state,
+            session,
+            display,
+            independent_identity,
+            verification,
+            crate::identity_trust::Purpose::Verify,
+        ),
+        Operation::IdentityTrustReset {
+            display,
+            independent_identity,
+            verification,
+        } => identity_records::confirm(
+            state,
+            session,
+            display,
+            independent_identity,
+            verification,
+            crate::identity_trust::Purpose::Reset,
+        ),
+        Operation::IdentityTrustInspect { target } => identity_records::inspect(state, target),
+        Operation::DeviceRegistrationProve { challenge_bytes } => {
+            identity_preflight::registration(state, &challenge_bytes)?;
+            Ok(
+                json!({"proof":crate::device_registration::sign_challenge(&challenge_bytes, &state.signer()?)?}),
+            )
+        }
         Operation::Init => Ok(state.public_identity()),
         Operation::HistoryRequest {
             transfer_id,

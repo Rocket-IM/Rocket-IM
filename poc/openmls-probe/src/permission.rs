@@ -128,6 +128,7 @@ pub fn execute(input: &str) -> Result<Value, PermissionError> {
         .map_err(|_| PermissionError::new("invalid_permission", "校验请求 JSON 无效"))?;
     if let Some(operation) = dispatch.operation {
         return match operation.as_str() {
+            "verify_device_registration" => crate::device_registration::execute(input),
             "verify_rebuild_stream" | "verify_rebuild_pull" => {
                 crate::rebuild_stream::execute(input)
             }

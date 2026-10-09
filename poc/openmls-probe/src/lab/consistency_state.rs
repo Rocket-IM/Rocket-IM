@@ -171,6 +171,7 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
                 | Operation::WireReadInspect
                 | Operation::WireSlotInspect { .. }
                 | Operation::PermissionInspect
+                | Operation::IdentityTrustInspect { .. }
                 | Operation::HistoryInspect
                 | Operation::ConsistencyInspect
                 | Operation::ConsistencyExchangeBegin { .. }

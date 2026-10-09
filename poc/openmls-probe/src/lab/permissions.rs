@@ -35,6 +35,11 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
                     | Operation::WireReadInspect
                     | Operation::PermissionInspect
                     | Operation::PermissionPinMember { .. }
+                    | Operation::IdentityTrustObserve { .. }
+                    | Operation::IdentityTrustPrepare { .. }
+                    | Operation::IdentityTrustConfirm { .. }
+                    | Operation::IdentityTrustReset { .. }
+                    | Operation::IdentityTrustInspect { .. }
                     | Operation::PermissionJoinAnchor { .. }
                     | Operation::PermissionDeviceJoinAnchor { .. }
                     | Operation::PermissionJoinAdvance { .. }
@@ -86,6 +91,11 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
                     | Operation::PermissionPrepareAdd { .. }
                     | Operation::PermissionPrepareDevice { .. }
                     | Operation::PermissionPinMember { .. }
+                    | Operation::IdentityTrustObserve { .. }
+                    | Operation::IdentityTrustPrepare { .. }
+                    | Operation::IdentityTrustConfirm { .. }
+                    | Operation::IdentityTrustReset { .. }
+                    | Operation::IdentityTrustInspect { .. }
                     | Operation::PermissionApply { .. }
                     | Operation::PermissionCloseRequest
                     | Operation::PermissionRecover { .. }
@@ -158,12 +168,16 @@ pub(super) fn prepare(
     action: Action,
     validity_secs: Option<u16>,
 ) -> Result<Value, LabError> {
+    validate_prepare_action(&action)?;
+    prepare_change(state, change_id, action, validity_secs, None)
+}
+
+pub(super) fn validate_prepare_action(action: &Action) -> Result<(), LabError> {
     ensure(
         !matches!(action, Action::AddMember { .. } | Action::AddDevice { .. }),
         "invalid_permission",
         "Add 必须使用专用准备入口",
-    )?;
-    prepare_change(state, change_id, action, validity_secs, None)
+    )
 }
 
 pub(super) fn prepare_change(

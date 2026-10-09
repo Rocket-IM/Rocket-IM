@@ -122,6 +122,13 @@ impl TrustedRoster {
             .map(|entry| entry.signature_key)
     }
 
+    /// 仅供本机独立核验排除公钥复用；撤销不删除既有设备绑定事实。
+    pub(crate) fn key_bound_to_other_device(&self, device: &str, key: &[u8; 32]) -> bool {
+        self.devices
+            .iter()
+            .any(|(id, entry)| id != device && entry.signature_key == *key)
+    }
+
     /// 调用者先用 OpenMLS 验证 KeyPackage，传入其原始序列化字节和实际签名公钥。
     /// 所有验证结束前不改状态；成功消耗 nonce 并推进版本，失败保持原检查点。
     /// now 必须来自调用者可信时钟；本模块没有网络、磁盘、token 或隐式授权入口。

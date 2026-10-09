@@ -28,6 +28,7 @@ from synchronization import get_crypto_dependencies, pull_events, report_deliver
 from stream_pages import pull_events_signed
 from reclamation import confirm_reclaim, finish_reclaim
 from expiration_projection import project_for_request
+from device_registration import begin_device_registration, complete_device_registration
 
 DISPATCH = {"submit_message": submit, "get_attempt": get_attempt, "close_attempt": close_attempt,
             "pull_events": pull_events, "pull_events_signed": pull_events_signed,
@@ -38,7 +39,9 @@ DISPATCH = {"submit_message": submit, "get_attempt": get_attempt, "close_attempt
             "get_join_material": get_join_material, "submit_history_transfer": submit_history_transfer,
             "get_history_transfer": get_history_transfer, "get_consistency_head": get_consistency_head,
             "register_rebuild_stream": register_rebuild_stream, "pull_rebuild_events": pull_rebuild_events,
-            "confirm_reclaim": confirm_reclaim, "finish_reclaim": finish_reclaim}
+            "confirm_reclaim": confirm_reclaim, "finish_reclaim": finish_reclaim,
+            "begin_device_registration": begin_device_registration,
+            "complete_device_registration": complete_device_registration}
 
 
 class RelayServer(ThreadingHTTPServer):
@@ -159,11 +162,11 @@ class Handler(BaseHTTPRequestHandler):
                     authorize_operation(db, device, operation)
                     # 拉取先校验旧水位，再投影到期并读取新水位，避免未来游标跳过新通知。
                     value = None
-                    if operation not in {"pull_events", "pull_events_signed", "pull_rebuild_events", "confirm_reclaim", "finish_reclaim"}:
+                    if operation not in {"pull_events", "pull_events_signed", "pull_rebuild_events", "confirm_reclaim", "finish_reclaim", "begin_device_registration", "complete_device_registration"}:
                         value = project_for_request(self.server.store, db, device, operation, req, DISPATCH[operation])
                     if value is None:
                         value = DISPATCH[operation](self.server.store, db, device, req)
-                    if operation in {"submit_message", "close_attempt", "report_delivery", "report_read", "submit_permission_change", "close_permission_change", "submit_history_transfer", "register_rebuild_stream", "pull_rebuild_events", "pull_events_signed", "confirm_reclaim", "finish_reclaim"}:
+                    if operation in {"submit_message", "close_attempt", "report_delivery", "report_read", "submit_permission_change", "close_permission_change", "submit_history_transfer", "register_rebuild_stream", "pull_rebuild_events", "pull_events_signed", "confirm_reclaim", "finish_reclaim", "begin_device_registration", "complete_device_registration"}:
                         hook = self.server.controls.take_hook()
                 self.before_commit(hook)
             self.after_commit(hook)

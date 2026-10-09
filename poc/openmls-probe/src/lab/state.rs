@@ -33,6 +33,9 @@ pub(super) struct ControlRecord {
 pub(super) struct DeviceState {
     pub version: u32,
     pub context: Context,
+    // 新 Init 显式标记严格账本；None 只兼容真实旧快照，绝不授予默认核验。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_trust: Option<super::identity_state::State>,
     pub provider_entries: Vec<(Vec<u8>, Vec<u8>)>,
     pub own_signature_key: [u8; 32],
     pub signature_id: StorageId,
@@ -110,6 +113,10 @@ impl DeviceState {
         )?;
         Ok(Self {
             version: 1,
+            identity_trust: Some(super::identity_state::State {
+                version: 1,
+                records: BTreeMap::new(),
+            }),
             context,
             provider_entries: Vec::new(),
             own_signature_key: public,
@@ -205,7 +212,8 @@ impl DeviceState {
     pub fn public_identity(&self) -> Value {
         json!({"service":self.context.service,"account":self.context.account,"device":self.context.device,
             "signature_key":codec::encode(&self.own_signature_key),"key_package":codec::encode(&self.key_package),
-            "key_package_available":self.group_id.is_none(),"roster_version":self.roster.version()})
+            "key_package_available":self.group_id.is_none(),"roster_version":self.roster.version(),
+            "identity_trust_version":"1","identity_trust_strict":true})
     }
 
     pub fn inspect(&self) -> Result<Value, LabError> {

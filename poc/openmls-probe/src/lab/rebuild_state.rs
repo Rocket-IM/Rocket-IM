@@ -219,6 +219,7 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
         }
         Operation::Inspect
         | Operation::PermissionInspect
+        | Operation::IdentityTrustInspect { .. }
         | Operation::WireReadPending
         | Operation::WireReadInspect => Ok(()),
         _ => Err(LabError::new(

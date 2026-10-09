@@ -60,11 +60,13 @@ pub(super) fn execute(
     locked: &LockedDevice,
     request: Request,
     context: Context,
+    session: &mut super::Session,
 ) -> Result<Value, LabError> {
     let config = Config::load(path, &request.directory)?;
     let directory = request.directory.clone();
     // 网络输入可能重复、损坏或迟到。先在临时元数据上复用纯校验，拒绝不消耗预约。
     // 成功预检不授予执行许可；下面仍须独立锚Reserve并重新核对完整快照。
+    super::identity_preflight::check(locked, &request, &context, session)?;
     super::rebuild_stream_sync::preflight(locked, &request, &context)?;
     let result = (|| {
         ensure(
@@ -157,7 +159,7 @@ pub(super) fn execute(
             serde_json::to_vec(&request.operation),
         )?);
         // Err 也可能已经消耗内存密码状态；不按旧磁盘摘要释放预约。
-        let output = execute_state(locked, request, enrolled)?;
+        let output = execute_state(locked, request, enrolled, session)?;
         let target = locked
             .saved_commitment
             .get()

@@ -154,6 +154,8 @@ class Store:
             install(db, fixture, not tables)
             from reclamation_storage import install as install_reclamation
             install_reclamation(db, previous_schema)
+            from registration_storage import install as install_registration
+            install_registration(db, previous_schema)
             db.commit()
         self.path.chmod(0o600)
 

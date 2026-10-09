@@ -39,6 +39,19 @@ impl Fixture {
                 .identities
                 .push(fixture.call(device, json!({"operation":"init"})));
         }
+        for device in devices {
+            for public in &fixture.identities {
+                if public["device"] != *device {
+                    super::identity_test_support::verify(
+                        &fixture.root.join(device),
+                        "S1",
+                        device,
+                        device,
+                        public,
+                    );
+                }
+            }
+        }
         let peers: Vec<_> = fixture.identities[1..].iter().map(|peer| json!({"account":peer["account"],
             "device":peer["device"],"signature_key":peer["signature_key"],"key_package":peer["key_package"]})).collect();
         let created = fixture.call("A", json!({"operation":"create","peers":peers}));

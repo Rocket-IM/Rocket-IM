@@ -3674,6 +3674,193 @@
         "$ref": "#/$defs/StreamRetentionStatement"
       },
       "x-signing-domain-utf8": "Rocket-IM/POC/stream-retention/v1\u0000"
+    },
+    "DeviceRegistrationBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 5464,
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 4096,
+      "description": "规范Base64的原始UTF-8 JSON挑战，必须精确保存；上限4096字节。"
+    },
+    "DeviceRegistrationChallenge": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-device-registration-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "registration_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signature_key": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        },
+        "purpose": {
+          "const": "register_device"
+        },
+        "challenge_nonce": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        },
+        "issued_at_ms": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_ms": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "account_id",
+        "device_id",
+        "registration_id",
+        "signature_key",
+        "purpose",
+        "challenge_nonce",
+        "issued_at_ms",
+        "expires_at_ms"
+      ],
+      "additionalProperties": false,
+      "description": "一次性私钥持有挑战；时间为UTC Unix毫秒、规范u64十进制字符串。Service生成300000ms期限，公共解析要求0<期限≤300000ms；公共验签不校验当前时钟，Service首次接受事务检查已保存原文与当前期限。主体从Bearer获取，不证明现实身份或账号从无旧身份。"
+    },
+    "SignedDeviceRegistration": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/DeviceRegistrationBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "x-statement-schema": {
+        "$ref": "#/$defs/DeviceRegistrationChallenge"
+      },
+      "x-signing-domain-utf8": "Rocket-IM/POC/device-registration/v1\u0000",
+      "description": "准确原始挑战及设备Ed25519签名；不重新编码声明原文，不包含私钥。"
+    },
+    "BeginDeviceRegistrationRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "registration_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signature_key": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        }
+      },
+      "required": [
+        "service_id",
+        "registration_id",
+        "signature_key"
+      ],
+      "additionalProperties": false
+    },
+    "CompleteDeviceRegistrationRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "proof": {
+          "$ref": "#/$defs/SignedDeviceRegistration"
+        }
+      },
+      "required": [
+        "service_id",
+        "proof"
+      ],
+      "additionalProperties": false
+    },
+    "DeviceRegistrationResult": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "registered"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "registration_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signature_key": {
+          "$ref": "#/$defs/PermissionKeyBytes"
+        }
+      },
+      "required": [
+        "status",
+        "service_id",
+        "account_id",
+        "device_id",
+        "registration_id",
+        "signature_key"
+      ],
+      "additionalProperties": false
+    },
+    "BeginDeviceRegistrationResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "challenge_bytes": {
+              "$ref": "#/$defs/DeviceRegistrationBytes"
+            }
+          },
+          "required": [
+            "challenge_bytes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "CompleteDeviceRegistrationResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/DeviceRegistrationResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
     }
   }
 }

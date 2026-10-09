@@ -113,6 +113,19 @@ impl BindingFixture {
                 .save(state, CrashPoint::None)
                 .unwrap();
         }
+        for (index, observer) in states.iter().enumerate() {
+            for (other, peer) in states.iter().enumerate() {
+                if index != other {
+                    super::identity_test_support::verify(
+                        &root.join(index.to_string()),
+                        &observer.context.service,
+                        &observer.context.account,
+                        &observer.context.device,
+                        &peer.public_identity(),
+                    );
+                }
+            }
+        }
         Self { root, contexts }
     }
 

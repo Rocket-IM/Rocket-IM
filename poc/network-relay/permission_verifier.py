@@ -18,7 +18,9 @@ ERROR_STATUS = {"invalid_permission": 400, "permission_denied": 403, "permission
                 "history_invalid": 400, "history_signature": 403, "history_context": 409, "history_denied": 403,
                 "rebuild_stream_invalid": 400, "rebuild_stream_context": 409, "rebuild_stream_signature": 403,
                 "rebuild_stream_denied": 403, "anchor_invalid": 400, "anchor_signature": 403,
-                "anchor_rebuild_denied": 403, "anchor_response_binding": 409}
+                "anchor_rebuild_denied": 403, "anchor_response_binding": 409,
+                "registration_invalid": 400, "registration_context": 403,
+                "registration_signature": 403, "registration_conflict": 409, "registration_expired": 409}
 
 
 def unavailable():
@@ -128,5 +130,13 @@ class PermissionVerifier:
         result = self._call({"operation": "verify_rebuild_pull", "binding": binding, "request": request})
         expected = {"pull": validate_pull(signed_statement(request)), "request_sha256": signed_digest(request)}
         if result != expected:
+            raise unavailable()
+        return result
+
+    def verify_device_registration(self, proof):
+        from registration_contract import proof as validate_registration_proof
+        statement = validate_registration_proof(proof)
+        result = self._call({"operation": "verify_device_registration", "proof": proof})
+        if result != {"statement": statement}:
             raise unavailable()
         return result
