@@ -14,6 +14,7 @@ from build import COMPILER, OUTPUT, ROOT, run, sha, sources, write_json
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--suite", choices=("all", "anchor-preflight"), default="all")
     parser.add_argument("--playwright", type=Path, default=Path("/Users/amant/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"))
     parser.add_argument("--browser", type=Path, default=Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
     args = parser.parse_args()
@@ -22,6 +23,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     report = {"run_id": run_id, "status": "RUNNING", "started_at": datetime.now(timezone.utc).isoformat(),
               "archive": str(args.archive.resolve()), "archive_sha256": sha(args.archive), "source_sha256_before": sources(),
+              "suite": args.suite,
               "not_tested": ["complete native and mobile MLS transaction acceptance", "physical device and Safari/Firefox", "OS power loss and disk failure", "production independent fault domain, first enrollment trust, human recovery approval and enforced client policy", "authenticated at-rest storage, browser secret storage and secure deletion", "rebuild cancellation, recursive successor chains, old history migration and production membership authorization"]}
     try:
         consumer = output / "consumer"
@@ -38,7 +40,7 @@ def main():
                       package_sources_match=artifact["source_sha256"] == report["source_sha256_before"])
         if not report["package_sources_match"]:
             raise RuntimeError("包所对应的源码与当前验证入口不匹配，须重新构建")
-        run(["node", ROOT / "tools/browser_storage/runner.mjs", consumer, output, args.playwright, args.browser],
+        run(["node", ROOT / "tools/browser_storage/runner.mjs", consumer, output, args.playwright, args.browser, args.suite],
             ROOT, output / "browser.log", timeout=600)
         browser_report = json.loads((output / "browser.json").read_text())
         report.update(browser=browser_report, status=browser_report["status"])
@@ -55,7 +57,7 @@ def main():
     write_json(output / "report.json", report)
     print(json.dumps({"status": report["status"], "run_id": run_id, "report": str(output / "report.json"),
                       "error": report.get("error"), "cases": len(report.get("browser", {}).get("cases", []))}, ensure_ascii=False))
-    raise SystemExit(0 if report["status"] == "PASS" else 1)
+    raise SystemExit(0 if report["status"] in ("PASS", "PASS_PARTIAL") else 1)
 
 
 if __name__ == "__main__":

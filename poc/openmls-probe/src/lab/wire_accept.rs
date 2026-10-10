@@ -50,11 +50,6 @@ pub(super) fn accept(
         .ok_or_else(|| LabError::new("receipt_pin_required", "缺少固定Service回执钥"))?;
     let accepted = message_acceptance::verify(pin, &receipt)?;
     ensure(
-        super::wire_reclaimed::acceptance(state, &accepted.acceptance_id).is_none(),
-        "acceptance_conflict",
-        "接受ID已属于已回收消息",
-    )?;
-    ensure(
         header.sender == sender
             && header.service_id == state.context.service
             && header.conversation_id == config.conversation_id
@@ -81,25 +76,20 @@ pub(super) fn accept(
         "closure_conflict",
         "已封口尝试不能覆盖为接受",
     )?;
-    // 已经有另一个尝试成功或同接受ID被复用时保留第一份事实，不能默默覆盖。
+    super::wire_acceptance::available(
+        state,
+        &accepted.acceptance_id,
+        Some(super::wire_acceptance::Owner::Outbox(&key)),
+    )?;
+    // 同逻辑的另一尝试即使使用不同接受ID也不能成功，保留第一份接受事实。
     for (other_key, other) in &state.wire.outbox {
-        if let Some(saved) = &other.acceptance_receipt {
-            let fact = message_acceptance::verify(pin, saved)?;
+        if other.acceptance_receipt.is_some() {
             ensure(
-                other_key == &key
-                    || (other.logical_key != logical
-                        && fact.acceptance_id != accepted.acceptance_id),
+                other_key == &key || other.logical_key != logical,
                 "acceptance_conflict",
-                "接受证明与已保存的逻辑消息或接受ID冲突",
+                "接受证明与已保存的逻辑消息冲突",
             )?;
         }
-    }
-    for inbound in state.wire.inbox.values() {
-        ensure(
-            inbound.acceptance_id.as_deref() != Some(accepted.acceptance_id.as_str()),
-            "acceptance_conflict",
-            "接受ID已属于其他本机收件",
-        )?;
     }
     let duplicate = if let Some(saved) = &original.acceptance_receipt {
         ensure(

@@ -20,6 +20,17 @@ pub(crate) struct Identity {
     pub key_package: String,
 }
 
+/// 仅比较公开身份元数据；不解析 KeyPackage、恢复 provider 或验证 MLS 消息。
+pub(super) fn peer_matches(own: &Identity, peer: &Identity) -> Result<bool, ApiError> {
+    validate_id(&peer.service)?;
+    validate_id(&peer.account)?;
+    validate_id(&peer.device)?;
+    Ok(peer.service == own.service
+        && peer.account != own.account
+        && decode(&peer.identity_key)?.len() == 32
+        && peer.identity_key != own.identity_key)
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Envelope {

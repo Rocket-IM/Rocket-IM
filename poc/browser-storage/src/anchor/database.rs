@@ -1,7 +1,8 @@
 //! 协调记录不含 MLS 秘密；门禁和结果分别签名绑定，和业务结果共用最终事务。
 use super::{client::Client, commitment, error, protocol};
 use crate::{
-    protocol::{ApiError, Checkpoint, Fault},
+    crypto::{preflight, requests::Action},
+    protocol::{ApiError, Checkpoint, Fault, Scope},
     transaction,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -200,6 +201,25 @@ pub(super) fn begin(
     client: &Client,
     input: &str,
 ) -> Result<Gate, ApiError> {
+    begin_inner(connection, client, input, None)
+}
+
+pub(super) fn begin_checked(
+    connection: &mut Connection,
+    client: &Client,
+    input: &str,
+    scope: &Scope,
+    action: &Action,
+) -> Result<Gate, ApiError> {
+    begin_inner(connection, client, input, Some((scope, action)))
+}
+
+fn begin_inner(
+    connection: &mut Connection,
+    client: &Client,
+    input: &str,
+    request: Option<(&Scope, &Action)>,
+) -> Result<Gate, ApiError> {
     transaction::run(
         connection,
         TransactionBehavior::Immediate,
@@ -210,6 +230,10 @@ pub(super) fn begin(
             let state = local(tx, client)?;
             if state.gate.is_some() || state.journal.is_some() {
                 return Err(error("anchor_paused"));
+            }
+            // 与写门共用同一事务，普通业务拒绝不得留下本地门或发出远端预约。
+            if let Some((scope, action)) = request {
+                preflight::check(tx, scope, action)?;
             }
             let gate = Gate {
                 kind: "gate_v1".into(),

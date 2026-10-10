@@ -225,7 +225,7 @@ fn pending_or_removed_sender_can_record_old_acceptance_without_restoring_access(
 }
 
 #[test]
-fn old_outbox_without_receipt_stays_unaccepted_and_export_rejects_ambiguous_ids() {
+fn old_outbox_without_receipt_stays_unaccepted_and_ambiguous_ids_fail_on_load() {
     let (f, key) = fixture();
     let envelope = legacy_send_attempt(&f, "B", "legacySent", "P1", None);
     mutate(&f, "B", |s| {
@@ -255,7 +255,7 @@ fn old_outbox_without_receipt_stays_unaccepted_and_export_rejects_ambiguous_ids(
         &f,
         "B",
         json!({"operation":"history_export","request":request}),
-        "history_conflict",
+        "acceptance_conflict",
     );
 }
 

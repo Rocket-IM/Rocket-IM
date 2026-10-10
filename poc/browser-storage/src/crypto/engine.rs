@@ -169,14 +169,8 @@ impl Engine {
     }
 
     fn validate_peer(&self, peer: &Identity) -> Result<(), ApiError> {
-        validate_id(&peer.service)?;
-        validate_id(&peer.account)?;
-        validate_id(&peer.device)?;
         require(
-            peer.service == self.own.service
-                && peer.account != self.own.account
-                && decode(&peer.identity_key)?.len() == 32
-                && peer.identity_key != self.own.identity_key,
+            model::peer_matches(&self.own, peer)?,
             "crypto_identity_mismatch",
         )
     }

@@ -4,6 +4,7 @@
 mod engine;
 pub(crate) mod model;
 mod operations;
+pub(crate) mod preflight;
 mod query;
 pub(crate) mod requests;
 mod schema;

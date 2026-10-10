@@ -2,7 +2,7 @@
 
 use super::{
     engine::Engine,
-    model::{decode, hash},
+    model::{decode, hash, peer_matches},
     query::{self, Event, Message, Outbound, State, LIMIT},
     requests::Action,
 };
@@ -28,9 +28,15 @@ pub(super) fn cached(state: &State, scope: &Scope, action: &Action) -> Result<bo
         return Err(reject("crypto_not_initialized", "尚未显式创建实验身份。"));
     }
     match action {
-        Action::CreateGroup { .. } | Action::JoinGroup { .. } => {
+        Action::CreateGroup { peer, .. } | Action::JoinGroup { peer, .. } => {
             if state.conversation.is_some() {
                 return Err(reject("crypto_already_grouped", "实验仅支持一个双成员群。"));
+            }
+            if !peer_matches(state.identity.as_ref().ok_or_else(query::corrupt)?, peer)? {
+                return Err(reject(
+                    "crypto_identity_mismatch",
+                    "密码实验状态或认证上下文不匹配。",
+                ));
             }
         }
         Action::Send {

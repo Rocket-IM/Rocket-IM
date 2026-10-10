@@ -164,7 +164,14 @@ pub(super) async fn execute(
     let input = protocol::hash_bytes(
         &serde_json::to_vec(&request.action).map_err(|_| ApiError::invalid())?,
     );
-    let gate = database::begin(connection(storage)?, client, &input)?;
+    let scope = storage.scope.clone();
+    let gate = database::begin_checked(
+        connection(storage)?,
+        client,
+        &input,
+        &scope,
+        &request.action,
+    )?;
     let observed = inspect(client, &gate.base).await?;
     let reserved = client
         .rpc(
@@ -191,7 +198,6 @@ pub(super) async fn execute(
         before: &before,
         complete: &complete,
     };
-    let scope = storage.scope.clone();
     let hook = storage.checkpoint.clone();
     let result = store::execute_completed(
         connection(storage)?,

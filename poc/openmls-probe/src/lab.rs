@@ -51,6 +51,9 @@ mod store;
 mod stream_source_test_support;
 mod wire;
 mod wire_accept;
+mod wire_acceptance;
+#[cfg(test)]
+mod wire_acceptance_tests;
 #[cfg(test)]
 mod wire_binding_tests;
 mod wire_close;

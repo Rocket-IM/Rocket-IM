@@ -160,6 +160,7 @@ impl LockedDevice {
         super::identity_state::validate(&state)?;
         super::wire_terminal_reference::stored(&state)?;
         super::wire_reclaim_validate::validate(&state)?;
+        super::wire_acceptance::validate(&state)?;
         super::wire_send_order::validate(&state)?;
         super::wire_reads::validate(&state)?;
         if restore_provider {

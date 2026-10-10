@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use super::{
     model::hash,
-    operations,
+    operations, preflight,
     query::{self, Reservation, State},
     requests::{Action, Request, TestCheckpoint, TestFault},
 };
@@ -89,24 +89,14 @@ pub(crate) fn execute_completed(
             if let Some(hooks) = hooks {
                 (hooks.before)(tx)?;
             }
-            // 暂停门先于 provider 读取、幂等返回及所有密码调用；inspect 是独立诊断入口。
-            if query::reservation(tx)?.is_some() {
-                return Err(ApiError::new(
-                    "crypto_pending",
-                    "存在未决密码预约；本实验不提供解锁或重算。",
-                    false,
-                ));
-            }
-            let state = query::load(tx, scope)?;
-            if operations::cached(&state, scope, &request.action)? {
+            let (state, cached) = preflight::prepare(tx, scope, &request.action)?;
+            if cached {
                 return Ok(Prepared::Cached(complete(
                     tx,
                     state.snapshot(scope, None, "none"),
                     hooks,
                 )?));
             }
-            journal_capacity(tx)?;
-            operations::next(&state.revision)?;
             let attempt_id = match &request.action {
                 Action::Send { attempt_id, .. } => attempt_id.clone(),
                 Action::ProcessNext => {
@@ -240,20 +230,6 @@ fn complete(
     }
 }
 
-fn journal_capacity(tx: &Transaction<'_>) -> Result<(), ApiError> {
-    let count: u32 = tx
-        .query_row("SELECT COUNT(*) FROM crypto_journal", [], |row| row.get(0))
-        .map_err(ApiError::database)?;
-    if count >= 128 {
-        return Err(ApiError::new(
-            "crypto_limit",
-            "密码实验操作日志达到上限。",
-            false,
-        ));
-    }
-    Ok(())
-}
-
 fn journal(
     tx: &Transaction<'_>,
     state: &State,
@@ -301,18 +277,10 @@ fn download(
             if let Some(hooks) = hooks {
                 (hooks.before)(tx)?;
             }
-            if query::reservation(tx)?.is_some() {
-                return Err(ApiError::new(
-                    "crypto_pending",
-                    "存在未决密码预约；本实验不提供解锁或重算。",
-                    false,
-                ));
-            }
-            let mut state = query::load(tx, scope)?;
-            if operations::cached(&state, scope, &request.action)? {
+            let (mut state, cached) = preflight::prepare(tx, scope, &request.action)?;
+            if cached {
                 return complete(tx, state.snapshot(scope, None, "none"), hooks);
             }
-            journal_capacity(tx)?;
             let change = operations::apply(&mut state, scope, &request.action)?;
             state.revision = operations::next(&state.revision)?;
             persist(tx, &state)?;

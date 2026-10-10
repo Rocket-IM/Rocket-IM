@@ -76,11 +76,13 @@ pub(super) fn receive(
         return Ok(result);
     }
     if let Some(id) = &acceptance_id {
-        ensure(
-            super::wire_reclaimed::acceptance(state, id).is_none(),
-            "acceptance_conflict",
-            "接受ID已属于已回收消息",
-        )?;
+        let exact_owner = state
+            .wire
+            .inbox
+            .get(&key)
+            .filter(|record| record.envelope == envelope)
+            .map(|_| super::wire_acceptance::Owner::Inbox(key.as_str()));
+        super::wire_acceptance::available(state, id, exact_owner)?;
     }
     if let Some(record) = state.wire.inbox.get_mut(&key) {
         if record.envelope == envelope {

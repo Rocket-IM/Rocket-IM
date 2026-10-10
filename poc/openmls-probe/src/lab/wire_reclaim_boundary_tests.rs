@@ -197,6 +197,46 @@ fn new_slot_cannot_restore_reclaimed_ciphertext_or_reuse_acceptance_identity() {
 }
 
 #[test]
+fn direct_receive_cannot_reuse_reclaimed_send_or_inbox_acceptance_id() {
+    let (f, key, sent, _) = fixture(false, "deleted");
+    for device in ["A", "B"] {
+        f.call(device,json!({"operation":"wire_reclaim","receipt":permit(&f,&key,device,&sent,"R1","deleted")}));
+    }
+    let next = f.send("C", "M2");
+    let operation = |id: &str| {
+        json!({"operation":"wire_receive",
+        "header_bytes":next["envelope"]["header_bytes"],"payload_bytes":next["envelope"]["payload_bytes"],
+        "acceptance_id":id,"acceptance_receipt":accept(&next,&key,id)["acceptance_receipt"]})
+    };
+    for device in ["A", "B"] {
+        reject(&f, device, operation("K1"), "acceptance_conflict");
+        let mut state = load(&f, device);
+        let before = serde_json::to_vec(&state).unwrap();
+        assert_eq!(
+            super::super::wire_receive::receive(
+                &mut state,
+                serde_json::from_value(next["envelope"].clone()).unwrap(),
+                Some("K1".into()),
+                Some(
+                    serde_json::from_value(operation("K1")["acceptance_receipt"].clone()).unwrap()
+                )
+            )
+            .unwrap_err()
+            .code,
+            "acceptance_conflict"
+        );
+        state.capture_provider().unwrap();
+        assert!(serde_json::to_vec(&state).unwrap() == before);
+        assert_eq!(f.call(device, operation("K2"))["duplicate"], false);
+    }
+    assert_eq!(f.call("A", accept(&sent, &key, "K1"))["duplicate"], true);
+    let original = json!({"operation":"wire_receive","header_bytes":sent["envelope"]["header_bytes"],
+        "payload_bytes":sent["envelope"]["payload_bytes"],"acceptance_id":"K1",
+        "acceptance_receipt":accept(&sent,&key,"K1")["acceptance_receipt"]});
+    assert_eq!(f.call("B", original)["payload_reclaimed"], true);
+}
+
+#[test]
 fn reclaim_with_other_pending_send_preflights_gate_without_restoring_provider() {
     let (f, key, sent, payload) = fixture(false, "deleted");
     f.send("A", "M2");

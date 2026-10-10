@@ -14,8 +14,10 @@ import { ProfileFixture } from "./profile_fixture.mjs";
 import { RebuildFixture } from "./rebuild_fixture.mjs";
 import { runRebuildCases } from "./rebuild_cases.mjs";
 import { runRebuildFaultCases } from "./rebuild_fault_cases.mjs";
+import { runAnchorPreflightCases } from "./anchor_preflight_cases.mjs";
 
-const [consumer, output, playwrightPath, executablePath] = process.argv.slice(2);
+const [consumer, output, playwrightPath, executablePath, suite = "all"] = process.argv.slice(2);
+if (!["all", "anchor-preflight"].includes(suite)) throw new Error("Unknown browser storage suite");
 const { chromium } = createRequire(import.meta.url)(playwrightPath);
 const report = { status: "RUNNING", cases: [], evidence: "real Chrome; dedicated persistent profile; ordinary records and real MLS with synthetic identities" };
 const mime = { ".html": "text/html", ".js": "text/javascript", ".wasm": "application/wasm", ".json": "application/json" };
@@ -32,6 +34,7 @@ const server = http.createServer(async (req, res) => {
 });
 let context;
 let anchor;
+let preflightAnchor;
 let profiles;
 let rebuild;
 async function save() { await fs.writeFile(path.join(output, "browser.json"), JSON.stringify(report, null, 2) + "\n"); }
@@ -95,15 +98,26 @@ try {
       console.log(name + ": " + report.cases.at(-1).status);
     },
   };
-  await runCases(kit);
-  await runCryptoCases(kit);
-  await runAnchorCases(kit);
-  await runAnchorResponseLossCases(kit);
-  await runAnchorFaultCases(kit);
-  await runAnchorRaceCases(kit);
-  await runRebuildCases(kit);
-  await runRebuildFaultCases(kit);
-  report.status = report.cases.every(c => c.status === "PASS") ? "PASS" : "FAIL";
+  if (suite === "all") {
+    await runCases(kit);
+    await runCryptoCases(kit);
+    await runAnchorCases(kit);
+    await runAnchorResponseLossCases(kit);
+    await runAnchorFaultCases(kit);
+    await runAnchorRaceCases(kit);
+    await runRebuildCases(kit);
+    await runRebuildFaultCases(kit);
+  }
+  if (suite === "all") {
+    // 各套件保留独立证据，避免累计账号耗尽模拟锚的 128 个 scope 上限。
+    await anchor.stop();
+    preflightAnchor = await AnchorFixture.start(path.join(output, "preflight"), origin);
+    await runAnchorPreflightCases({ ...kit, anchor: preflightAnchor });
+  } else {
+    await runAnchorPreflightCases(kit);
+  }
+  report.suite = suite;
+  report.status = report.cases.every(c => c.status === "PASS") ? (suite === "all" ? "PASS" : "PASS_PARTIAL") : "FAIL";
 } catch (error) { report.status = "FAIL"; report.error = String(error.stack ?? error); }
 finally {
   if (context) await context.close().catch(() => {});
@@ -111,6 +125,11 @@ finally {
     report.anchor = anchor.evidence;
     await anchor.stop().catch(() => {});
     report.anchor_files = await anchor.fileHashes().catch(() => null);
+  }
+  if (preflightAnchor) {
+    report.preflight_anchor = preflightAnchor.evidence;
+    await preflightAnchor.stop().catch(() => {});
+    report.preflight_anchor_files = await preflightAnchor.fileHashes().catch(() => null);
   }
   if (profiles) report.profile_copies = profiles.evidence;
   if (rebuild) {
@@ -120,4 +139,4 @@ finally {
   server.close();
   await save();
 }
-process.exitCode = report.status === "PASS" ? 0 : 1;
+process.exitCode = ["PASS", "PASS_PARTIAL"].includes(report.status) ? 0 : 1;
