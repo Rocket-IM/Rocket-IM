@@ -158,6 +158,7 @@ impl LockedDevice {
             "快照版本或设备上下文不匹配",
         )?;
         super::identity_state::validate(&state)?;
+        super::wire_terminal_reference::stored(&state)?;
         super::wire_reclaim_validate::validate(&state)?;
         super::wire_send_order::validate(&state)?;
         super::wire_reads::validate(&state)?;

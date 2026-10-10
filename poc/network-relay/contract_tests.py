@@ -137,6 +137,24 @@ class ContractTests(unittest.TestCase):
             self.assertIsNotNone(re.search(pattern, valid))
             self.assertIsNone(re.search(pattern, invalid))
 
+    def test_terminal_reference_capability_is_only_in_signed_pull_schema(self):
+        plain = SCHEMA["$defs"]["PullRequest"]
+        signed = SCHEMA["$defs"]["SignedPullRequest"]
+        self.assertNotIn("include_terminal_references", plain["properties"])
+        self.assertFalse(plain["additionalProperties"])
+        self.assertFalse(signed["additionalProperties"])
+        self.assertEqual(signed["required"], plain["required"])
+        self.assertEqual(signed["anyOf"], plain["anyOf"])
+        capability = signed["properties"]["include_terminal_references"]
+        self.assertEqual(capability["type"], "boolean")
+        self.assertIs(capability["default"], False)
+        self.assertEqual({key: value for key, value in signed["properties"].items()
+                          if key != "include_terminal_references"}, plain["properties"])
+        for operation, definition in (("pull_events", "PullRequest"), ("pull_events_signed", "SignedPullRequest")):
+            request = OPENAPI["paths"]["/v1/" + operation]["post"]["requestBody"]
+            self.assertEqual(request["content"]["application/json"]["schema"],
+                             {"$ref": "../realtime/message.schema.json#/$defs/" + definition})
+
     def test_source_references_and_operation_coverage(self):
         expected = {"/v1/" + name for name in contract.OPERATIONS}
         self.assertEqual(set(OPENAPI["paths"]), expected)

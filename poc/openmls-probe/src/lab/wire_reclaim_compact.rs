@@ -117,7 +117,12 @@ pub(super) fn apply(
             .insert(candidate.logical_key.clone(), candidate.clone());
     }
     for (seq, stored) in &state.wire_sync.slots {
-        let Some(event) = &stored.slot.event else {
+        let Some(event) = stored
+            .slot
+            .event
+            .as_ref()
+            .or(stored.slot.terminal_reference.as_ref())
+        else {
             continue;
         };
         let Some((id, kind)) = event_identity(event) else {

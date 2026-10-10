@@ -13,11 +13,14 @@ from .reclamation_preparation_support import local_plan, state
 def legacy(lab):
     check(getattr(lab, "legacy_binary", None) is not None, "该场景必须显式提供真实 build5 --legacy-binary")
     current = lab.binary
+    references = lab.include_terminal_references
     lab.binary = lab.legacy_binary
+    lab.include_terminal_references = False
     try:
         yield
     finally:
         lab.binary = current
+        lab.include_terminal_references = references
 
 
 def old_requests(lab, record, plan):

@@ -75,6 +75,13 @@ pub(super) struct Slot {
         skip_serializing_if = "Option::is_none"
     )]
     pub(super) event: Option<Event>,
+    // 已签终态槽仅补公开回执身份；不恢复事件可用性或消息载荷。
+    #[serde(
+        default,
+        deserialize_with = "present_event",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(super) terminal_reference: Option<Event>,
 }
 
 fn present_event<'de, D: serde::Deserializer<'de>>(

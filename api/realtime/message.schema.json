@@ -229,6 +229,49 @@
         }
       ]
     },
+    "SignedPullRequest": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "stream_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "after_seq": {
+          "$ref": "#/$defs/U64"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)(?![\\s\\S])"
+        },
+        "include_terminal_references": {
+          "type": "boolean",
+          "default": false,
+          "description": "仅显式true为已删除或到期的原送达/已读槽返回terminal_reference；缺省或false保持原匿名占位及原分页字节格式。旧客户端不得启用不认识的字段。"
+        }
+      },
+      "required": [
+        "service_id",
+        "after_seq",
+        "limit"
+      ],
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "stream_id"
+          ]
+        },
+        {
+          "properties": {
+            "after_seq": {
+              "const": "0"
+            }
+          }
+        }
+      ]
+    },
     "DeliveryRequest": {
       "type": "object",
       "properties": {
@@ -627,6 +670,10 @@
         },
         "event": {
           "$ref": "#/$defs/Event"
+        },
+        "terminal_reference": {
+          "$ref": "#/$defs/ReceiptEvent",
+          "description": "仅普通签名页在请求显式include_terminal_references=true时，为已删除或到期的原delivery/read槽提供公开归属；包含原type、acceptance_id、attempt_id及device，不含正文、信封或接受回执。参与完整页原字节签名与分页预算；不表示新送达、已读或权限恢复。普通未签名页与重建页不输出。"
         }
       },
       "required": [
@@ -651,6 +698,28 @@
             ]
           },
           "else": {
+            "not": {
+              "required": [
+                "event"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "terminal_reference"
+            ]
+          },
+          "then": {
+            "properties": {
+              "availability": {
+                "enum": [
+                  "deleted",
+                  "expired"
+                ]
+              }
+            },
             "not": {
               "required": [
                 "event"

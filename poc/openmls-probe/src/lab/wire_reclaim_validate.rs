@@ -214,9 +214,8 @@ pub(super) fn validate(state: &DeviceState) -> Result<(), LabError> {
                 }) && compacted.slots.values().any(|s| s.acceptance_id == message.acceptance_id && s.kind == "message")
                     && compacted.slots.iter().any(|(seq, fact)| fact.acceptance_id == message.acceptance_id
                         && fact.kind == "delivery" && state.wire_sync.slots.get(seq).is_some_and(|stored|
-                            matches!(&stored.slot.event, Some(super::wire_sync_types::Event::Delivery { attempt_id, device, .. })
-                                if attempt_id == &message.attempt_id && device.account_id == state.context.account && device.device_id == state.context.device)
-                                && stored.result.as_ref().is_some_and(|r| r["status"] == "receipt_recorded"))),
+                            matches!(super::wire_terminal_reference::processed_receipt(stored), Some(super::wire_sync_types::Event::Delivery { attempt_id, device, .. })
+                                if attempt_id == &message.attempt_id && device.account_id == state.context.account && device.device_id == state.context.device))),
                 "reclaim_state",
                 "紧凑收件不属于本机",
             )?;
@@ -320,6 +319,7 @@ pub(super) fn validate(state: &DeviceState) -> Result<(), LabError> {
                 .slot
                 .event
                 .as_ref()
+                .or(stored.slot.terminal_reference.as_ref())
                 .ok_or_else(|| LabError::new("reclaim_state", "紧凑回执或终态事件缺失"))?;
             ensure(
                 super::wire_reclaim_compact::event_identity(event)

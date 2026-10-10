@@ -2,6 +2,9 @@
 use super::*;
 use std::{fs, path::PathBuf};
 
+#[path = "identity_binding_tests.rs"]
+mod bindings;
+
 struct Fixture {
     root: PathBuf,
     public: Vec<Value>,

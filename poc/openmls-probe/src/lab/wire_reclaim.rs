@@ -158,7 +158,12 @@ pub(super) fn candidate(
     let mut message_slots = 0;
     let mut delivery_confirmed = false;
     for (seq, stored) in &state.wire_sync.slots {
-        let relevant = match &stored.slot.event {
+        let event = stored
+            .slot
+            .event
+            .as_ref()
+            .or(stored.slot.terminal_reference.as_ref());
+        let relevant = match event {
             Some(Event::Message { acceptance_id, .. })
             | Some(Event::Delivery { acceptance_id, .. })
             | Some(Event::Read { acceptance_id, .. })
@@ -182,7 +187,7 @@ pub(super) fn candidate(
             "reclaim_dependency",
             "目标存在隔离或等待",
         )?;
-        match &stored.slot.event {
+        match event {
             Some(Event::Message {
                 envelope: original, ..
             }) => {
@@ -210,9 +215,11 @@ pub(super) fn candidate(
                 attempt_id, device, ..
             }) if device.account_id == state.context.account
                 && device.device_id == state.context.device
-                && attempt_id == &header.attempt_id =>
+                && attempt_id == &header.attempt_id
+                && header.recipients.contains(device) =>
             {
-                delivery_confirmed |= result["status"] == "receipt_recorded";
+                delivery_confirmed |= super::wire_terminal_reference::processed_receipt(stored)
+                    .is_some_and(|receipt| Some(receipt) == event);
             }
             _ => {}
         }

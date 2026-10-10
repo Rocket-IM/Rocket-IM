@@ -14,6 +14,8 @@ mod history_import;
 mod history_state;
 mod history_transfer;
 mod identity_gate;
+#[cfg(test)]
+mod identity_init_tests;
 mod identity_preflight;
 mod identity_records;
 mod identity_session;
@@ -68,6 +70,7 @@ mod wire_reclaim;
 mod wire_reclaim_compact;
 mod wire_reclaim_preparation;
 mod wire_reclaim_recovery;
+mod wire_reclaim_refresh;
 #[cfg(test)]
 mod wire_reclaim_tests;
 mod wire_reclaim_types;
@@ -98,6 +101,7 @@ mod wire_stream_source;
 mod wire_stream_source_tests;
 mod wire_sync;
 mod wire_sync_types;
+mod wire_terminal_reference;
 #[cfg(test)]
 mod wire_tests;
 mod wire_types;
@@ -224,6 +228,26 @@ fn execute_session(input: &str, session: &mut Session) -> Result<Value, LabError
     for id in [&context.service, &context.account, &context.device] {
         codec::valid_id(id)?;
     }
+    // 旧宽标识快照仍可读取；新身份在创建目录、密钥或快照之前遵守公开身份契约。
+    if matches!(request.operation, Operation::Init)
+        && !checked(
+            "state_metadata",
+            request.directory.join("state.enc").try_exists(),
+        )?
+    {
+        codec::identity_context(&context)
+            .map_err(|error| LabError::new("invalid_id", error.message))?;
+    }
+    if matches!(
+        request.operation,
+        Operation::IdentityTrustObserve { .. }
+            | Operation::IdentityTrustPrepare { .. }
+            | Operation::IdentityTrustConfirm { .. }
+            | Operation::IdentityTrustReset { .. }
+            | Operation::DeviceRegistrationProve { .. }
+    ) {
+        codec::identity_context(&context)?;
+    }
     session.activate(request.directory.clone(), context.clone())?;
     let locked = LockedDevice::open(&request.directory)?;
     if let Some(path) = std::env::var_os("RIM_ROLLBACK_ANCHOR_CONFIG") {
@@ -246,7 +270,12 @@ fn execute_locked(
     }
     let state = match locked.load(&context)? {
         Some(state) => state,
-        None if matches!(request.operation, Operation::Init) => DeviceState::new(context)?,
+        None if matches!(request.operation, Operation::Init) => {
+            // 再核对持锁后的实际新建分支，文件存在性预检不能成为身份生成依据。
+            codec::identity_context(&context)
+                .map_err(|error| LabError::new("invalid_id", error.message))?;
+            DeviceState::new(context)?
+        }
         None => return Err(LabError::new("not_initialized", "设备尚未初始化")),
     };
     execute_state(locked, request, state, session)

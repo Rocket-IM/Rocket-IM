@@ -109,6 +109,11 @@ pub(super) fn validate(state: &DeviceState) -> Result<(), LabError> {
     let Some(stored) = &state.identity_trust else {
         return Ok(());
     };
+    validate_records(state, stored)
+}
+
+/// 保存前和加载时使用同一组不变量，避免成功写出下次无法加载的账本。
+pub(super) fn validate_records(state: &DeviceState, stored: &State) -> Result<(), LabError> {
     ensure(
         stored.version == 1,
         "identity_invalid",

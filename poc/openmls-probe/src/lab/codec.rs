@@ -37,6 +37,11 @@ pub(super) fn valid_id(value: &str) -> Result<(), LabError> {
     )
 }
 
+pub(super) fn identity_context(context: &Context) -> Result<(), LabError> {
+    crate::identity_trust::validate_ids(&context.service, &context.account, &context.device)
+        .map_err(Into::into)
+}
+
 pub(super) fn credential_context(credential: &Credential) -> Result<Context, LabError> {
     let basic = checked(
         "credential_type",

@@ -32,7 +32,12 @@ class PreparedRequest(dict):
 
 
 class ReclamationHTTP:
+    include_terminal_references = True
+
     def http(self, device, operation, fields, **options):
+        if operation == "pull_events_signed":
+            fields = dict(fields)
+            fields.setdefault("include_terminal_references", self.include_terminal_references)
         if operation == "confirm_reclaim" and isinstance(fields, PreparedRequest):
             options.setdefault("raw", fields.request_json.encode())
         return super().http(device, operation, fields, **options)

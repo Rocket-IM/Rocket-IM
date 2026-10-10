@@ -61,6 +61,7 @@ fn download_with_source(
     verified: bool,
 ) -> Result<Value, LabError> {
     super::wire_lifecycle::require_source(&events, verified)?;
+    super::wire_terminal_reference::preflight(state, &events, verified)?;
     id(&stream_id)?;
     ensure(
         !state.wire_sync.halted,
@@ -120,6 +121,7 @@ fn download_with_source(
         )?;
         previous = Some(seq);
         if let Some(old) = state.wire_sync.slots.get(&seq) {
+            super::wire_terminal_reference::overlap(&old.slot, slot)?;
             let conflict = old.slot.event_id != slot.event_id
                 || (slot.availability == Availability::Available
                     && old.slot.availability != Availability::Available)
@@ -192,6 +194,9 @@ fn download_with_source(
         if let Some(old) = state.wire_sync.slots.get_mut(&seq) {
             // 可用性单独投影；保留已存原始事件与成功去重，不覆盖业务记录。
             old.slot.availability = slot.availability;
+            if slot.terminal_reference.is_some() {
+                old.slot.terminal_reference = slot.terminal_reference;
+            }
         } else {
             state.wire_sync.slots.insert(
                 seq,

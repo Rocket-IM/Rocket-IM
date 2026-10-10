@@ -13,6 +13,22 @@ pub struct DeviceIdentity {
     pub signature_key: String,
 }
 
+pub(crate) fn validate_ids(
+    service: &str,
+    account: &str,
+    device: &str,
+) -> Result<(), PermissionError> {
+    for id in [service, account, device] {
+        types::id(id).map_err(|_| {
+            PermissionError::new(
+                "identity_invalid",
+                "设备标识必须是 1—64 个 ASCII 字母、数字、下划线或连字符",
+            )
+        })?;
+    }
+    Ok(())
+}
+
 impl DeviceIdentity {
     pub fn validate(&self) -> Result<(), PermissionError> {
         let invalid = |_| PermissionError::new("identity_invalid", "设备身份格式无效");
@@ -22,9 +38,7 @@ impl DeviceIdentity {
                 "设备身份版本不支持",
             ));
         }
-        for id in [&self.service_id, &self.account_id, &self.device_id] {
-            types::id(id).map_err(invalid)?;
-        }
+        validate_ids(&self.service_id, &self.account_id, &self.device_id)?;
         receipts::validate_key(&self.signature_key).map_err(invalid)?;
         Ok(())
     }

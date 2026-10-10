@@ -38,7 +38,7 @@ fn candidate(state: &DeviceState) -> stored::State {
     })
 }
 fn budget(state: &DeviceState, next: &stored::State) -> Result<(), LabError> {
-    stored::budget(next)?;
+    stored::validate_records(state, next)?;
     // 元数据预检与执行使用同一快照候选，不把账本上限误当全快照有空余。
     let mut encoded = checked("identity_invalid", serde_json::to_value(state))?;
     encoded["identity_trust"] = checked("identity_invalid", serde_json::to_value(next))?;
@@ -222,6 +222,21 @@ pub(super) fn preflight(
     operation: &Operation,
 ) -> Result<(), LabError> {
     match operation {
+        Operation::PermissionPinMember { member } => {
+            super::permission_admission::check_pin(state, member)?;
+        }
+        Operation::Authorize { authorization, .. } => {
+            let request = &authorization.request;
+            stored::binding_available(
+                state,
+                &stored::object(
+                    &request.service,
+                    &request.account,
+                    &request.new_device,
+                    &codec::encode(&request.new_signature_key),
+                ),
+            )?;
+        }
         Operation::IdentityTrustObserve { identity } => {
             observed(state, identity)?;
         }

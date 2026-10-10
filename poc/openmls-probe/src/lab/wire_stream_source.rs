@@ -91,6 +91,7 @@ fn verify(state: &DeviceState, page_bytes: &str, receipt: &SignedRecord) -> Resu
         "stream_page_range",
         "签页首槽或空页游标不对应已签起点",
     )?;
+    super::wire_terminal_reference::preflight(state, &page.events, true)?;
     Ok(page)
 }
 

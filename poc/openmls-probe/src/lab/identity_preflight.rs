@@ -29,6 +29,8 @@ pub(super) fn check(
             | Operation::IdentityTrustReset { .. }
             | Operation::IdentityTrustInspect { .. }
             | Operation::DeviceRegistrationProve { .. }
+            | Operation::PermissionPinMember { .. }
+            | Operation::Authorize { .. }
             | Operation::Create { .. }
             | Operation::Send { .. }
             | Operation::Remove { .. }

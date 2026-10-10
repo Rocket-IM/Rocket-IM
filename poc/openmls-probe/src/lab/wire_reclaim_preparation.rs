@@ -137,16 +137,22 @@ pub(super) fn prepare(
     wire_reclaim::source(state)?;
     wire_types::id(&plan_id)?;
     wire_reclaim::selection(&ids)?;
+    let mut refresh = None;
     if let Some(ledger) = &state.wire_reclamation {
         if let Some(prepared) = ledger.prepared.get(&plan_id) {
+            let original = Confirm::parse(&prepared.request_json)?;
             ensure(
-                Confirm::parse(&prepared.request_json)?.acceptance_ids == ids,
+                original.acceptance_ids == ids,
                 "reclaim_conflict",
                 "原计划ID不能改变准备选择",
             )?;
-            let mut result = output(&plan_id, prepared)?;
-            result["duplicate"] = json!(true);
-            return Ok(result);
+            if let Some(evidence) = super::wire_reclaim_refresh::evidence(state, &original)? {
+                refresh = Some((original, prepared.request_json.clone(), evidence));
+            } else {
+                let mut result = output(&plan_id, prepared)?;
+                result["duplicate"] = json!(true);
+                return Ok(result);
+            }
         }
         if let Some(plan) = ledger.plans.get(&plan_id) {
             let statement =
@@ -181,6 +187,9 @@ pub(super) fn prepare(
     };
     let mut result = output(&plan_id, &prepared)?;
     result["duplicate"] = json!(false);
+    if let Some((original, raw, evidence)) = refresh {
+        super::wire_reclaim_refresh::describe(&mut result, &original, &raw, evidence);
+    }
     let mut ledger = state.wire_reclamation.clone().unwrap_or_default();
     ledger.version = 2;
     ledger.prepared.insert(plan_id, prepared);

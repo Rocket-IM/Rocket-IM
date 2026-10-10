@@ -25,7 +25,7 @@ def pull_events(store, db, device, req):
     return event_page(store, db, device, req)
 
 
-def event_page(store, db, device, req, max_bytes=MAX_PAGE_BYTES):
+def event_page(store, db, device, req, max_bytes=MAX_PAGE_BYTES, terminal_references=False):
     """调用者先完成设备流授权；分页只投影同一事务内的连续事件。"""
     store.context(db, device, req["service_id"])
     stream_id = device["stream_id"]
@@ -57,6 +57,14 @@ def event_page(store, db, device, req, max_bytes=MAX_PAGE_BYTES):
         event = {"stream_id": stream_id, "event_seq": str(row["seq"]), "event_id": row["event_id"], "availability": row["availability"]}
         if row["availability"] == "available":
             event["event"] = json.loads(row["content"])
+        elif terminal_references and row["availability"] in {"deleted", "expired"}:
+            content = json.loads(row["content"])
+            if content["type"] in {"delivery", "read"}:
+                # 签页只证明原回执槽的公开归属，正文与原接受回执不会重新外发。
+                event["terminal_reference"] = {name: content[name] for name in
+                                               ("type", "acceptance_id", "attempt_id")}
+                event["terminal_reference"]["device"] = {name: content["device"][name] for name in
+                                                          ("account_id", "device_id")}
         event_size = len(encode_json(event))
         if events and page_size + event_size > max_bytes:
             break

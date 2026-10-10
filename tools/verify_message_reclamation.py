@@ -23,9 +23,12 @@ from network_poc.reclamation_faults import CASES as FAULT_CASES, ANCHOR_CASES
 from network_poc.reclamation_preparation_cases import CASES as PREPARATION_CASES
 from network_poc.reclamation_preparation_faults import ANCHOR_CASES as PREPARATION_ANCHOR_CASES
 from network_poc.reclamation_preparation_legacy import CASES as LEGACY_CASES
+from network_poc.reclamation_preparation_refresh import (CASES as REFRESH_CASES,
+                                                        ANCHOR_CASES as REFRESH_ANCHOR_CASES)
 
 CASES = MAIN_CASES + BOUNDARY_CASES + FAULT_CASES
-PREPARATION_CASES += LEGACY_CASES
+PREPARATION_CASES += LEGACY_CASES + REFRESH_CASES
+PREPARATION_ANCHOR_CASES += REFRESH_ANCHOR_CASES
 
 
 def digest(path):

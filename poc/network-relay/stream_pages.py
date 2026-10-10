@@ -13,7 +13,8 @@ from synchronization import event_page
 def pull_events_signed(store, db, device, req):
     authorize_operation(db, device, "pull_events_signed")
     require_receipts(store)
-    page = event_page(store, db, device, req, MAX_PAGE_BYTES - 512)
+    page = event_page(store, db, device, req, MAX_PAGE_BYTES - 512,
+                      terminal_references=req.get("include_terminal_references", False))
     raw = encode_json(page)
     if len(raw) > MAX_PAGE_BYTES:
         raise ProtocolError("resource_exhausted", "普通设备流原始页超过740KiB", status=429)

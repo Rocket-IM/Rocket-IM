@@ -1011,13 +1011,13 @@
     "/v1/pull_events_signed": {
       "post": {
         "operationId": "pull_events_signed",
-        "description": "普通设备流的签名分页，请求同 pull_events。Service 在同一事务读取已认证设备的流与连续槽，按原始 UTF-8 page_bytes 摘要签署实例、账号、设备、流、after_seq 和 limit；page_bytes 原字节最多 740 KiB。客户端必须使用先前固定的 Service 公钥校验来源与内容后才落盘；已固定公钥的客户端不能退回普通无签名页。没有签名配置返回 receipt_not_enabled，签名器故障返回 receipt_signer_unavailable；不返回无签名替代。此入口不证明全局新鲜度或独立锚状态，预先登记为重建后继的设备始终禁止使用，仍须走 pull_rebuild_events。 删除/到期首次终态变化为原目标消息槽追加message_availability事件；目标流由外层签页绑定，旧槽身份和接受事实不变。通知不代表清除已下载副本，不自动生成送达或已读；旧POC客户端不支持该事件时明确拒绝。TTL仍由成功请求事务触发，满事件配额时整事务明确失败，不静默丢通知。 请求游标低于已回收连续前缀时返回409/cursor_reclaimed及绑定原after_seq/limit、设备流的retention_receipt；客户端验签后明确停在缺口，不把它当作空页或跳跃授权。",
+        "description": "普通设备流的签名分页；在pull_events请求上可选include_terminal_references布尔值。仅显式true为删除/到期的原delivery/read槽附带最小公开terminal_reference，缺省或false保持原匿名占位和原分页字节格式；旧客户端保持缺省。普通未签名入口拒绝此字段，重建页不输出该字段。Service 在同一事务读取已认证设备的流与连续槽，按原始 UTF-8 page_bytes 摘要签署实例、账号、设备、流、after_seq 和 limit；page_bytes 原字节最多 740 KiB。客户端必须使用先前固定的 Service 公钥校验来源与内容后才落盘；已固定公钥的客户端不能退回普通无签名页。没有签名配置返回 receipt_not_enabled，签名器故障返回 receipt_signer_unavailable；不返回无签名替代。此入口不证明全局新鲜度或独立锚状态，预先登记为重建后继的设备始终禁止使用，仍须走 pull_rebuild_events。 删除/到期首次终态变化为原目标消息槽追加message_availability事件；目标流由外层签页绑定，旧槽身份和接受事实不变。通知不代表清除已下载副本，不自动生成送达或已读；旧POC客户端不支持该事件时明确拒绝。TTL仍由成功请求事务触发，满事件配额时整事务明确失败，不静默丢通知。 请求游标低于已回收连续前缀时返回409/cursor_reclaimed及绑定原after_seq/limit、设备流的retention_receipt；客户端验签后明确停在缺口，不把它当作空页或跳跃授权。",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "../realtime/message.schema.json#/$defs/PullRequest"
+                "$ref": "../realtime/message.schema.json#/$defs/SignedPullRequest"
               }
             }
           }

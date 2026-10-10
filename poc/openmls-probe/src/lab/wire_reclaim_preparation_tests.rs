@@ -3,6 +3,10 @@
 mod boundaries;
 #[path = "wire_reclaim_preparation_quota_tests.rs"]
 mod quotas;
+#[path = "wire_reclaim_refresh_tests.rs"]
+mod refresh;
+#[path = "wire_terminal_reference_tests.rs"]
+mod terminal_reference;
 
 use super::*;
 use crate::lab::{self, wire_send_order_test_support::alter_invalid};
@@ -63,7 +67,7 @@ fn prepared_only_reopens_with_original_request_bytes_and_processed_prefix() {
     assert!(recovery.get("duplicate").is_none());
     assert_eq!(bytes(&f, "B"), saved);
 
-    // 真签页推进P，重复投递回执不改变原准备绑定，也不把恢复当重新准备。
+    // 无关消息的真签页推进P不能证明原confirm无效，也不把恢复当重新准备。
     download(
         &f,
         &key,
@@ -71,7 +75,7 @@ fn prepared_only_reopens_with_original_request_bytes_and_processed_prefix() {
         vec![event(
             "B",
             4,
-            json!({"type":"delivery","acceptance_id":"K1",
+            json!({"type":"delivery","acceptance_id":"unrelated",
         "attempt_id":"P1","device":{"account_id":"B","device_id":"B"}}),
         )],
         3,

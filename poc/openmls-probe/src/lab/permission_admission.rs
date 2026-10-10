@@ -65,11 +65,11 @@ pub(super) struct AdmissionState {
     pub joined_epoch: Option<String>,
 }
 
-pub(super) fn pin(state: &mut DeviceState, member: Member) -> Result<Value, LabError> {
+pub(super) fn check_pin(state: &DeviceState, member: &Member) -> Result<(), LabError> {
     super::wire_types::id(&member.account_id)?;
     super::wire_types::id(&member.device_id)?;
     permission::receipts::validate_key(&member.signature_key)?;
-    check_key_binding(state, &member)?;
+    check_key_binding(state, member)?;
     ensure(
         member.account_id != state.context.account,
         "join_identity",
@@ -85,7 +85,8 @@ pub(super) fn pin(state: &mut DeviceState, member: Member) -> Result<Value, LabE
             "identity_changed",
             "独立身份 pin 不可改绑",
         )?;
-        return Ok(json!({"member":member,"reused":true}));
+        // 原 pin 是历史事实；精确重复读取不把退役身份重新授予核验或群权限。
+        return Ok(());
     }
     ensure(
         state.peer_pins.len() < 31,
@@ -101,6 +102,26 @@ pub(super) fn pin(state: &mut DeviceState, member: Member) -> Result<Value, LabE
         "identity_changed",
         "不同设备不能复用身份公钥",
     )?;
+    super::identity_state::binding_available(
+        state,
+        &super::identity_state::object(
+            &state.context.service,
+            &member.account_id,
+            &member.device_id,
+            &member.signature_key,
+        ),
+    )
+}
+
+pub(super) fn pin(state: &mut DeviceState, member: Member) -> Result<Value, LabError> {
+    check_pin(state, &member)?;
+    if state
+        .peer_pins
+        .iter()
+        .any(|old| old.account == member.account_id && old.device == member.device_id)
+    {
+        return Ok(json!({"member":member,"reused":true}));
+    }
     state.peer_pins.push(Pin {
         account: member.account_id.clone(),
         device: member.device_id.clone(),

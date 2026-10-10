@@ -224,7 +224,10 @@ def validate_request(operation, value):
             else:
                 validate_id(item, name)
     elif operation in {"pull_events", "pull_events_signed"}:
-        fields(value, ("service_id", "after_seq", "limit"), ("stream_id",))
+        optional = ("stream_id", "include_terminal_references") if operation == "pull_events_signed" else ("stream_id",)
+        fields(value, ("service_id", "after_seq", "limit"), optional)
+        if "include_terminal_references" in value and type(value["include_terminal_references"]) is not bool:
+            invalid("include_terminal_references 必须为布尔值")
         parse_u64(value["after_seq"], "after_seq")
         if "stream_id" in value:
             validate_id(value["stream_id"], "stream_id")
