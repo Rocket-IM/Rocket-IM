@@ -7,7 +7,7 @@ export interface CapacityBudget {
   readonly used: string; readonly limit: string; readonly hard_remaining: string;
 }
 export interface CapacityOperation {
-  readonly operation: string; readonly state: 'requires_input' | 'not_reserved' | 'blocked';
+  readonly operation: string; readonly state: 'requires_input' | 'not_reserved' | 'blocked' | 'bounded_ready';
   readonly blockers: readonly string[];
 }
 export interface CapacityBlocker {
@@ -15,7 +15,7 @@ export interface CapacityBlocker {
 }
 /** 单库逻辑快照。数字均为u64十进制字符串；观察ID不是执行许可。 */
 export interface Capacity {
-  readonly version: 'sdk-capacity-alpha1'; readonly owner: 'sdk'; readonly scope: Scope;
+  readonly version: 'sdk-capacity-alpha2'; readonly owner: 'sdk'; readonly scope: Scope;
   readonly observation_id: string; readonly consistency: 'single_sqlite_read'; readonly revision: string;
   readonly cursors: { readonly downloaded: string; readonly processed: string; readonly reported: string } | null;
   readonly recovery: {
@@ -24,7 +24,7 @@ export interface Capacity {
   };
   readonly budgets: readonly CapacityBudget[];
   readonly components: readonly { readonly category: string; readonly included_in: 'meta_bytes'; readonly bytes: string }[];
-  readonly reserve: { readonly state: 'not_implemented'; readonly protected_remaining: null; readonly ordinary_available: null };
+  readonly reserve: { readonly state: 'not_enabled' | 'bounded_ready'; readonly protected_remaining: null; readonly ordinary_available: null; readonly resources: readonly { readonly category: string; readonly protected_remaining: string; readonly ordinary_available: string }[]; readonly work: readonly { readonly kind: string; readonly count: string }[] };
   readonly operations: readonly CapacityOperation[]; readonly blockers: readonly CapacityBlocker[];
   readonly physical: { readonly state: 'unavailable'; readonly reserved: false };
   readonly remote: { readonly state: 'unavailable'; readonly reserved: false };
@@ -53,7 +53,7 @@ function unavailable(value: unknown): Capacity['physical'] {
 }
 export function capacity(value: unknown): Capacity {
   const v = exact(value, ['version','owner','scope','observation_id','consistency','revision','cursors','recovery','budgets','components','reserve','operations','blockers','physical','remote']);
-  if (v.version !== 'sdk-capacity-alpha1' || v.owner !== 'sdk' || v.consistency !== 'single_sqlite_read') return bad();
+  if (v.version !== 'sdk-capacity-alpha2' || v.owner !== 'sdk' || v.consistency !== 'single_sqlite_read') return bad();
   const observation = string(v.observation_id); if (!/^[0-9a-f]{64}$/.test(observation)) return bad();
   const own = scope(exact(v.scope, ['service','account','device']));
   let cursors: Capacity['cursors'] = null;
@@ -81,8 +81,24 @@ export function capacity(value: unknown): Capacity {
     return { category, included_in: c.included_in, bytes: count(c.bytes) };
   });
   unique(components.map(c => c.category)); if (components.length !== 4) return bad();
-  const reserve = exact(v.reserve, ['state','protected_remaining','ordinary_available']);
-  if (reserve.state !== 'not_implemented' || reserve.protected_remaining !== null || reserve.ordinary_available !== null) return bad();
+  const reserve = exact(v.reserve, ['state','protected_remaining','ordinary_available','resources','work']);
+  if ((reserve.state !== 'not_enabled' && reserve.state !== 'bounded_ready') || reserve.protected_remaining !== null || reserve.ordinary_available !== null) return bad();
+  const resources = list<Capacity['reserve']['resources'][number]>(reserve.resources, categories.length, raw => {
+    const r = exact(raw, ['category','protected_remaining','ordinary_available']);
+    const category = choice(r.category, categories), protectedRemaining = count(r.protected_remaining), available = count(r.ordinary_available);
+    const budget = budgets.find(b => b.category === category); if (!budget) return bad();
+    if (BigInt(protectedRemaining) + BigInt(available) !== BigInt(budget.hard_remaining)) return bad();
+    return { category, protected_remaining: protectedRemaining, ordinary_available: available };
+  });
+  unique(resources.map(r => r.category));
+  const kinds = ['candidate_install','send_settlement','known_control','known_report','target_install','backup_guard'];
+  const work = list<Capacity['reserve']['work'][number]>(reserve.work, kinds.length, raw => {
+    const w = exact(raw, ['kind','count']); const kind = choice(w.kind, kinds), total = count(w.count);
+    const max = ['candidate_install','target_install','backup_guard'].includes(kind) ? 1n : kind === 'send_settlement' ? 256n : 512n;
+    if (BigInt(total) > max) return bad(); return { kind, count: total };
+  });
+  unique(work.map(w => w.kind));
+  if (reserve.state === 'not_enabled' ? (resources.length !== 0 || work.length !== 0) : (resources.length !== categories.length || work.length !== kinds.length)) return bad();
   const blockers = list(v.blockers, 32, raw => {
     const b = exact(raw, ['code','resource','operations']);
     const operations = list(b.operations, operationNames.length, v => choice(v, operationNames)); unique(operations);
@@ -91,13 +107,17 @@ export function capacity(value: unknown): Capacity {
   });
   const operations = list<CapacityOperation>(v.operations, operationNames.length, raw => {
     const o = exact(raw, ['operation','state','blockers']), operation = choice(o.operation, operationNames);
-    if (o.state !== 'requires_input' && o.state !== 'not_reserved' && o.state !== 'blocked') return bad();
+    if (o.state !== 'requires_input' && o.state !== 'not_reserved' && o.state !== 'blocked' && o.state !== 'bounded_ready') return bad();
     const codes = list(o.blockers, reasons.length, v => choice(v, reasons)); unique(codes);
     const expected = new Set(blockers.filter(b => b.operations.includes(operation)).map(b => b.code));
     if ((o.state === 'blocked') !== (codes.length > 0) || codes.length !== expected.size || codes.some(c => !expected.has(c))) return bad();
+    if (o.state === 'bounded_ready') {
+      const kinds: Record<string,string> = {install_candidate:'candidate_install',retry_send:'send_settlement',process:'known_control',report:'known_report',authorized_recovery:'target_install'};
+      if (reserve.state !== 'bounded_ready' || !work.some(w => w.kind === kinds[operation] && BigInt(w.count) > 0n)) return bad();
+    }
     return { operation, state: o.state, blockers: codes };
   });
   unique(operations.map(o => o.operation)); if (operations.length !== operationNames.length) return bad();
   return { version: v.version, owner: v.owner, scope: own, observation_id: observation, consistency: v.consistency, revision: count(v.revision), cursors, recovery, budgets, components,
-    reserve: { state: reserve.state, protected_remaining: null, ordinary_available: null }, operations, blockers, physical: unavailable(v.physical), remote: unavailable(v.remote) };
+    reserve: { state: reserve.state, protected_remaining: null, ordinary_available: null, resources, work }, operations, blockers, physical: unavailable(v.physical), remote: unavailable(v.remote) };
 }

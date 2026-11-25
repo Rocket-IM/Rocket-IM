@@ -32,7 +32,7 @@ def observe(lab, label, global_scope=True):
         require({k:v for k,v in value.items() if k != 'observation_id'} == {k:v for k,v in again.items() if k != 'observation_id'}, 'same durable logical snapshot')
         require(value['scope'] == worker.options['scope'] and value['revision'] == states[i]['state']['revision'], 'local owner and revision')
         require(worker.call('events') == [], 'diagnosis publishes no change events')
-        require(value['reserve'] == {'state':'not_implemented','protected_remaining':None,'ordinary_available':None}, 'no invented reservation')
+        require(value['reserve'] == {'state':'not_enabled','protected_remaining':None,'ordinary_available':None,'resources':[],'work':[]}, 'no invented reservation')
         require(value['physical'] == value['remote'] == {'state':'unavailable','reserved':False}, 'no remote or disk promise')
         require(all(o['state'] != 'bounded_ready' for o in value['operations']), 'observation cannot grant execution')
         local.append(value)
@@ -61,7 +61,7 @@ def observe(lab, label, global_scope=True):
 def secret_samples(lab):
     lab.snapshot_secrets()
     # 诊断报告也作为公开输出单独扫描；令牌样本只留测试进程内存。
-    raw = json.dumps(lab.report.get('diagnostics',[])).encode()
+    raw = json.dumps({'diagnostics':lab.report.get('diagnostics',[]),'reserve':lab.report.get('reserve_observations',[])}).encode()
     samples = lab.texts+lab.tokens+lab.sessions+getattr(lab,'extra_secrets',[])+[lab.business_token,lab.other_token,lab.expired_token,lab.signing_key]
     require(all(sample.encode() not in raw for sample in samples), 'diagnostic output has no real secret sample')
     lab.report.setdefault('diagnostic_secret_scans',[]).append({'static_samples':len(samples),'matches':0})

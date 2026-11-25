@@ -4,6 +4,8 @@ mod auth;
 #[cfg(feature = "network")]
 mod auth_types;
 mod capacity;
+mod reserve;
+pub(in crate::persistent) use reserve::{install_receipt, project_known};
 mod ledger;
 pub(in crate::persistent) use capacity::capacity;
 mod rejection;
@@ -50,3 +52,6 @@ mod rejection_budget_tests;
 mod rejection_tests;
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, feature = "network"))]
+mod reserve_tests;

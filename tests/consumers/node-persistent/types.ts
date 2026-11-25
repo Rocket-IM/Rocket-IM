@@ -62,7 +62,7 @@ void authenticationTypes;
 async function backupTypes(device: PersistentDevice) {
   await device.disconnect();
   const info = await device.createBackup('/private/tmp/example.rimbackup');
-  const version: 1 = info.format; const digest: string = info.snapshot;
+  const version: 1 | 2 = info.format; const digest: string = info.snapshot;
   await device.close();
   await PersistentDevice.restoreBackup({path: '/private/tmp/original.db', scope: info.scope, keychain: '/private/tmp/dedicated.keychain-db'}, '/private/tmp/example.rimbackup');
   // @ts-expect-error 宿主不能注入数据库对象或导出密钥。
@@ -79,3 +79,13 @@ async function capacityTypes(device: import("@rocket-im/desktop-dev").Persistent
   return {revision, unavailable};
 }
 void capacityTypes;
+
+// 显式预留只由Rust持久化，宿主不提交额度或密码状态。
+async function reserveTypes(device: PersistentDevice) {
+  const result = await device.reserveCapacity({signal:new AbortController().signal});
+  const available: string | undefined = result.reserve.resources[0]?.ordinary_available;
+  // @ts-expect-error 宿主不能指定保护额度或跳过授权。
+  await device.reserveCapacity({is_recovery:true, bytes:100});
+  return available;
+}
+void reserveTypes;

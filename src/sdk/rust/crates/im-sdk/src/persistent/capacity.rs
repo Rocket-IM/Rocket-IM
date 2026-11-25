@@ -36,7 +36,7 @@ pub(super) fn snapshot(s: Saved) -> Result<Capacity> {
         None => "none",
     };
     let mut out = Capacity {
-        version: "sdk-capacity-alpha1".into(),
+        version: "sdk-capacity-alpha2".into(),
         owner: "sdk".into(),
         scope: s.data.state.scope.clone(),
         observation_id: observation_id(),
@@ -86,9 +86,11 @@ pub(super) fn snapshot(s: Saved) -> Result<Capacity> {
             component("legacy_bytes", optional_bytes(s.meta.legacy.as_ref())?),
         ],
         reserve: CapacityReserve {
-            state: "not_implemented".into(),
+            state: "not_enabled".into(),
             protected_remaining: None,
             ordinary_available: None,
+            resources: vec![],
+            work: vec![],
         },
         operations: vec![],
         blockers: vec![],
@@ -241,6 +243,27 @@ pub(super) fn snapshot(s: Saved) -> Result<Capacity> {
             state,
             blockers,
         });
+    }
+    if s.meta.reserve_version.is_some() {
+        let proof = super::reserve::prove(&s)?;
+        if !proof.fits() {
+            return Err(Error::paused("reserve_invalid"));
+        }
+        for op in &mut out.operations {
+            if op.blockers.is_empty()
+                && match op.operation.as_str() {
+                    "install_candidate" => proof.candidate,
+                    "retry_send" => proof.sends > 0,
+                    "process" => proof.controls > 0,
+                    "report" => proof.reports > 0,
+                    "authorized_recovery" => proof.recovery,
+                    _ => false,
+                }
+            {
+                op.state = CapacityOperationState::BoundedReady;
+            }
+        }
+        out.reserve = proof.public();
     }
     Ok(out)
 }

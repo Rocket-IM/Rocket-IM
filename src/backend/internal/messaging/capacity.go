@@ -41,9 +41,11 @@ type CapacityCursors struct {
 	PendingControl  string `json:"pending_control"`
 }
 type CapacityReserve struct {
-	State              string  `json:"state"`
-	ProtectedRemaining *string `json:"protected_remaining"`
-	OrdinaryAvailable  *string `json:"ordinary_available"`
+	State              string                     `json:"state"`
+	ProtectedRemaining *string                    `json:"protected_remaining"`
+	OrdinaryAvailable  *string                    `json:"ordinary_available"`
+	Resources          []CapacityReservedResource `json:"resources"`
+	Work               []CapacityReservedWork     `json:"work"`
 }
 type CapacityOperation struct {
 	Operation string   `json:"operation"`
@@ -53,4 +55,14 @@ type CapacityOperation struct {
 type CapacityUnavailable struct {
 	State    string `json:"state"`
 	Reserved bool   `json:"reserved"`
+}
+
+type CapacityReservedResource struct {
+	Category           string `json:"category"`
+	ProtectedRemaining string `json:"protected_remaining"`
+	OrdinaryAvailable  string `json:"ordinary_available"`
+}
+type CapacityReservedWork struct {
+	Kind  string `json:"kind"`
+	Count string `json:"count"`
 }

@@ -20,11 +20,15 @@ class DiagnosticsLab(CapacityLab):
 
     def command(self, args, cwd, label, env=None):
         if label == 'go-build' and self.old_service:
-            require(sha(OLD_SERVICE) == OLD_SHA, 'unchanged actual alpha.5 baseline')
-            shutil.copy2(OLD_SERVICE, self.root/'im-service')
-            self.report['upgrade_old_service'] = {'path': str(OLD_SERVICE), 'sha256': OLD_SHA}
+            source,digest=OLD_SERVICE,OLD_SHA
+            if self.old_service == 'reserve':
+                from reserve_upgrade import OLD_SERVICE as source, OLD_SHA as digest
+            version = 'alpha.6' if self.old_service == 'reserve' else 'alpha.5'
+            require(sha(source) == digest, 'unchanged actual '+version+' baseline')
+            shutil.copy2(source, self.root/'im-service')
+            self.report['upgrade_old_service'] = {'path': str(source), 'sha256': digest}
             log = self.run/'old-service-copy.log'
-            log.write_text('Verified actual alpha.5 executable copied into new isolated environment.\n')
+            log.write_text('Verified actual '+version+' executable copied into new isolated environment.\n')
             return log
         return super().command(args, cwd, label, env)
 
@@ -62,14 +66,14 @@ class DiagnosticsLab(CapacityLab):
         self.report['upgrade_new_service'] = {'version': report['service_version'], 'sha256': report['service_sha256']}
 
 
-def old_client(task, new):
+def old_client(task, new, key="dev10"):
     fingerprint = json.loads((new/'report.json').read_text())['signing']['certificate_sha1']
     matches = []
     for path in Path(task).glob('*-signer.json'):
         record = json.loads(path.read_text())
-        if record.get('status') == 'PASS_SCOPED' and record.get('certificate_sha1') == fingerprint and record.get('dev10'):
-            matches.append(record['dev10'])
-    require(len(matches) == 1, 'one same-signer verified dev.10 baseline')
+        if record.get('status') == 'PASS_SCOPED' and record.get('certificate_sha1') == fingerprint and record.get(key):
+            matches.append(record[key])
+    require(len(matches) == 1, 'one same-signer verified '+key+' baseline')
     release = Path(matches[0]['release'])
     report = json.loads((release/'report.json').read_text())
     require(report['archive_sha256'] == matches[0]['archive_sha256'] == sha(Path(report['archive'])), 'exact copied old package')

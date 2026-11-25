@@ -33,7 +33,7 @@ def build(destination, existing_client=None, verified_client=None):
             assert all(sha(prior/'source'/name)==digest for name,digest in original['source_before'].items())
             if verified_client:
                 assert original['source_before']==original['source_after']==original['frozen_source_after']
-                assert json.loads((prior/'package/package.json').read_text())['version']=='0.2.0-dev.11'
+                assert json.loads((prior/'package/package.json').read_text())['version']=='0.2.0-dev.12'
                 assert all(sha(ROOT/name)==digest for name,digest in original['source_before'].items())
                 assert json.loads((prior/'package/artifact.json').read_text())['sourceSha256']==original['source_before']
                 report['new_client_verified']=True
@@ -64,10 +64,10 @@ def build(destination, existing_client=None, verified_client=None):
         binary=destination/'im-service'
         with (destination/'service-build.log').open('wb') as out:
             subprocess.run([ROOT/'dist/toolchains/go/bin/go','build','-trimpath','-o',binary,'./cmd/im-service'],cwd=source/'src/backend',env=env,stdout=out,stderr=subprocess.STDOUT,check=True,timeout=120)
-        assert subprocess.check_output([binary,'-version'],text=True).strip()=='0.1.0-alpha.6'
+        assert subprocess.check_output([binary,'-version'],text=True).strip()=='0.1.0-alpha.7'
         assert b'ROCKET_IM_TEST_' not in binary.read_bytes()
         assert inputs==all_hashes(source) and all_hashes(BASE/'package')==before and sha(Path(old['archive']))==BASE_SHA
-        report.update(status='PASS_SCOPED',source_files=inputs,service_version='0.1.0-alpha.6',service_sha256=sha(binary),client=str(client),client_archive_sha256=sha(archive),historical_preserved=True)
+        report.update(status='PASS_SCOPED',source_files=inputs,service_version='0.1.0-alpha.7',service_sha256=sha(binary),client=str(client),client_archive_sha256=sha(archive),historical_preserved=True)
     except Exception as error:
         report.update(status='FAIL',error=str(error),trace=traceback.format_exc())
     finally:

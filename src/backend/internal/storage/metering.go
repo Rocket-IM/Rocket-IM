@@ -5,7 +5,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 原生产限额的单一来源。诊断不降低准入，也不建立预留。
+// 原生产限额的单一来源。诊断与有限预留使用同一原限额。
 const messageLimit = 256
 const businessRequestLimit = 4096
 const recoveryRoundLimit = 16

@@ -19,7 +19,7 @@ func capacityFixture() map[string]any {
 	for _, name := range []string{"new_send", "retry_send", "export", "import", "renew_credential", "revoke_credential", "new_recovery"} {
 		operations = append(operations, map[string]any{"operation": name, "state": "requires_input", "blockers": []string{}})
 	}
-	return map[string]any{"version": "service-capacity-alpha1", "owner": "service", "observation_id": strings.Repeat("a", 64), "consistency": "single_pg_read", "scope": map[string]any{"service": "service", "conversation": "chat", "access": "service", "account": nil, "device": nil, "principal": "operator"}, "schema": "5", "budgets": budgets, "cursors": nil, "recovery": "none", "reserve": map[string]any{"state": "not_implemented", "protected_remaining": nil, "ordinary_available": nil}, "operations": operations, "physical": map[string]any{"state": "unavailable", "reserved": false}, "remote": map[string]any{"state": "unavailable", "reserved": false}}
+	return map[string]any{"version": "service-capacity-alpha2", "owner": "service", "observation_id": strings.Repeat("a", 64), "consistency": "single_pg_read", "scope": map[string]any{"service": "service", "conversation": "chat", "access": "service", "account": nil, "device": nil, "principal": "operator"}, "schema": "5", "budgets": budgets, "cursors": nil, "recovery": "none", "reserve": map[string]any{"state": "not_enabled", "protected_remaining": nil, "ordinary_available": nil, "resources": []any{}, "work": []any{}}, "operations": operations, "physical": map[string]any{"state": "unavailable", "reserved": false}, "remote": map[string]any{"state": "unavailable", "reserved": false}}
 }
 func TestCapacityStrictLosslessReadOnlyContract(t *testing.T) {
 	cases := map[string]func(map[string]any){
@@ -66,5 +66,34 @@ func TestCapacityStrictLosslessReadOnlyContract(t *testing.T) {
 				t.Fatal("invalid response accepted")
 			}
 		})
+	}
+}
+
+func TestCapacityReservedResourcesAndStrictNestedFields(t *testing.T) {
+	fixture := capacityFixture()
+	fixture["schema"] = "6"
+	fixture["reserve"] = map[string]any{"state": "bounded_ready", "protected_remaining": nil, "ordinary_available": nil, "resources": []any{map[string]any{"category": "reconciliation_row_bytes", "protected_remaining": "0", "ordinary_available": "10"}}, "work": []any{map[string]any{"kind": "known_control_report", "count": "1"}}}
+	// Match the fixture's actual hard remainder rather than duplicate the accounting algorithm.
+	raw, _ := json.Marshal(fixture)
+	var capacity Capacity
+	_ = json.Unmarshal(raw, &capacity)
+	for _, b := range capacity.Budgets {
+		if b.Category == "reconciliation_row_bytes" {
+			fixture["reserve"].(map[string]any)["resources"].([]any)[0].(map[string]any)["ordinary_available"] = *b.HardRemaining
+		}
+	}
+	raw, _ = json.Marshal(fixture)
+	_ = json.Unmarshal(raw, &capacity)
+	if !capacityFields(raw) || !capacity.valid("service") {
+		t.Fatal("valid persisted reserve rejected")
+	}
+	for _, key := range []string{"resources", "work"} {
+		copy := map[string]any{}
+		_ = json.Unmarshal(raw, &copy)
+		copy["reserve"].(map[string]any)[key].([]any)[0].(map[string]any)["unexpected"] = true
+		invalid, _ := json.Marshal(copy)
+		if capacityFields(invalid) {
+			t.Fatal("unknown nested field accepted", key)
+		}
 	}
 }

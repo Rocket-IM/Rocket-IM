@@ -118,8 +118,16 @@ Service `0.1.0-alpha.5`新增005迁移（schema5）和显式离线对账，本�
 复跑使用`python3 tools/platform_release/service_capacity.py verify <task-root> <frozen-service-release> <new-label> baseline|overflow|large-local|recovery|renewal|lifecycle|successor|unknown`，baseline顺序执行两个独立新label。装置通过公开SDK驱动真实包，创建新隔离PG/TLS及专用钥匙串，结束后清理所属进程/PG并锁定钥匙串；不扩额、清库或淘汰幂等事实。64MiB导出文件预算与256MiB完整状态行JSON读取预算分别验证，维护摘要不是数据备份。
 
 
-## 只读容量诊断
+## 只读容量诊断（alpha.6历史）
 
 Service `0.1.0-alpha.6`增加 `GET /v1/capacity`（设备自身固定会话/同步范围）和 `GET /v1/business/capacity`（显式全局计量权限）；无query、正文或请求号。两者都使用原Bearer鉴权、维护门与受控只读事务，返回 `Cache-Control: no-store`。业务Go SDK `v0.1.0-alpha.2`提供 `Capacity(ctx)`，全局接口要求对应principal在新实例初始化前配置 `capacity_read: true`；默认普通业务返回forbidden。未配置保持旧配置摘要，不能向已登记旧实例直接添加权限来绕过配置对账。
 
-用量/硬余量不代表持久预留或执行成功，reserve固定not_implemented、受保护余量与普通可用量为null。SDK/Service无跨库原子快照；64MiB最终导出与256MiB行JSON对账分开，schema5旧导出行预检标not_applied。实际计量、超限含义及兼容验证见[Service第11节](../docs/服务备份恢复.md#service-capacity-readonly-20261125)。迁移001—005及普通准入/限额保持；Windows、生产与分发仍未验收/批准。
+该alpha.6诊断轮的用量/硬余量不代表持久预留或执行成功，reserve固定not_implemented、受保护余量与普通可用量为null。SDK/Service无跨库原子快照；64MiB最终导出与256MiB行JSON对账分开，schema5旧导出行预检标not_applied。实际计量、超限含义及兼容验证见[Service第11节](../docs/服务备份恢复.md#service-capacity-readonly-20261125)。迁移001—005及普通准入/限额保持；Windows、生产与分发仍未验收/批准。
+
+## 已知控制报告有限预留（alpha.7）
+
+本地`known-v1`只保护已持久、连续且位于下一个message之前的delivered/unavailable报告。先正常停服并确认原维护记录sealed且已启用外部对账，再用相同配置执行`im-service -config <原配置> -operation enable-capacity-reserve`；成功后按原入口启动。006迁移将schema5显式升级至6，不会自动启用或降级，旧Service将拒载；重复操作幂等。每次原受控事务在外部候选预约前核验全部已用行JSON与剩余增长，超额返回`capacity_reserved`且回滚。
+
+新`service-capacity-alpha2`的`reserve.state`为not_enabled或bounded_ready。Go SDK alpha.3仅封装只读查询，启用仍须离线维护；全局查询仍要求原`capacity_read:true`权限，设备仅见自身范围。配置摘要、原鉴权、未知提交/撤销/恢复门禁和256/4096/16、64MiB导出、256MiB对账限额保持。认证续期/撤销、未来消息、后继材料、完整导出和磁盘未预约，也没有SDK/Service共同工作集完成保证。
+
+客户端dev.12单独调用`reserveCapacity()`启用v6及格式2备份；两端启用不是跨库原子操作。构建和复跑仍使用原`persistent_network.py build-reserve`、`service_backup.py build-new-client`及`service_capacity.py verify ... reserve|reserve-full|reserve-upgrade|reserve-upgrade-full`。完整范围与证据见[Service第12节](../docs/服务备份恢复.md#service-capacity-known-20261125)。

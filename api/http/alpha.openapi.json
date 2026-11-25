@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Rocket-IM fixed-device Alpha",
-    "version": "alpha1",
+    "version": "0.1.0-alpha.7",
     "description": "仅本机开发验收。两个显式配置设备，单会话E2EE；TLS1.3，独立公钥核验，设备Bearer凭证不建立E2EE信任。 successor-alpha1增加设备鉴权下的recovery_reserve/recovery_query/recovery_publish；转交不代替端侧签名、信任或双方批准。schema3保留旧接受与信箱事实，旧消息不可解密终态与delivered分离。 Service 0.1.0-alpha.4新增schema4与service-backup-alpha1离线维护CLI；HTTP/WSS契约不变。受控恢复要求停服、原配置/身份/秘密和独立维护记录一致；过旧、未封存或错目标明确拒绝，不提供HTTP备份或通用管理员解密。 Service 0.1.0-alpha.6增加service-capacity-alpha1只读容量查询，不改既有准入/持久格式。"
   },
   "servers": [

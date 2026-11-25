@@ -51,6 +51,7 @@ enum Operation {
     },
     State,
     Capacity,
+    ReserveCapacity,
     CreateBackup {
         path: PathBuf,
     },
@@ -144,6 +145,7 @@ fn execute(
         Operation::NetworkUnavailable { sequence } => json!(device.network_unavailable(sequence)?),
         Operation::State => json!(device.state()?),
         Operation::Capacity => json!(device.capacity()?),
+        Operation::ReserveCapacity => json!(device.reserve_capacity()?),
         Operation::CreateBackup { path } => {
             if network.is_some() {
                 return Err(error("backup_disconnect_required", false));

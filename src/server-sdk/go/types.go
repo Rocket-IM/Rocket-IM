@@ -3,7 +3,7 @@ package rocketim
 
 import "time"
 
-const Version = "v0.1.0-alpha.2"
+const Version = "v0.1.0-alpha.3"
 
 // UserRequest 的RequestID由业务后台持久保存。超时后必须使用相同ID和原参数重试。
 // ExternalUser来自已经验证的业务登录上下文，不能取自未经授权的客户端账号字段。

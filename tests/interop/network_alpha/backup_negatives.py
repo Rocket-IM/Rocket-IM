@@ -24,7 +24,7 @@ def run(lab):
     lab.case('truncated_corrupt_empty_oversized_symlink_relative_missing_backup_rejection',malformed)
     def version():
         path=lab.root/'wrong-version.rimbackup'
-        fault=BackupFault(lab,0,'none',extra={'ROCKET_IM_TEST_BACKUP_VERSION':'2'})
+        fault=BackupFault(lab,0,'none',extra={'ROCKET_IM_TEST_BACKUP_VERSION':'3'})
         try:fault.call({'op':'create_backup','path':str(path)})
         finally:fault.close()
         lab.restore(0);lab.roundtrip(0,path,expected='backup_format_unsupported')

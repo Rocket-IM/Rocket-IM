@@ -106,6 +106,9 @@ func (t *evidencedTransaction) Commit(ctx context.Context) error {
 	defer t.Tx.Rollback(ctx)
 	s, g := t.store, t.store.maintenance
 	if t.writable {
+		if e := s.checkKnownReserve(ctx, t.Tx); e != nil {
+			return e
+		}
 		data, e := evidenceSnapshot(ctx, t.Tx)
 		if e != nil {
 			return e

@@ -2209,7 +2209,7 @@ dependencies = [
 
 [[package]]
 name = "rocket-im-desktop-runtime"
-version = "0.2.0-dev.11"
+version = "0.2.0-dev.12"
 dependencies = [
  "rocket-im-sdk",
  "serde",

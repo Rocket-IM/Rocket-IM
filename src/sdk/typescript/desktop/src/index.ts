@@ -169,13 +169,25 @@ export class PersistentDevice {
   history(query: T.HistoryQuery, options?: T.CallOptions): Promise<T.HistoryPage> {
     return this.#call({ op: 'history', query }, v.history, options);
   }
-  /** 同一SQLite读事务的容量观察；没有受保护余量，不代表后续操作必成功。 */
+  /** 同一SQLite读事务观察；容量状态不授予操作权限。 */
   async capacity(options?: T.CallOptions): Promise<Capacity> {
     if (this.#closing) throw new SdkError('closed');
     if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options) ||
         Object.keys(options).some(key => key !== 'signal') ||
         (options.signal !== undefined && !(options.signal instanceof AbortSignal)))) throw new SdkError('invalid_options');
     return this.#call({ op: 'capacity' }, data => {
+      const result = capacity(data);
+      if (!v.sameScope(result.scope, this.#scope)) throw new SdkError('scope_mismatch', true);
+      return result;
+    }, options);
+  }
+  /** 显式启用known-v1本地有限预留并升级v6；旧包拒载。取消不撤销已提交的启用。 */
+  async reserveCapacity(options?: T.CallOptions): Promise<Capacity> {
+    if (this.#closing) throw new SdkError('closed');
+    if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options) ||
+        Object.keys(options).some(key => key !== 'signal') ||
+        (options.signal !== undefined && !(options.signal instanceof AbortSignal)))) throw new SdkError('invalid_options');
+    return this.#call({ op: 'reserve_capacity' }, data => {
       const result = capacity(data);
       if (!v.sameScope(result.scope, this.#scope)) throw new SdkError('scope_mismatch', true);
       return result;

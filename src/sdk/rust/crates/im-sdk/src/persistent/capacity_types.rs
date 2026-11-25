@@ -24,12 +24,28 @@ pub struct CapacityReserve {
     pub state: String,
     pub protected_remaining: Option<String>,
     pub ordinary_available: Option<String>,
+    pub resources: Vec<CapacityReservedResource>,
+    pub work: Vec<CapacityReservedWork>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapacityReservedResource {
+    pub category: String,
+    pub protected_remaining: String,
+    pub ordinary_available: String,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapacityReservedWork {
+    pub kind: String,
+    pub count: String,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CapacityOperationState {
     RequiresInput,
     NotReserved,
+    BoundedReady,
     Blocked,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://rocket-im.invalid/http/capacity.schema.json",
-  "description": "同一受控RepeatableRead读事务的只读容量观察；无持久预留、无跨库快照、无执行许可。schema5导出使用256MiB证据读取后校验完整64MiB编码；旧64MiB-64KiB行预检单列not_applied。 未启用Evidence时对账预算enforcement=not_applied；此时limit/差额仅为该能力参考阈值，非当前准入额度。",
+  "description": "同一受控读事务的容量观察；schema6显式保护已知控制报告的256MiB对账行JSON余量。设备只读自身工作数，不暴露全主体余量；capacity_read主体可读全局。逻辑余量不是权限、远端或物理保证，64MiB导出没有预留。",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,7 +22,7 @@
   "properties": {
     "version": {
       "enum": [
-        "service-capacity-alpha1"
+        "service-capacity-alpha2"
       ]
     },
     "owner": {
@@ -45,7 +45,8 @@
     "schema": {
       "enum": [
         "4",
-        "5"
+        "5",
+        "6"
       ]
     },
     "budgets": {
@@ -321,12 +322,15 @@
       "required": [
         "state",
         "protected_remaining",
-        "ordinary_available"
+        "ordinary_available",
+        "resources",
+        "work"
       ],
       "properties": {
         "state": {
           "enum": [
-            "not_implemented"
+            "not_enabled",
+            "bounded_ready"
           ]
         },
         "protected_remaining": {
@@ -334,6 +338,50 @@
         },
         "ordinary_available": {
           "type": "null"
+        },
+        "resources": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "category",
+              "protected_remaining",
+              "ordinary_available"
+            ],
+            "properties": {
+              "category": {
+                "const": "reconciliation_row_bytes"
+              },
+              "protected_remaining": {
+                "$ref": "#/$defs/Decimal"
+              },
+              "ordinary_available": {
+                "$ref": "#/$defs/Decimal"
+              }
+            }
+          }
+        },
+        "work": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "count"
+            ],
+            "properties": {
+              "kind": {
+                "const": "known_control_report"
+              },
+              "count": {
+                "$ref": "#/$defs/Decimal"
+              }
+            }
+          }
         }
       }
     },

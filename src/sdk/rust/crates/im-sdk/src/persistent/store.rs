@@ -109,9 +109,9 @@ impl Store {
             let version: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
             if app != APP_ID
                 || (if protected {
-                    !matches!(version, 3..=5)
+                    !matches!(version, 3..=6)
                 } else {
-                    !matches!(version, 1 | 2 | 5)
+                    !matches!(version, 1 | 2 | 5 | 6)
                 })
             {
                 return Err(Error::paused("store_format_unsupported"));
@@ -161,9 +161,10 @@ impl Store {
                 super::checkpoint("before_migration_commit");
             }
             let saved = load(&tx, &scope)?;
-            if (version == 5) != saved.data.has_rejections()
+            if (version == 6) != saved.meta.reserve_version.is_some()
+                || (version != 6 && (version == 5) != saved.data.has_rejections())
                 || (!protected && saved.meta.backup_guard.is_some())
-                || (version != 5 && (version == 4) != saved.meta.backup_guard.is_some())
+                || (version < 5 && (version == 4) != saved.meta.backup_guard.is_some())
             {
                 return Err(Error::paused("store_invalid"));
             }
@@ -281,7 +282,11 @@ impl Store {
         if let Some(p) = &self.protection {
             p.check_progress(&saved)?;
         }
+        let reserve_before = saved.meta.reserve_version.clone();
         let value = f(&mut saved)?;
+        if reserve_before.is_some() && saved.meta.reserve_version != reserve_before {
+            return Err(Error::paused("reserve_changed"));
+        }
         write(&tx, &saved)?;
         #[cfg(feature = "protected-storage")]
         if let Some(p) = &self.protection {
@@ -368,6 +373,7 @@ pub(super) fn digest(saved: &Saved) -> Result<String> {
 pub(super) fn write(tx: &Transaction<'_>, saved: &Saved) -> Result<()> {
     saved.data.validate(&saved.crypto)?;
     saved.meta.validate(&saved.data, &saved.crypto)?;
+    super::reserve::check(saved)?;
     let measured = EncodedSaved::new(saved)?;
     let meta = measured.meta;
     if meta.len() > MAX_META {
@@ -379,7 +385,12 @@ pub(super) fn write(tx: &Transaction<'_>, saved: &Saved) -> Result<()> {
     }
     let digest = hash(&[data.as_slice(), saved.crypto.as_slice(), meta.as_slice()].concat());
     // 首个终态和格式门禁在同一提交中生效；旧包必须拒绝，不能误读已压缩的消息投影。
-    if saved.data.has_rejections() {
+    if saved.meta.reserve_version.is_some() {
+        let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
+        if app == APP_ID {
+            tx.execute_batch("PRAGMA user_version=6;")?;
+        }
+    } else if saved.data.has_rejections() {
         let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
         if app == APP_ID {
             tx.execute_batch("PRAGMA user_version=5;")?;

@@ -123,39 +123,12 @@ impl PersistentDevice {
         mut saved: Saved,
         packet: String,
     ) -> Result<RecoveryResult> {
-        let s = session(&saved)?;
-        if !s.target {
-            return Err(Error::new("recovery_role_mismatch"));
-        }
-        let Body::Commit {
-            context,
-            ready_hash,
-        } = wire::parse(&packet, &s.offer.peer)?
-        else {
-            return Err(Error::new("invalid_recovery_material"));
-        };
-        if context != s.offer.context()?
-            || s.ready
-                .as_ref()
-                .is_none_or(|r| hash(r.as_bytes()) != ready_hash)
-        {
-            return Err(Error::new("recovery_material_conflict"));
-        }
-        if s.phase == RecoveryPhase::Finished {
-            return if s.receipt.as_ref() == Some(&packet) {
-                s.result()
-            } else {
-                Err(Error::new("recovery_material_conflict"))
-            };
-        }
-        if s.phase != RecoveryPhase::Ready {
-            return Err(Error::paused("recovery_not_ready"));
-        }
         let base = operations::fingerprint(&saved)?;
-        let s = session_mut(&mut saved)?;
-        s.receipt = Some(packet);
-        s.phase = RecoveryPhase::Finished;
-        install(&mut saved)?;
+        let already_finished = session(&saved)?.phase == RecoveryPhase::Finished;
+        saved = finished(saved, packet)?;
+        if already_finished {
+            return session(&saved)?.result();
+        }
         self.save_recovery(base, saved, true, "recovery_after_finish")
     }
     pub(super) fn close_recovery(
@@ -244,4 +217,41 @@ fn install(saved: &mut Saved) -> Result<()> {
     });
     saved.crypto = crypto;
     Ok(())
+}
+
+/// 只安装已有Ready候选与可核验的同轮commit；预留与执行共用转换。
+pub(super) fn finished(mut saved: Saved, packet: String) -> Result<Saved> {
+    let s = session(&saved)?;
+    if !s.target {
+        return Err(Error::new("recovery_role_mismatch"));
+    }
+    let Body::Commit {
+        context,
+        ready_hash,
+    } = wire::parse(&packet, &s.offer.peer)?
+    else {
+        return Err(Error::new("invalid_recovery_material"));
+    };
+    if context != s.offer.context()?
+        || s.ready
+            .as_ref()
+            .is_none_or(|r| hash(r.as_bytes()) != ready_hash)
+    {
+        return Err(Error::new("recovery_material_conflict"));
+    }
+    if s.phase == RecoveryPhase::Finished {
+        return if s.receipt.as_ref() == Some(&packet) {
+            Ok(saved)
+        } else {
+            Err(Error::new("recovery_material_conflict"))
+        };
+    }
+    if s.phase != RecoveryPhase::Ready {
+        return Err(Error::paused("recovery_not_ready"));
+    }
+    let s = session_mut(&mut saved)?;
+    s.receipt = Some(packet);
+    s.phase = RecoveryPhase::Finished;
+    install(&mut saved)?;
+    Ok(saved)
 }

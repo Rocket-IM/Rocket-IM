@@ -89,7 +89,11 @@ impl Store {
         let key = p.encryption_key()?;
         let manifest = Manifest {
             info: BackupInfo {
-                format: 1,
+                format: if saved.meta.reserve_version.is_some() {
+                    2
+                } else {
+                    1
+                },
                 backup_id: files::random_id()?,
                 scope: self.scope.clone(),
                 revision: saved.data.state.revision.clone(),

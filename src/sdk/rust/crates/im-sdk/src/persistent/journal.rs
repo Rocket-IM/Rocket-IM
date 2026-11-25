@@ -156,12 +156,7 @@ impl PersistentDevice {
             return Err(Error::paused("store_invalid"));
         };
         let outcome = outcome.clone();
-        let mut next = Saved {
-            data: candidate.data,
-            crypto: candidate.crypto,
-            meta: saved.meta,
-        };
-        next.meta.journal = None;
+        let next = installed(&saved)?;
         self.compare_write(base, next, true)
             .map_err(|e| protection_error(e, "commit_unknown"))?;
         Ok(outcome)
@@ -188,4 +183,21 @@ fn protection_error(error: Error, fallback: &str) -> Error {
     } else {
         Error::paused(fallback)
     }
+}
+
+/// 与真实安装共用完整状态转换；只移动已持久候选，不执行原密码输入。
+pub(super) fn installed(saved: &Saved) -> Result<Saved> {
+    let candidate = saved
+        .meta
+        .journal
+        .as_ref()
+        .and_then(|j| j.candidate.as_ref())
+        .ok_or_else(|| Error::paused("successor_required"))?;
+    let mut next = Saved {
+        data: candidate.data.clone(),
+        crypto: candidate.crypto.clone(),
+        meta: saved.meta.clone(),
+    };
+    next.meta.journal = None;
+    Ok(next)
 }

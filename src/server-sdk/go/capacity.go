@@ -53,8 +53,21 @@ func capacityFields(raw json.RawMessage) bool {
 			return false
 		}
 	}
-	if !exactFields(v["scope"], "service", "conversation", "access", "account", "device", "principal") || !exactFields(v["reserve"], "state", "protected_remaining", "ordinary_available") {
+	if !exactFields(v["scope"], "service", "conversation", "access", "account", "device", "principal") || !exactFields(v["reserve"], "state", "protected_remaining", "ordinary_available", "resources", "work") {
 		return false
+	}
+	var reservation map[string]json.RawMessage
+	_ = json.Unmarshal(v["reserve"], &reservation)
+	for key, fields := range map[string][]string{"resources": {"category", "protected_remaining", "ordinary_available"}, "work": {"kind", "count"}} {
+		var list []json.RawMessage
+		if json.Unmarshal(reservation[key], &list) != nil || list == nil {
+			return false
+		}
+		for _, item := range list {
+			if !exactFields(item, fields...) {
+				return false
+			}
+		}
 	}
 	var budgets, operations []json.RawMessage
 	if json.Unmarshal(v["budgets"], &budgets) != nil || json.Unmarshal(v["operations"], &operations) != nil {
@@ -73,7 +86,7 @@ func capacityFields(raw json.RawMessage) bool {
 	return true
 }
 func (c Capacity) valid(service string) bool {
-	if c.Version != "service-capacity-alpha1" || c.Owner != "service" || c.Consistency != "single_pg_read" || c.Scope.Service != service || c.Scope.Access != "service" || c.Scope.Account != nil || c.Scope.Device != nil || c.Scope.Principal == nil || *c.Scope.Principal == "" || c.Scope.Conversation == "" || c.Cursors != nil || (c.Schema != "4" && c.Schema != "5") {
+	if c.Version != "service-capacity-alpha2" || c.Owner != "service" || c.Consistency != "single_pg_read" || c.Scope.Service != service || c.Scope.Access != "service" || c.Scope.Account != nil || c.Scope.Device != nil || c.Scope.Principal == nil || *c.Scope.Principal == "" || c.Scope.Conversation == "" || c.Cursors != nil || (c.Schema != "4" && c.Schema != "5" && c.Schema != "6") {
 		return false
 	}
 	if len(c.ObservationID) != 64 {
@@ -84,7 +97,10 @@ func (c Capacity) valid(service string) bool {
 			return false
 		}
 	}
-	if c.Reserve.State != "not_implemented" || c.Reserve.ProtectedRemaining != nil || c.Reserve.OrdinaryAvailable != nil || c.Physical.State != "unavailable" || c.Physical.Reserved || c.Remote.State != "unavailable" || c.Remote.Reserved {
+	if (c.Reserve.State != "not_enabled" && c.Reserve.State != "bounded_ready") || c.Reserve.ProtectedRemaining != nil || c.Reserve.OrdinaryAvailable != nil || c.Physical.State != "unavailable" || c.Physical.Reserved || c.Remote.State != "unavailable" || c.Remote.Reserved {
+		return false
+	}
+	if !c.validReserve() {
 		return false
 	}
 	switch c.Recovery {
@@ -162,4 +178,39 @@ func (c Capacity) valid(service string) bool {
 		}
 	}
 	return true
+}
+
+func (c Capacity) validReserve() bool {
+	if c.Reserve.Resources == nil || c.Reserve.Work == nil {
+		return false
+	}
+	if c.Reserve.State == "not_enabled" {
+		return c.Schema != "6" && len(c.Reserve.Resources) == 0 && len(c.Reserve.Work) == 0
+	}
+	if c.Schema != "6" || len(c.Reserve.Resources) != 1 || len(c.Reserve.Work) != 1 {
+		return false
+	}
+	r, w := c.Reserve.Resources[0], c.Reserve.Work[0]
+	reserved, ok := decimal(r.ProtectedRemaining)
+	if !ok {
+		return false
+	}
+	available, ok := decimal(r.OrdinaryAvailable)
+	if !ok {
+		return false
+	}
+	count, ok := decimal(w.Count)
+	if !ok || count > 1024 || w.Kind != "known_control_report" {
+		return false
+	}
+	for _, b := range c.Budgets {
+		if b.Category == r.Category && r.Category == "reconciliation_row_bytes" {
+			if b.HardRemaining == nil {
+				return false
+			}
+			remaining, ok := decimal(*b.HardRemaining)
+			return ok && reserved <= remaining && available == remaining-reserved
+		}
+	}
+	return false
 }

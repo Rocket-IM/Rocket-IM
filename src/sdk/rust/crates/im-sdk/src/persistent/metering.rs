@@ -1,4 +1,4 @@
-//! 生产序列化及既有硬限额的单一来源；诊断不引入预留或改变准入公式。
+//! 生产序列化及既有硬限额的单一来源；诊断与有限预留复用原预算。
 use super::{data::Saved, types::*};
 
 pub(super) const MAX_REQUESTS: usize = 1024;
@@ -38,4 +38,31 @@ impl EncodedSaved {
 
 pub(super) fn growth(action: &Action) -> Result<usize> {
     Ok(encode(action)?.len().saturating_mul(6).max(MIN_GROWTH))
+}
+
+/// 顺序固定，诊断、预留和写入共用同一预算与编码。
+pub(super) const RESOURCES: [(&str, &str, usize); 9] = [
+    ("requests", "items", MAX_REQUESTS),
+    ("ordinary_messages", "items", MAX_MESSAGES),
+    ("events", "items", MAX_EVENTS),
+    ("data_bytes", "bytes", super::data::MAX_DATA),
+    ("crypto_bytes", "bytes", MAX_CRYPTO),
+    ("meta_bytes", "bytes", super::store::MAX_META),
+    ("history", "items", MAX_ROUNDS),
+    ("archives", "items", MAX_ROUNDS),
+    ("transitions", "items", MAX_ROUNDS),
+];
+pub(super) fn usage(s: &Saved) -> Result<[usize; 9]> {
+    let e = EncodedSaved::new(s)?;
+    Ok([
+        s.data.requests.len(),
+        s.data.messages.len(),
+        super::network::capacity(s, &e)?.events,
+        e.data.len(),
+        e.crypto,
+        e.meta.len(),
+        s.meta.history.len(),
+        s.meta.archives.len(),
+        s.data.transitions.len(),
+    ])
 }

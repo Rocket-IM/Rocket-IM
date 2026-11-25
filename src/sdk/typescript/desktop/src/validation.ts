@@ -17,8 +17,8 @@ export function scope(value: unknown): T.Scope { const v = object(value); return
 export function sameScope(a: T.Scope, b: T.Scope): boolean { return a.service === b.service && a.account === b.account && a.device === b.device; }
 export function backupInfo(value: unknown): T.BackupInfo {
   const v = object(value), backup = hex(v.backup_id), snapshot = hex(v.snapshot);
-  if (v.format !== 1 || backup.length !== 64 || snapshot.length !== 64) return bad();
-  return {format: 1, backup_id: backup, scope: scope(v.scope), revision: count(v.revision), snapshot};
+  if ((v.format !== 1 && v.format !== 2) || backup.length !== 64 || snapshot.length !== 64) return bad();
+  return {format: v.format, backup_id: backup, scope: scope(v.scope), revision: count(v.revision), snapshot};
 }
 export function identity(value: unknown): T.Identity { const v = object(value); const key = hex(v.identity_key); if (key.length !== 64) return bad(); return { scope: scope(v.scope), identity_key: key }; }
 export function joining(value: unknown): T.JoiningMaterial { const v = object(value); return { identity: identity(v.identity), key_package: hex(v.key_package) }; }

@@ -5,6 +5,7 @@ mod candidate;
 mod capacity;
 mod capacity_types;
 mod metering;
+mod reserve;
 pub use capacity_types::*;
 mod journal;
 pub mod network;
@@ -95,12 +96,26 @@ impl PersistentDevice {
         let _lock = protection.lock()?;
         protection.confirm_logout()
     }
-    /// 单库同快照只读观察；没有持久预留。所有访问门禁成功后交付，不能作为下一次执行许可。
+    /// 单库同快照观察。所有访问门禁成功后交付；容量状态不是操作授权。
     pub fn capacity(&self) -> Result<Capacity> {
         self.database.call(|db| {
             let snapshot = db.read(capacity::snapshot)?;
             checkpoint("capacity_after_read");
             Ok(snapshot)
+        })
+    }
+    /// 显式启用known-v1本地有限预留，原子升级为v6；不可降级，旧包将拒载。
+    /// 只保护已持久的可证明工作；不启动密码步骤、网络或新后继。重复调用不重复扣额。
+    pub fn reserve_capacity(&self) -> Result<Capacity> {
+        self.database.call(|db| {
+            if db.read(|s| Ok(s.meta.reserve_version.is_some()))? {
+                return db.read(capacity::snapshot);
+            }
+            db.update(true, |s| {
+                s.meta.reserve_version = Some(reserve::VERSION.into());
+                Ok(())
+            })?;
+            db.read(capacity::snapshot)
         })
     }
     pub fn state(&self) -> Result<State> {
@@ -260,3 +275,6 @@ mod recovery_budget_tests;
 
 #[cfg(test)]
 mod capacity_tests;
+
+#[cfg(test)]
+mod reserve_tests;

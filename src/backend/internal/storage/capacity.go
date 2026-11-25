@@ -46,6 +46,16 @@ func (s *Store) CapacityDevice(ctx context.Context, token string) (m.Capacity, e
 	if e != nil {
 		return m.Capacity{}, e
 	}
+	// 设备观察不得通过全局余量反推出业务主体账本；只给本设备已知控制数量。
+	out.Reserve.Resources = []m.CapacityReservedResource{}
+	if out.Schema == "6" {
+		var controls int64
+		e = tx.QueryRow(ctx, `SELECT count(*) FROM alpha_mailbox m JOIN alpha_devices d USING(device_index) WHERE d.device_index=$1 AND m.sequence>d.processed AND m.sequence < COALESCE((SELECT min(x.sequence) FROM alpha_mailbox x WHERE x.device_index=$1 AND x.sequence>d.processed AND x.event->>'kind' NOT IN ('delivered','unavailable')),d.tail+1)`, index).Scan(&controls)
+		if e != nil {
+			return m.Capacity{}, e
+		}
+		out.Reserve.Work = []m.CapacityReservedWork{{Kind: "known_control_report", Count: strconv.FormatInt(controls, 10)}}
+	}
 	out.Scope.Access = "device"
 	out.Scope.Account = &own.Scope.Account
 	out.Scope.Device = &own.Scope.Device
@@ -135,7 +145,7 @@ func (s *Store) CapacityBusiness(ctx context.Context, token string) (m.Capacity,
 	return out, nil
 }
 func (s *Store) capacityBase(ctx context.Context, tx pgx.Tx) (m.Capacity, error) {
-	out := m.Capacity{Version: "service-capacity-alpha1", Owner: "service", Consistency: "single_pg_read", Scope: m.CapacityScope{Service: s.Config.Service, Conversation: s.Config.Conversation}, Reserve: m.CapacityReserve{State: "not_implemented"}, Physical: m.CapacityUnavailable{State: "unavailable"}, Remote: m.CapacityUnavailable{State: "unavailable"}}
+	out := m.Capacity{Version: "service-capacity-alpha2", Owner: "service", Consistency: "single_pg_read", Scope: m.CapacityScope{Service: s.Config.Service, Conversation: s.Config.Conversation}, Reserve: m.CapacityReserve{State: "not_implemented"}, Physical: m.CapacityUnavailable{State: "unavailable"}, Remote: m.CapacityUnavailable{State: "unavailable"}}
 	id, e := randomCheckpoint()
 	if e != nil {
 		return out, e
@@ -145,7 +155,7 @@ func (s *Store) capacityBase(ctx context.Context, tx pgx.Tx) (m.Capacity, error)
 	if e = tx.QueryRow(ctx, s.queries["schema_version"]).Scan(&count, &version); e != nil {
 		return out, e
 	}
-	if count != 1 || (version != 4 && version != 5) {
+	if count != 1 || (version != 4 && version != 5 && version != 6) {
 		return out, m.Fail("schema_version_unsupported")
 	}
 	out.Schema = strconv.Itoa(version)
@@ -174,6 +184,9 @@ func (s *Store) capacityBase(ctx context.Context, tx pgx.Tx) (m.Capacity, error)
 		}
 	}
 	out.Operations = []m.CapacityOperation{capacityOperation("new_send", "requires_input", reasons...), capacityOperation("retry_send", "requires_input")}
+	if e = s.capacityReservation(ctx, tx, &out); e != nil {
+		return out, e
+	}
 	return out, nil
 }
 func (s *Store) capacityMaintenance(ctx context.Context, tx pgx.Tx, out *m.Capacity) error {

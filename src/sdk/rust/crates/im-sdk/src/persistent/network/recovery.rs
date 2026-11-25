@@ -157,8 +157,18 @@ fn record(
     {
         return Err(Error::new("recovery_authorization_missing"));
     }
+    let known_commit = round.materials.contains_key("commit")
+        && saved
+            .meta
+            .session
+            .as_ref()
+            .is_some_and(|s| s.target && s.phase == RecoveryPhase::Ready);
     local.round = Some(round);
-    save(device, local.clone())
+    save(device, local.clone())?;
+    if known_commit {
+        super::super::checkpoint("network_recovery_after_known_commit");
+    }
+    Ok(())
 }
 fn outgoing(saved: &Saved, s: &Session, round: &Round) -> Result<Option<(&'static str, String)>> {
     let target = s.target;

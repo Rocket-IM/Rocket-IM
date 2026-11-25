@@ -7,7 +7,7 @@ import uuid
 import persistent_release as release
 from persistent_signing_packages import LabIdentity, sign, verified_copy, write_json
 
-def build(run, upgrade=False, capacity=False):
+def build(run, upgrade=False, capacity=False, reserve=False):
     signer = None
     report = {'status': 'RUNNING'}
     record = Path(run).parent / (Path(run).name + '-signer.json')
@@ -25,6 +25,11 @@ def build(run, upgrade=False, capacity=False):
             target=Path(run).parent/(Path(run).name+'-dev10')
             old=verified_copy(source,target,signer,'8ee61f10db59475ffccbdbff3074ad773dcbf65939f6ed1c9545a78c073074ec')
             report['dev10']={'release':str(target),'archive_sha256':old['archive_sha256']}
+        if reserve:
+            source=release.OUTPUT/'runs/eb56aef4-6ce2-4a69-b429-cedf3b950dda/dev11-r02'
+            target=Path(run).parent/(Path(run).name+'-dev11')
+            old=verified_copy(source,target,signer,'fbedacca80737e29d379f7760c8e18101ac9b6b27ed32363b7ca79558e166feb')
+            report['dev11']={'release':str(target),'archive_sha256':old['archive_sha256']}
         result = release.main(Path(run),signer=lambda binary:sign(binary,signer))
         report['status'] = 'PASS_SCOPED' if result == 0 else 'FAIL'
         return result
@@ -34,5 +39,5 @@ def build(run, upgrade=False, capacity=False):
         write_json(record, report)
 
 if __name__=='__main__':
-    if len(sys.argv)!=3 or sys.argv[1] not in ('build','build-upgrade','build-capacity'): raise SystemExit('usage: persistent_network.py build|build-upgrade|build-capacity ABSOLUTE_RUN_DIRECTORY')
-    sys.exit(build(sys.argv[2], upgrade=sys.argv[1]=='build-upgrade',capacity=sys.argv[1]=='build-capacity'))
+    if len(sys.argv)!=3 or sys.argv[1] not in ('build','build-upgrade','build-capacity','build-reserve'): raise SystemExit('usage: persistent_network.py build|build-upgrade|build-capacity|build-reserve ABSOLUTE_RUN_DIRECTORY')
+    sys.exit(build(sys.argv[2], upgrade=sys.argv[1]=='build-upgrade',capacity=sys.argv[1]=='build-capacity',reserve=sys.argv[1]=='build-reserve'))

@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub(super) struct Meta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserve_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup_guard: Option<String>,
     pub journal: Option<Journal>,
     pub session: Option<Session>,
@@ -32,6 +34,13 @@ impl Meta {
     }
     pub fn validate(&self, data: &Data, crypto: &[u8]) -> Result<()> {
         let bad = || Error::paused("store_invalid");
+        if self
+            .reserve_version
+            .as_deref()
+            .is_some_and(|v| v != super::reserve::VERSION)
+        {
+            return Err(bad());
+        }
         if self.backup_guard.as_ref().is_some_and(|id| {
             id.len() != 64
                 || !id

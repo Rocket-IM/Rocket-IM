@@ -9,7 +9,7 @@ import (
 	m "rocket-im/service/internal/messaging"
 )
 
-const ServiceVersion = "0.1.0-alpha.6"
+const ServiceVersion = "0.1.0-alpha.7"
 const maintenanceVersion = "service-backup-alpha1"
 
 // 顺序同时满足外键导入依赖；表名与排序列来自此封闭清单，不接受外部SQL。
@@ -61,7 +61,7 @@ func snapshotWithLimit(ctx context.Context, tx pgx.Tx, limit int) (databaseSnaps
 	if e := tx.QueryRow(ctx, "SELECT count(*),coalesce(max(version),0) FROM schema_version").Scan(&count, &version); e != nil {
 		return out, e
 	}
-	if count != 1 || (version != 4 && version != 5) {
+	if count != 1 || (version != 4 && version != 5 && version != 6) {
 		return out, m.Fail("schema_version_unsupported")
 	}
 	// 结构完整参与比较；拒绝未纳入数据备份的表、视图、序列和自定义函数。

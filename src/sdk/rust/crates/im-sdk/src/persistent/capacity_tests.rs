@@ -29,7 +29,7 @@ pub(super) fn measured(device: &PersistentDevice) -> Capacity {
             number(&budget.limit).unwrap().saturating_sub(value as u64)
         );
     }
-    assert_eq!(result.reserve.state, "not_implemented");
+    assert_eq!(result.reserve.state, "not_enabled");
     assert!(
         result.reserve.ordinary_available.is_none() && result.reserve.protected_remaining.is_none()
     );

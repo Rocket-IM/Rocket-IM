@@ -42,7 +42,7 @@ try {
     const before = await a.state(), bytes = await readFile(options('alice').path);
     let count = 0; const cancel = a.subscribe(() => count++);
     const first = await a.capacity(), second = await a.capacity();
-    assert.equal(first.version, 'sdk-capacity-alpha1'); assert.deepEqual(first.scope, before.scope);
+    assert.equal(first.version, 'sdk-capacity-alpha2'); assert.deepEqual(first.scope, before.scope);
     assert.equal(first.revision, before.revision); assert.notEqual(first.observation_id, second.observation_id);
     assert.deepEqual({...first,observation_id:''}, {...second,observation_id:''});
     assert.equal(first.reserve.protected_remaining, null); assert.equal(first.reserve.ordinary_available, null);

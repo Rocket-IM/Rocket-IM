@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Rocket-IM business-alpha1",
-    "version": "business-alpha1",
+    "version": "0.1.0-alpha.7",
     "description": "固定双设备/单会话的业务身份接入；不接管业务密码，不提供密码成员撤销，目录关联不构成独立信任。 Service 0.1.0-alpha.6增加service-capacity-alpha1只读容量查询，不改既有准入/持久格式。"
   },
   "paths": {
