@@ -1,6 +1,6 @@
 # Go 业务服务端 SDK（本机 Alpha）
 
-模块 `rocket-im.local/server-sdk`，版本 `v0.1.0-alpha.4`，Go 1.27.4，仅标准库。`.local` 是本机版本化模块代理标识，尚未对外发布，也不表示许可或分发获准。接入方只需 Go 与本模块，不需要 Rust、Service 源码或数据库访问。
+模块 `rocket-im.local/server-sdk`，版本 `v0.1.0-alpha.5`，Go 1.27.4，仅标准库。`.local` 是本机版本化模块代理标识，尚未对外发布，也不表示许可或分发获准。接入方只需 Go 与本模块，不需要 Rust、Service 源码或数据库访问。
 
 ```go
 import rocketim "rocket-im.local/server-sdk"
@@ -50,3 +50,6 @@ v0.1.0-alpha.4增加`client.CapacityWorksets(ctx)`，通过无正文GET `/v1/bus
 Service阶段prepared只表示Service本地持久准备；confirmed表示收到了同一工作集的参加者确认；settled表示原范围的报告均已提交。该GET不能证明SDK已收到最近回复，不是双方原子快照。真正确认与结清由客户端Rust和设备认证RPC完成，业务SDK没有写入、替换或解除工作集接口。schema7显式启用`enable-capacity-workset`，仍依赖原sealed、外部Evidence与schema6；旧格式不自动升级。schema7的alpha2容量查询在同一256MiB预算中计入新记录及最长确认阶段差额，控制报告工作数的原口径不变。
 
 超时、取消、已提交丢回复、关闭及维护阻断均不能回收承诺；仅匹配原完整状态和外部进度时允许重开。外部候选存在但数据库只有前态时，继续`service_reconciliation_incomplete`，不可清pending或按期限放行。本机共同范围只有已下载连续控制报告，每设备一个不可替换记录，不包含未来消息、新密码步骤、认证续期、磁盘和网络可用性。完整契约与验证见仓库《服务备份恢复》第13节。
+
+
+v0.1.0-alpha.5识别schema8容量和`control-workset-v2`的必填previous。`CapacityWorksets(ctx)`仍只返回两个设备各自的当前记录；旧轮由Service永久保留并供原设备精确重试。v2 ID使用独立域并绑定前轮ID，校验与v1分别执行。此只读结果不是SDK当前观察，不创建接续或释放承诺；设备端由实际SDK的`prepareNextCapacityWorkset(previous)`发起，Service须先按原封存/Evidence流程显式启用schema8。新格式和真实包验收见端侧存储第36节。

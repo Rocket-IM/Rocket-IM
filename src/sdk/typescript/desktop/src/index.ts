@@ -202,15 +202,23 @@ export class PersistentDevice {
     if (result === null) throw new SdkError('ipc_protocol_error', true);
     return result;
   }
+  /** previous为本库已结清前轮ID。同一ID精确重试返回同一后继；Rust选择原件，首次升级v8。
+   * 只有已保存Service结清回复才能新准入。取消/失联不解除承诺；旧轮及原件永久保留。 */
+  async prepareNextCapacityWorkset(previous: string, options?: T.CallOptions): Promise<CapacityWorksetState> {
+    if (typeof previous !== 'string' || !/^[0-9a-f]{64}$/.test(previous)) throw new SdkError('invalid_workset');
+    const result = await this.#workset('prepare_next_capacity_workset', options, previous);
+    if (result === null) throw new SdkError('ipc_protocol_error', true);
+    return result;
+  }
   /** 本机持久观察；active才包含Service确认。null表示本机尚未准备，不能推断远端。 */
   capacityWorkset(options?: T.CallOptions): Promise<CapacityWorksetState | null> {
     return this.#workset('capacity_workset', options);
   }
-  #workset(op: string, options?: T.CallOptions): Promise<CapacityWorksetState | null> {
+  #workset(op: string, options?: T.CallOptions, previous?: string): Promise<CapacityWorksetState | null> {
     if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options) ||
         Object.keys(options).some(key => key !== 'signal') ||
         (options.signal !== undefined && !(options.signal instanceof AbortSignal)))) return Promise.reject(new SdkError('invalid_options'));
-    return this.#call({op}, data => {
+    return this.#call(previous === undefined ? {op} : {op, previous}, data => {
       const result = worksetState(data);
       if (result !== null && !v.sameScope(result.workset.owner.scope, this.#scope)) throw new SdkError('scope_mismatch', true);
       return result;

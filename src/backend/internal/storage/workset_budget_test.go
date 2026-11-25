@@ -56,8 +56,23 @@ func TestWorksetMetadataAdmissionCannotStealExistingReserve(t *testing.T) {
 	sealClose(t, s)
 }
 func TestWorksetLastByteConcurrentOrdinaryWritesAndPhaseGrowth(t *testing.T) {
-	s := worksetStore(t)
+	worksetLastByte(t, false)
+}
+func TestRepeatedWorksetLastByteConcurrentOrdinaryWritesAndPhaseGrowth(t *testing.T) {
+	worksetLastByte(t, true)
+}
+func worksetLastByte(t *testing.T, repeated bool) {
+	var s *Store
+	if repeated {
+		s = repeatedWorksetStore(t)
+	} else {
+		s = worksetStore(t)
+	}
 	w := controlWorkset(t, s)
+	if repeated {
+		finishWorkset(t, s, w)
+		w = followingWorkset(t, s, w)
+	}
 	worksetCall(t, s, "prepare", &w, "prepared")
 	worksetPadding(t, s, 1)
 	ctx := context.Background()
@@ -103,7 +118,7 @@ func TestWorksetLastByteConcurrentOrdinaryWritesAndPhaseGrowth(t *testing.T) {
 		t.Fatal("missing phase/control reserve")
 	}
 	worksetCall(t, s, "confirm", &w, "confirmed")
-	if _, e := s.Processed(ctx, 0, m.Processed{Sequence: "1", Disposition: "received"}); e != nil {
+	if _, e := s.Processed(ctx, 0, m.Processed{Sequence: w.Last, Disposition: "received"}); e != nil {
 		t.Fatal(e)
 	}
 	u, r, n = reserveUsage(t, s)

@@ -10,10 +10,15 @@ from harness import require, wait
 from workset_harness import enable, source, service_state, originals, transport
 
 
-def run(lab):
+def run(lab, repeated=False):
     enable(lab);start(lab);lab.aligned();lab.offline()
+    first = None
+    if repeated:
+        from workset_repeat import enable_repeat, settle
+        enable_repeat(lab)
+        source(lab, 0, 'common-lifecycle-first');lab.workers[0].call('prepareWorkset');first=settle(lab,0)
     source(lab, 0, 'common-lifecycle')
-    local = lab.workers[0].call('prepareWorkset')
+    local = lab.workers[0].call('prepareNextWorkset', previous=first['workset']['id']) if first else lab.workers[0].call('prepareWorkset')
     def delayed():
         lab.control.write_text(json.dumps({'mode': 'delay_workset_ack', 'field': 'capacity_workset_prepare'}))
         lab.auto(0)
@@ -64,6 +69,20 @@ def run(lab):
         require(service_state(lab, 0) == state, 'same original terminal range on Service')
         originals(lab, 0, state)
     lab.case('unknown_gate_authorized_successor_and_original_settlement', recovery)
+    if repeated:
+        def successor_round():
+            from workset_repeat import settle, histories, replay_reply
+            from workset_harness import manifest_id
+            second=lab.workers[0].call('workset')
+            source(lab,0,'repeat-after-successor')
+            next_state=lab.workers[0].call('prepareNextWorkset',previous=second['workset']['id'])
+            require(next_state['workset']['context']!=second['workset']['context'],'new round belongs to authorized current context')
+            retired={**next_state['workset'],'context':second['workset']['context']};retired['id']=manifest_id(retired)
+            before=lab.database_snapshot();reply=lab.rpc(0,'capacity_workset_prepare',retired)
+            require(not reply['ok'] and reply['error']['code']=='workset_context_mismatch','retired context cannot prepare new round')
+            require(before==lab.database_snapshot(),'retired context refusal preserves predecessor and originals')
+            replay_reply(lab,0,second,'prepare');settle(lab,0);histories(lab,0,[first,second])
+        lab.case('third_round_current_context_and_old_reply_replay',successor_round)
     lab.case('lifecycle_common_service_restore', lambda: lab.controlled_restore('common-lifecycle', reconnect=False))
     for i in range(2):
         path, _ = lab.export(i, 'common-lifecycle-'+str(i))

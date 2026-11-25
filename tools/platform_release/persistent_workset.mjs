@@ -14,3 +14,10 @@ const cases=[v=>{v.extra=true;},v=>{delete v.phase;},v=>{v.phase='complete';},v=
   v=>{v.workset.last='513';},v=>{v.workset.first='2';v.workset.last='1';},v=>{v.workset.context='retired';},v=>{v.workset.originals_hash=null;}];
 for(const change of cases){const v=fixture();change(v);assert.throws(()=>worksetState(v),e=>e.code==='ipc_protocol_error');}
 console.log(JSON.stringify({status:'PASS',positive_phases:4,null_observation:true,invalid_cases:cases.length}));
+
+const v2=fixture();v2.workset.version='control-workset-v2';v2.workset.previous='cc'.repeat(32);
+assert.deepEqual(worksetState(v2),v2);
+const chainCases=[v=>{delete v.workset.previous;},v=>{v.workset.previous=null;},v=>{v.workset.previous='';},
+  v=>{v.workset.previous='CC'.repeat(32);},v=>{v.workset.version='control-workset-v1';}];
+for(const change of chainCases){const v=structuredClone(v2);change(v);assert.throws(()=>worksetState(v),e=>e.code==='ipc_protocol_error');}
+console.log(JSON.stringify({status:'PASS',v2:true,invalid_chain_cases:chainCases.length}));

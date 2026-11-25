@@ -36,3 +36,17 @@ func TestWorksetCanonicalDigest(t *testing.T) {
 		}
 	}
 }
+
+func TestRepeatedWorksetCanonicalDigest(t *testing.T) {
+	w := CapacityWorkset{Version: WorksetChainVersion, Owner: Identity{Scope: Scope{Service: "test", Account: "alice", Device: "a1"}, IdentityKey: strings.Repeat("01", 32)}, SDKInstance: strings.Repeat("aa", 32), Conversation: "chat", Context: "initial", First: "3", Last: "4", OriginalsHash: strings.Repeat("bb", 32), Previous: "81368f51e502e0cfde7e723c56923389136e5afba2fd06c6830acf6d1e843e49"}
+	w.ID = w.Digest()
+	if w.Validate() != nil || w.ID != "04ad78a7e2dc01d74ac20ecde9b482df4654f0ff63d09dba61f3910a8ed61482" {
+		t.Fatal("v2 canonical mismatch")
+	}
+	for _, raw := range []string{`{"version":"control-workset-v1","previous":null}`, `{"version":"control-workset-v1","previous":""}`, `{"version":"control-workset-v2","previous":null}`, `{"version":"control-workset-v2"}`} {
+		var value CapacityWorkset
+		if Decode([]byte(raw), &value) == nil {
+			t.Fatal("accepted missing/null/foreign-version predecessor")
+		}
+	}
+}

@@ -54,6 +54,9 @@ enum Operation {
     ReserveCapacity,
     CapacityWorkset,
     PrepareCapacityWorkset,
+    PrepareNextCapacityWorkset {
+        previous: String,
+    },
     CreateBackup {
         path: PathBuf,
     },
@@ -150,6 +153,9 @@ fn execute(
         Operation::ReserveCapacity => json!(device.reserve_capacity()?),
         Operation::CapacityWorkset => json!(device.capacity_workset()?),
         Operation::PrepareCapacityWorkset => json!(device.prepare_capacity_workset()?),
+        Operation::PrepareNextCapacityWorkset { previous } => {
+            json!(device.prepare_next_capacity_workset(previous)?)
+        }
         Operation::CreateBackup { path } => {
             if network.is_some() {
                 return Err(error("backup_disconnect_required", false));

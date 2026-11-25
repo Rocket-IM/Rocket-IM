@@ -56,14 +56,28 @@ func TestWorksetProcessHelper(t *testing.T) {
 	}
 	os.Exit(86)
 }
-func TestWorksetProcessEveryPersistentBoundary(t *testing.T) {
+func TestWorksetProcessEveryPersistentBoundary(t *testing.T) { worksetProcessBoundaries(t, false) }
+func TestRepeatedWorksetProcessEveryPersistentBoundary(t *testing.T) {
+	worksetProcessBoundaries(t, true)
+}
+func worksetProcessBoundaries(t *testing.T, repeated bool) {
 	for _, operation := range []string{"prepare", "confirm", "settle"} {
 		for _, window := range []string{"before_external_reserve", "before_sql_commit", "after_sql_commit", "after_external_confirm"} {
 			t.Run(operation+"_"+window, func(t *testing.T) {
-				s := worksetStore(t)
+				var s *Store
+				if repeated {
+					s = repeatedWorksetStore(t)
+				} else {
+					s = worksetStore(t)
+				}
 				w := controlWorkset(t, s)
-				ctx := context.Background()
 				prior := ""
+				if repeated {
+					finishWorkset(t, s, w)
+					w = followingWorkset(t, s, w)
+					prior = "settled"
+				}
+				ctx := context.Background()
 				if operation != "prepare" {
 					worksetCall(t, s, "prepare", &w, "prepared")
 					prior = "prepared"
@@ -71,7 +85,7 @@ func TestWorksetProcessEveryPersistentBoundary(t *testing.T) {
 				if operation == "settle" {
 					worksetCall(t, s, "confirm", &w, "confirmed")
 					prior = "confirmed"
-					if _, e := s.Processed(ctx, 0, m.Processed{Sequence: "1", Disposition: "received"}); e != nil {
+					if _, e := s.Processed(ctx, 0, m.Processed{Sequence: w.Last, Disposition: "received"}); e != nil {
 						t.Fatal(e)
 					}
 				}
@@ -155,6 +169,12 @@ func TestWorksetProcessEveryPersistentBoundary(t *testing.T) {
 					}
 				}
 				worksetCall(t, s, operation, &w, map[string]string{"prepare": "prepared", "confirm": "confirmed", "settle": "settled"}[operation])
+				if repeated {
+					h := worksetHistory(t, s)
+					if len(h) != 1 || h[0].Workset.ID != w.Previous {
+						t.Fatal("process boundary lost predecessor")
+					}
+				}
 				sealClose(t, s)
 			})
 		}

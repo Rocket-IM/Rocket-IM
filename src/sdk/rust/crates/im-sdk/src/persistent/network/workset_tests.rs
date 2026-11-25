@@ -28,6 +28,7 @@ fn workset_canonical_digest_matches_service_vector() {
         first: "1".into(),
         last: "2".into(),
         originals_hash: "bb".repeat(32),
+        previous: None,
     };
     w.id = w.digest().unwrap();
     w.validate().unwrap();
@@ -35,9 +36,22 @@ fn workset_canonical_digest_matches_service_vector() {
         w.id,
         "81368f51e502e0cfde7e723c56923389136e5afba2fd06c6830acf6d1e843e49"
     );
+    w.previous = Some(w.id.clone());
+    w.version = "control-workset-v2".into();
+    w.first = "3".into();
+    w.last = "4".into();
+    w.id = w.digest().unwrap();
+    w.validate().unwrap();
+    assert_eq!(
+        w.id,
+        "04ad78a7e2dc01d74ac20ecde9b482df4654f0ff63d09dba61f3910a8ed61482"
+    );
+    let mut raw: serde_json::Value = serde_json::from_slice(&encode(&w).unwrap()).unwrap();
+    raw["previous"] = serde_json::Value::Null;
+    assert!(serde_json::from_value::<CapacityWorkset>(raw).is_err());
 }
 
-fn source() -> Pair {
+pub(super) fn source() -> Pair {
     let mut p = Pair::new();
     p.group();
     attach(&mut p);
@@ -63,7 +77,7 @@ fn source() -> Pair {
         .unwrap();
     p
 }
-fn prepare(p: &Pair) -> CapacityWorksetState {
+pub(super) fn prepare(p: &Pair) -> CapacityWorksetState {
     p.b.database
         .call(|db| {
             db.update(false, |s| {
@@ -74,7 +88,7 @@ fn prepare(p: &Pair) -> CapacityWorksetState {
         })
         .unwrap()
 }
-fn phase(p: &Pair, phase: WorksetPhase) -> Result<()> {
+pub(super) fn phase(p: &Pair, phase: WorksetPhase) -> Result<()> {
     p.b.database.call(move |db| {
         db.update(false, |s| {
             s.data
@@ -191,8 +205,12 @@ fn workset_record_and_original_mutations_roll_back() {
 
 #[test]
 fn workset_metadata_competes_in_original_budget_and_reserved_growth_settles() {
-    let mut p = source();
+    let p = source();
     let w = prepare(&p);
+    budget_competition(p, w);
+}
+
+pub(super) fn budget_competition(mut p: Pair, w: CapacityWorksetState) {
     p.b.database
         .call(|db| {
             db.update(false, |s| {
@@ -220,7 +238,13 @@ fn workset_metadata_competes_in_original_budget_and_reserved_growth_settles() {
             .unwrap();
     }
     fn grow(s: &mut crate::persistent::data::Saved) -> Result<()> {
-        let r = s.data.requests.get_mut("budget-padding-3").unwrap();
+        let r = s
+            .data
+            .requests
+            .iter_mut()
+            .find(|(id, _)| id.starts_with("budget-padding-"))
+            .unwrap()
+            .1;
         if let Some(Action::Send { text, .. }) = &mut r.input {
             text.push('x');
         }
@@ -262,13 +286,15 @@ fn workset_metadata_competes_in_original_budget_and_reserved_growth_settles() {
     super::queue::process_event(
         &mut p.b,
         &saved,
-        saved.data.network.as_ref().unwrap().events[0].clone(),
+        saved.data.network.as_ref().unwrap().events[number(&w.workset.last).unwrap() as usize - 1]
+            .clone(),
     )
     .unwrap();
+    let last = w.workset.last.clone();
     p.b.database
-        .call(|db| {
+        .call(move |db| {
             db.update(false, |s| {
-                s.data.network.as_mut().unwrap().reported = "1".into();
+                s.data.network.as_mut().unwrap().reported = last;
                 Ok(())
             })
         })

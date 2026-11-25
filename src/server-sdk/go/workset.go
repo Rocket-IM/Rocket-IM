@@ -22,6 +22,7 @@ type CapacityWorkset struct {
 	First         string   `json:"first"`
 	Last          string   `json:"last"`
 	OriginalsHash string   `json:"originals_hash"`
+	Previous      string   `json:"previous,omitempty"`
 }
 
 // Phase是Service持久观察：prepared/confirmed/settled，不等价于SDK当前已观察的阶段。
@@ -68,11 +69,15 @@ func worksetFields(raw json.RawMessage) bool {
 	}
 	var s map[string]json.RawMessage
 	_ = json.Unmarshal(raw, &s)
-	if !exactFields(s["workset"], "version", "id", "owner", "sdk_instance", "conversation", "context", "first", "last", "originals_hash") {
-		return false
-	}
 	var w map[string]json.RawMessage
 	_ = json.Unmarshal(s["workset"], &w)
+	fields := []string{"version", "id", "owner", "sdk_instance", "conversation", "context", "first", "last", "originals_hash"}
+	if bytes.Equal(w["version"], []byte(`"control-workset-v2"`)) {
+		fields = append(fields, "previous")
+	}
+	if !exactFields(s["workset"], fields...) {
+		return false
+	}
 	if !exactFields(w["owner"], "scope", "identity_key") {
 		return false
 	}
@@ -84,7 +89,8 @@ func (s CapacityWorksetState) valid(service string) bool {
 	w := s.Workset
 	first, ok := decimal(w.First)
 	last, ok2 := decimal(w.Last)
-	if !ok || !ok2 || first < 1 || first > last || last > 512 || w.Version != "control-workset-v1" ||
+	versionValid := (w.Version == "control-workset-v1" && w.Previous == "") || (w.Version == "control-workset-v2" && worksetDigest.MatchString(w.Previous))
+	if !ok || !ok2 || first < 1 || first > last || last > 512 || !versionValid ||
 		(s.Phase != "prepared" && s.Phase != "confirmed" && s.Phase != "settled") ||
 		w.Owner.Scope.Service != service || !worksetID.MatchString(w.Owner.Scope.Service) ||
 		!worksetID.MatchString(w.Owner.Scope.Account) || !worksetID.MatchString(w.Owner.Scope.Device) ||
@@ -93,8 +99,13 @@ func (s CapacityWorksetState) valid(service string) bool {
 		(w.Context != "initial" && !worksetDigest.MatchString(w.Context)) {
 		return false
 	}
-	raw, _ := json.Marshal([]string{"rocket-im/capacity-workset/1", w.Version, w.Owner.Scope.Service, w.Owner.Scope.Account,
-		w.Owner.Scope.Device, w.Owner.IdentityKey, w.SDKInstance, w.Conversation, w.Context, w.First, w.Last, w.OriginalsHash})
+	fields := []string{"rocket-im/capacity-workset/1", w.Version, w.Owner.Scope.Service, w.Owner.Scope.Account,
+		w.Owner.Scope.Device, w.Owner.IdentityKey, w.SDKInstance, w.Conversation, w.Context, w.First, w.Last, w.OriginalsHash}
+	if w.Version == "control-workset-v2" {
+		fields[0] = "rocket-im/capacity-workset/2"
+		fields = append(fields, w.Previous)
+	}
+	raw, _ := json.Marshal(fields)
 	digest := sha256.Sum256(raw)
 	return w.ID == hex.EncodeToString(digest[:])
 }

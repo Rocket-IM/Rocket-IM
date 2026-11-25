@@ -23,6 +23,10 @@ def verify(task, release, label, suite):
             lab=DiagnosticsLab(release,root/'environment.json',run)
         else:lab=CapacityLab(release,root/'environment.json',run)
         new_client=lab.release
+        if suite=='workset-repeat-upgrade':
+            from diagnostics_harness import old_client
+            lab.release=old_client(task,new_client,'dev13')
+            lab.old_service='repeat';lab.operator=False
         if suite in ('workset-upgrade','workset-upgrade-legacy','workset-upgrade-full'):
             from diagnostics_harness import old_client
             lab.release=old_client(task,new_client,'dev12')
@@ -39,7 +43,19 @@ def verify(task, release, label, suite):
             from rejection_upgrade import baseline
             lab.release=baseline(task,new_client)
         lab.build(proxy=True)
-        if suite=='workset':
+        if suite=='workset-repeat':
+            from workset_repeat import run as repeat_run
+            repeat_run(lab)
+        elif suite=='workset-repeat-full':
+            from workset_repeat import full as repeat_full
+            repeat_full(lab)
+        elif suite=='workset-repeat-upgrade':
+            from workset_repeat_upgrade import run as repeat_upgrade
+            repeat_upgrade(lab,new_client)
+        elif suite=='workset-repeat-lifecycle':
+            from workset_lifecycle import run as repeat_lifecycle
+            repeat_lifecycle(lab,repeated=True)
+        elif suite=='workset':
             from workset_cases import run as workset_run
             workset_run(lab)
         elif suite=='workset-lifecycle':
@@ -137,5 +153,5 @@ def verify(task, release, label, suite):
 
 if __name__=='__main__':
     if len(sys.argv)!=6 or sys.argv[1]!='verify':
-        raise SystemExit('verify <task-root> <frozen-service-release> <new-label> workset|workset-full|workset-lifecycle|workset-upgrade|workset-upgrade-legacy|workset-upgrade-full|reserve|reserve-full|reserve-upgrade|reserve-upgrade-full|diagnostics|diagnostics-upgrade|diagnostics-full|startup|baseline|overflow|rejection|rejection-multiple|rejection-faults|rejection-upgrade|rejection-upgrade-guarded|large-local|recovery|renewal|lifecycle|successor|unknown')
+        raise SystemExit('verify <task-root> <frozen-service-release> <new-label> workset-repeat|workset-repeat-full|workset-repeat-upgrade|workset-repeat-lifecycle|workset|workset-full|workset-lifecycle|workset-upgrade|workset-upgrade-legacy|workset-upgrade-full|reserve|reserve-full|reserve-upgrade|reserve-upgrade-full|diagnostics|diagnostics-upgrade|diagnostics-full|startup|baseline|overflow|rejection|rejection-multiple|rejection-faults|rejection-upgrade|rejection-upgrade-guarded|large-local|recovery|renewal|lifecycle|successor|unknown')
     sys.exit(verify(*sys.argv[2:]))

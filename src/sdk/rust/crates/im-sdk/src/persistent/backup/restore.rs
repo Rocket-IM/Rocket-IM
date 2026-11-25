@@ -12,7 +12,7 @@ pub(super) fn read_current(path: &Path, key: &str, scope: &Scope) -> Result<Save
     let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
     let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
     let version: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    if app != store::APP_ID || !matches!(version, 4..=7) {
+    if app != store::APP_ID || !matches!(version, 4..=8) {
         return Err(Error::paused("store_format_unsupported"));
     }
     let names: String = tx.query_row(
@@ -25,7 +25,8 @@ pub(super) fn read_current(path: &Path, key: &str, scope: &Scope) -> Result<Save
     }
     let current = store::load(&tx, scope)?;
     if (version >= 6) != current.meta.reserve_version.is_some()
-        || (version == 7) != current.data.has_workset()
+        || (version >= 7) != current.data.has_workset()
+        || (version == 8) != current.data.has_workset_history()
         || (version < 6 && (version == 5) != current.data.has_rejections())
         || current.meta.backup_guard.is_none()
     {

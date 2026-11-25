@@ -18,12 +18,13 @@ import (
 
 type Config struct{ Listen, Upstream, Cert, Key, CA, Control, Observations string }
 type Fault struct {
-	Mode      string `json:"mode"`
-	TokenHash string `json:"token_hash"`
-	Consumed  bool   `json:"consumed"`
-	Material  string `json:"material"`
-	Field     string `json:"field"`
-	Hits      int    `json:"hits"`
+	Mode         string          `json:"mode"`
+	TokenHash    string          `json:"token_hash"`
+	Consumed     bool            `json:"consumed"`
+	Material     string          `json:"material"`
+	Field        string          `json:"field"`
+	Hits         int             `json:"hits"`
+	WorksetReply json.RawMessage `json:"workset_reply,omitempty"`
 }
 type Envelope struct {
 	Service       string `json:"service"`
@@ -183,8 +184,12 @@ func main() {
 			recoveryFault := req.Op == "recovery_publish" && (fault.Material == "" || fault.Material == material.Kind) && (fault.Mode == "drop_recovery_ack" || fault.Mode == "delay_recovery_ack" || fault.Mode == "duplicate_recovery")
 			active := target && !fault.Consumed && string(response["ok"]) == "true" && ((req.Op == "send" && (fault.Mode == "drop_send_ack" || fault.Mode == "delay_send_ack")) || (req.Op == "processed" && fault.Mode == "drop_processed_ack") || (req.Op == "poll" && fault.Mode == "tamper_message"))
 			active = active || (target && !fault.Consumed && string(response["ok"]) == "true" && recoveryFault)
-			worksetFault := strings.HasPrefix(req.Op, "capacity_workset_") && req.Op == fault.Field && (fault.Mode == "hold_workset_ack" || fault.Mode == "delay_workset_ack" || fault.Mode == "tamper_workset_ack")
+			worksetFault := strings.HasPrefix(req.Op, "capacity_workset_") && req.Op == fault.Field && (fault.Mode == "hold_workset_ack" || fault.Mode == "delay_workset_ack" || fault.Mode == "tamper_workset_ack" || fault.Mode == "replay_workset_ack")
 			active = active || (target && !fault.Consumed && string(response["ok"]) == "true" && worksetFault)
+			if active && fault.Mode == "replay_workset_ack" && json.Valid(fault.WorksetReply) {
+				response["result"] = fault.WorksetReply
+				reply, _ = json.Marshal(response)
+			}
 			if active && fault.Mode == "tamper_workset_ack" {
 				var result map[string]json.RawMessage
 				var workset map[string]json.RawMessage

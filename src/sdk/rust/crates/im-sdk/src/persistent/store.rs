@@ -109,9 +109,9 @@ impl Store {
             let version: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
             if app != APP_ID
                 || (if protected {
-                    !matches!(version, 3..=7)
+                    !matches!(version, 3..=8)
                 } else {
-                    !matches!(version, 1 | 2 | 5 | 6 | 7)
+                    !matches!(version, 1 | 2 | 5 | 6 | 7 | 8)
                 })
             {
                 return Err(Error::paused("store_format_unsupported"));
@@ -162,7 +162,8 @@ impl Store {
             }
             let saved = load(&tx, &scope)?;
             if (version >= 6) != saved.meta.reserve_version.is_some()
-                || (version == 7) != saved.data.has_workset()
+                || (version >= 7) != saved.data.has_workset()
+                || (version == 8) != saved.data.has_workset_history()
                 || (version < 6 && (version == 5) != saved.data.has_rejections())
                 || (!protected && saved.meta.backup_guard.is_some())
                 || (version < 5 && (version == 4) != saved.meta.backup_guard.is_some())
@@ -285,13 +286,25 @@ impl Store {
         }
         let reserve_before = saved.meta.reserve_version.clone();
         let workset_before = saved.data.network.as_ref().and_then(|n| n.workset.clone());
+        let history_before = saved
+            .data
+            .network
+            .as_ref()
+            .map(|n| n.workset_history.clone())
+            .unwrap_or_default();
         let value = f(&mut saved)?;
         if reserve_before.is_some() && saved.meta.reserve_version != reserve_before {
             return Err(Error::paused("reserve_changed"));
         }
         super::network::check_workset_transition(
             workset_before.as_ref(),
+            &history_before,
             saved.data.network.as_ref().and_then(|n| n.workset.as_ref()),
+            saved
+                .data
+                .network
+                .as_ref()
+                .map_or(&[], |n| n.workset_history.as_slice()),
         )?;
         let workset_changed =
             workset_before.as_ref() != saved.data.network.as_ref().and_then(|n| n.workset.as_ref());
@@ -408,7 +421,12 @@ pub(super) fn write(tx: &Transaction<'_>, saved: &Saved) -> Result<()> {
     }
     let digest = hash(&[data.as_slice(), saved.crypto.as_slice(), meta.as_slice()].concat());
     // 首个终态和格式门禁在同一提交中生效；旧包必须拒绝，不能误读已压缩的消息投影。
-    if saved.data.has_workset() {
+    if saved.data.has_workset_history() {
+        let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
+        if app == APP_ID {
+            tx.execute_batch("PRAGMA user_version=8;")?;
+        }
+    } else if saved.data.has_workset() {
         let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
         if app == APP_ID {
             tx.execute_batch("PRAGMA user_version=7;")?;

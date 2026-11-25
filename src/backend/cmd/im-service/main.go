@@ -22,7 +22,7 @@ import (
 
 func run() error {
 	path := flag.String("config", "", "显式JSON配置路径")
-	operation := flag.String("operation", "serve", "serve / enroll / backup / restore / enable-reconciliation / reconcile / enable-capacity-reserve / enable-capacity-workset")
+	operation := flag.String("operation", "serve", "serve / enroll / backup / restore / enable-reconciliation / reconcile / enable-capacity-reserve / enable-capacity-workset / enable-repeated-workset")
 	backup := flag.String("backup", "", "规范绝对备份文件路径")
 	version := flag.Bool("version", false, "显示Service产物版本")
 	flag.Parse()

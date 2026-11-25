@@ -1,4 +1,4 @@
-//! 一设备一个固定控制工作集；原件/终态永久保留，不按失联或时间释放。
+//! 固定控制原件；当前轮和已结清前轮永久保留，不按失联或时间释放。
 use super::workset_types::*;
 use super::{
     super::{
@@ -46,9 +46,14 @@ pub(super) fn originals(data: &Data, n: &NetworkData, first: u64, last: u64) -> 
 }
 
 pub(super) fn validate(data: &Data, n: &NetworkData) -> Result<()> {
-    let Some(state) = &n.workset else {
-        return Ok(());
-    };
+    super::workset_chain::validate(n)?;
+    for state in n.workset_history.iter().chain(n.workset.iter()) {
+        validate_state(data, n, state)?;
+    }
+    Ok(())
+}
+
+fn validate_state(data: &Data, n: &NetworkData, state: &CapacityWorksetState) -> Result<()> {
     let w = &state.workset;
     w.validate()?;
     let b = n
@@ -79,6 +84,16 @@ pub(super) fn select(s: &Saved, instance: &str) -> Result<CapacityWorksetState> 
     if let Some(w) = &n.workset {
         return Ok(w.clone());
     }
+    select_originals(s, instance)
+}
+
+#[cfg(any(feature = "protected-storage", test))]
+pub(super) fn select_originals(s: &Saved, instance: &str) -> Result<CapacityWorksetState> {
+    let n = s
+        .data
+        .network
+        .as_ref()
+        .ok_or_else(|| Error::new("network_binding_required"))?;
     if s.meta.reserve_version.is_none() {
         return Err(Error::new("capacity_reserve_required"));
     }
@@ -119,6 +134,7 @@ pub(super) fn select(s: &Saved, instance: &str) -> Result<CapacityWorksetState> 
         first: first.to_string(),
         last: last.to_string(),
         originals_hash: originals(&s.data, n, first, last)?,
+        previous: None,
     };
     w.id = w.digest()?;
     w.validate()?;
@@ -185,7 +201,7 @@ pub(in crate::persistent) fn project_phase(s: &mut Saved) {
     }
 }
 
-pub(in crate::persistent) fn check_transition(
+pub(super) fn check_phase(
     before: Option<&CapacityWorksetState>,
     after: Option<&CapacityWorksetState>,
 ) -> Result<()> {

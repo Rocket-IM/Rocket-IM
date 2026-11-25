@@ -46,13 +46,16 @@ def prepare(lab, index):
     locked(lab, index)
 
 
-def handshake(lab, index):
+def handshake(lab, index, predecessor=None):
     for operation, before, after, remote_before, remote_after in (
-        ('prepare', 'prepared', 'confirmed', None, 'prepared'),
+        ('prepare', 'prepared', 'confirmed', 'settled' if predecessor else None, 'prepared'),
         ('confirm', 'confirmed', 'active', 'prepared', 'confirmed'),
         ('settle', 'active', 'settled', 'confirmed', 'settled')):
         transport(lab, index, operation, 'hold_workset_request', before, remote_before)
         transport(lab, index, operation, 'hold_workset_ack', before, remote_after, hits=2)
+        if predecessor:
+            from workset_repeat import replay_reply
+            replay_reply(lab, index, predecessor, operation)
         # 远端已持久，但SDK不知道；真实Service异常退出后必须先通过原外部进度对账。
         lab.cycle('common-'+str(index)+'-'+operation, reconnect=False)
         observe(lab, index, 'reconciled-'+str(index)+'-'+operation, before, remote_after)
@@ -71,7 +74,7 @@ def handshake(lab, index):
         state = observe(lab, index, 'durable-'+str(index)+'-'+after, after, remote_after)
         originals(lab, index, state)
         backup, info = lab.export(index, 'common-'+str(index)+'-'+after)
-        require(info['format'] == 3, 'actual v7 backup3')
+        require(info['format'] == (4 if predecessor else 3), 'actual complete versioned backup')
         lab.roundtrip(index, backup)
         require(lab.workers[index].call('workset') == state, 'exact workset through complete client restore')
         if after == 'active':

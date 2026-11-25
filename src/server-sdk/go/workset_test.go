@@ -22,7 +22,23 @@ func worksetFixture() map[string]any {
 }
 func TestCapacityWorksetsStrictReadContract(t *testing.T) {
 	cases := map[string]func(map[string]any){
-		"valid":           func(map[string]any) {},
+		"valid": func(map[string]any) {},
+		"valid_v2": func(v map[string]any) {
+			w := v["workset"].(map[string]any)
+			w["version"] = "control-workset-v2"
+			w["previous"] = strings.Repeat("cc", 32)
+			fields := []string{"rocket-im/capacity-workset/2", "control-workset-v2", "service", "alice", "a1", strings.Repeat("01", 32), strings.Repeat("aa", 32), "chat", "initial", "1", "512", strings.Repeat("bb", 32), strings.Repeat("cc", 32)}
+			raw, _ := json.Marshal(fields)
+			digest := sha256.Sum256(raw)
+			w["id"] = hex.EncodeToString(digest[:])
+		},
+		"v1_previous":         func(v map[string]any) { v["workset"].(map[string]any)["previous"] = nil },
+		"v2_missing_previous": func(v map[string]any) { v["workset"].(map[string]any)["version"] = "control-workset-v2" },
+		"v2_null_previous": func(v map[string]any) {
+			w := v["workset"].(map[string]any)
+			w["version"] = "control-workset-v2"
+			w["previous"] = nil
+		},
 		"unknown":         func(v map[string]any) { v["extra"] = true },
 		"missing":         func(v map[string]any) { delete(v, "phase") },
 		"sdk_phase":       func(v map[string]any) { v["phase"] = "active" },
@@ -48,7 +64,7 @@ func TestCapacityWorksetsStrictReadContract(t *testing.T) {
 				w.Write(raw)
 			}, 1, time.Second)
 			out, e := c.CapacityWorksets(context.Background())
-			if name == "valid" {
+			if name == "valid" || name == "valid_v2" {
 				if e != nil || len(out) != 2 || out[0].Phase != "confirmed" || out[1] != nil {
 					t.Fatal(e)
 				}

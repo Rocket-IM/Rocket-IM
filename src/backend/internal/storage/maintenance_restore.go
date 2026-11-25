@@ -37,7 +37,7 @@ func (s *Store) restoreService(ctx context.Context, path string) error {
 	if st.Evidence != nil {
 		wantVersion = reconciliationBackupVersion
 	}
-	if backup.Version != wantVersion || (backup.ServiceVersion != ServiceVersion && backup.ServiceVersion != "0.1.0-alpha.7" && backup.ServiceVersion != "0.1.0-alpha.6" && backup.ServiceVersion != "0.1.0-alpha.5" && !(st.Evidence == nil && backup.ServiceVersion == "0.1.0-alpha.4")) {
+	if backup.Version != wantVersion || (backup.ServiceVersion != ServiceVersion && backup.ServiceVersion != "0.1.0-alpha.8" && backup.ServiceVersion != "0.1.0-alpha.7" && backup.ServiceVersion != "0.1.0-alpha.6" && backup.ServiceVersion != "0.1.0-alpha.5" && !(st.Evidence == nil && backup.ServiceVersion == "0.1.0-alpha.4")) {
 		return m.Fail("service_backup_version_unsupported")
 	}
 	if backup.GuardID != st.GuardID || backup.Configuration != st.Configuration {
@@ -141,8 +141,13 @@ func (s *Store) importSnapshot(ctx context.Context, data databaseSnapshot, diges
 			return e
 		}
 	}
-	if versions[0].Version == 7 {
+	if versions[0].Version >= 7 {
 		if e = applyMigration(ctx, tx, "007_common_workset.sql"); e != nil {
+			return e
+		}
+	}
+	if versions[0].Version >= 8 {
+		if e = applyMigration(ctx, tx, "008_repeated_workset.sql"); e != nil {
 			return e
 		}
 	}

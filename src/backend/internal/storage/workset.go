@@ -9,36 +9,12 @@ import (
 )
 
 func (s *Store) requireWorkset(ctx context.Context, tx pgx.Tx) error {
-	var count, version int
-	if e := tx.QueryRow(ctx, s.queries["schema_version"]).Scan(&count, &version); e != nil {
-		return e
-	}
-	if count != 1 || version != 7 || !s.evidenced {
-		return m.Fail("workset_not_enabled")
-	}
-	return nil
+	_, e := s.worksetSchema(ctx, tx)
+	return e
 }
 func (s *Store) readWorkset(ctx context.Context, tx pgx.Tx, index int) (*m.CapacityWorksetState, error) {
-	var raw []byte
-	if e := tx.QueryRow(ctx, s.queries["workset_read"], index).Scan(&raw); e != nil {
-		return nil, e
-	}
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	var out m.CapacityWorksetState
-	if m.Decode(raw, &out) != nil || out.Workset.Validate() != nil || (out.Phase != "prepared" && out.Phase != "confirmed" && out.Phase != "settled") {
-		return nil, m.Fail("workset_invalid")
-	}
-	if e := s.verifyWorkset(ctx, tx, index, out.Workset); e != nil {
-		return nil, e
-	}
-	if out.Phase == "settled" {
-		if e := s.worksetComplete(ctx, tx, index, out.Workset); e != nil {
-			return nil, e
-		}
-	}
-	return &out, nil
+	current, _, e := s.readWorksetChain(ctx, tx, index)
+	return current, e
 }
 
 // 认证、原件、额度及阶段变化共用原受控事务；成功还须外部候选证据确认。
@@ -66,7 +42,7 @@ func (s *Store) capacityWorkset(ctx context.Context, tx pgx.Tx, token, operation
 	if e != nil {
 		return nil, e
 	}
-	old, e := s.readWorkset(ctx, tx, index)
+	old, history, e := s.readWorksetChain(ctx, tx, index)
 	if e != nil {
 		return nil, e
 	}
@@ -74,11 +50,40 @@ func (s *Store) capacityWorkset(ctx context.Context, tx pgx.Tx, token, operation
 		if input == nil {
 			return nil, m.Fail("workset_invalid")
 		}
-		if old != nil && old.Workset != *input {
+		if old != nil && old.Workset.ID == input.ID && old.Workset != *input {
 			return nil, m.Fail("workset_conflict")
+		}
+		// 旧ID精确重试只返回旧终态，不更新当前轮或重新分配历史。
+		for _, record := range history {
+			if record.Workset.ID == input.ID {
+				if record.Workset != *input {
+					return nil, m.Fail("workset_conflict")
+				}
+				if operation != "prepare" && operation != "confirm" && operation != "settle" {
+					return nil, m.Fail("invalid_request")
+				}
+				if !deadline.IsZero() && !time.Now().Before(deadline) {
+					return nil, m.Fail("credential_expired")
+				}
+				if e = tx.Commit(ctx); e != nil {
+					return nil, e
+				}
+				return &record, nil
+			}
 		}
 		if input.Validate() != nil {
 			return nil, m.Fail("workset_invalid")
+		}
+		if old != nil && old.Workset != *input {
+			if operation != "prepare" {
+				return nil, m.Fail("workset_conflict")
+			}
+			if e = s.appendWorksetPredecessor(ctx, tx, index, *old, *input); e != nil {
+				return nil, e
+			}
+			old = nil
+		} else if old == nil && input.Version != m.WorksetVersion {
+			return nil, m.Fail("workset_conflict")
 		}
 		if e = s.verifyWorkset(ctx, tx, index, *input); e != nil {
 			return nil, e

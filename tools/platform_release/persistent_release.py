@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / 'dist/platform-release/persistent'
 PACKAGE = ROOT / 'src/sdk/typescript/desktop'
 CONSUMER = ROOT / 'tests/consumers/node-persistent'
-VERSION = '0.2.0-dev.13'
+VERSION = '0.2.0-dev.14'
 NAME = '@rocket-im/desktop-dev'
 
 def sources():

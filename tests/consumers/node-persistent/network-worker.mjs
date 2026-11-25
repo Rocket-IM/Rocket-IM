@@ -46,6 +46,10 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
       case 'recoverRequest': result = await device.recoverRequest(request.requestId, request.action); break;
       case 'reserveCapacity': result = await device.reserveCapacity(); break;
       case 'prepareWorkset': result = await device.prepareCapacityWorkset(); break;
+      case 'prepareNextWorkset': result = await device.prepareNextCapacityWorkset(request.previous); break;
+      case 'nextWorksetCancel': { const c = new AbortController(); c.abort(); result = await device.prepareNextCapacityWorkset(request.previous, {signal:c.signal}); break; }
+      case 'nextWorksetCancelInFlight': { const c = new AbortController(); const pending = device.prepareNextCapacityWorkset(request.previous, {signal:c.signal}); c.abort(); result = await pending; break; }
+      case 'nextWorksetConcurrent': result = await Promise.all([device.prepareNextCapacityWorkset(request.previous), device.prepareNextCapacityWorkset(request.previous)]); break;
       case 'workset': result = await device.capacityWorkset(); break;
       case 'worksetCancel': { const signal = new AbortController(); signal.abort(); result = await device.prepareCapacityWorkset({signal:signal.signal}); break; }
       case 'reserveCancel': { const signal = new AbortController(); signal.abort(); result = await device.reserveCapacity({signal:signal.signal}); break; }

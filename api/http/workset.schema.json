@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://rocket-im.invalid/http/workset.schema.json",
-  "description": "固定原件闭区间1<=first<=last<=512。SDK/Service核对原件和原身份；原件及工作集摘要规则见端侧存储35节。没有TTL或解除。Service confirmed是持久收到SDK确认，SDK active是持久收到Service确认；不是跨库原子快照。",
+  "description": "固定原件闭区间1<=first<=last<=512。SDK/Service核对原件和原身份；原件及工作集摘要规则见端侧存储35节。没有TTL或解除。Service confirmed是持久收到SDK确认，SDK active是持久收到Service确认；不是跨库原子快照。 v2追加previous并使用独立ID域/2；前轮必须双方按协议持久结清，原件区间严格后移，旧轮永久保留，最多512轮。新SDK接续调用以真实前轮ID精确幂等，详见端侧36节。",
   "oneOf": [
     {
       "type": "null"
@@ -27,7 +27,10 @@
       ],
       "properties": {
         "version": {
-          "const": "control-workset-v1"
+          "enum": [
+            "control-workset-v1",
+            "control-workset-v2"
+          ]
         },
         "id": {
           "type": "string",
@@ -59,8 +62,35 @@
         "originals_hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "previous": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "version": {
+                "const": "control-workset-v2"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "previous"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "previous"
+              ]
+            }
+          }
+        }
+      ]
     },
     "ServiceState": {
       "type": "object",

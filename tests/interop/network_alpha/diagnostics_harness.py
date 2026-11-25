@@ -25,7 +25,9 @@ class DiagnosticsLab(CapacityLab):
                 from reserve_upgrade import OLD_SERVICE as source, OLD_SHA as digest
             if self.old_service == 'workset':
                 from workset_upgrade import OLD_SERVICE as source, OLD_SHA as digest
-            version = {'reserve': 'alpha.6', 'workset': 'alpha.7'}.get(self.old_service, 'alpha.5')
+            if self.old_service == 'repeat':
+                from workset_repeat_upgrade import OLD_SERVICE as source, OLD_SHA as digest
+            version = {'reserve': 'alpha.6', 'workset': 'alpha.7', 'repeat': 'alpha.8'}.get(self.old_service, 'alpha.5')
             require(sha(source) == digest, 'unchanged actual '+version+' baseline')
             shutil.copy2(source, self.root/'im-service')
             self.report['upgrade_old_service'] = {'path': str(source), 'sha256': digest}

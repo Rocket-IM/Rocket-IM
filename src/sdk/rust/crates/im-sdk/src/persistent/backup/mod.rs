@@ -89,7 +89,9 @@ impl Store {
         let key = p.encryption_key()?;
         let manifest = Manifest {
             info: BackupInfo {
-                format: if saved.data.has_workset() {
+                format: if saved.data.has_workset_history() {
+                    4
+                } else if saved.data.has_workset() {
                     3
                 } else if saved.meta.reserve_version.is_some() {
                     2

@@ -211,7 +211,7 @@ type MaintenanceResult struct {
 // Maintain 是离线维护入口；正常操作没有测试钩子，不接收SQL或用户秘密恢复材料。
 func Maintain(ctx context.Context, c config.Config, operation, backupPath string) (MaintenanceResult, error) {
 	result := MaintenanceResult{Version: maintenanceVersion, Operation: operation}
-	if operation != "enroll" && operation != "backup" && operation != "restore" && operation != "enable-reconciliation" && operation != "reconcile" && operation != "enable-capacity-reserve" && operation != "enable-capacity-workset" {
+	if operation != "enroll" && operation != "backup" && operation != "restore" && operation != "enable-reconciliation" && operation != "reconcile" && operation != "enable-capacity-reserve" && operation != "enable-capacity-workset" && operation != "enable-repeated-workset" {
 		return result, m.Fail("maintenance_operation_invalid")
 	}
 	s, e := connect(ctx, c)
@@ -235,6 +235,8 @@ func Maintain(ctx context.Context, c config.Config, operation, backupPath string
 		e = s.enableCapacityReserve(ctx)
 	case "enable-capacity-workset":
 		e = s.enableCapacityWorkset(ctx)
+	case "enable-repeated-workset":
+		e = s.enableRepeatedWorkset(ctx)
 	case "reconcile":
 		e = s.reconcile(ctx)
 	}

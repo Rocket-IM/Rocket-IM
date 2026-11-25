@@ -49,6 +49,11 @@ pub(super) struct Saved {
     pub meta: super::recovery_types::Meta,
 }
 impl Data {
+    pub fn has_workset_history(&self) -> bool {
+        self.network
+            .as_ref()
+            .is_some_and(|n| !n.workset_history.is_empty())
+    }
     pub fn has_workset(&self) -> bool {
         self.network.as_ref().is_some_and(|n| n.workset.is_some())
     }

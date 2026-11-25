@@ -131,3 +131,14 @@ Service `0.1.0-alpha.6`增加 `GET /v1/capacity`（设备自身固定会话/同�
 新`service-capacity-alpha2`的`reserve.state`为not_enabled或bounded_ready。Go SDK alpha.3仅封装只读查询，启用仍须离线维护；全局查询仍要求原`capacity_read:true`权限，设备仅见自身范围。配置摘要、原鉴权、未知提交/撤销/恢复门禁和256/4096/16、64MiB导出、256MiB对账限额保持。认证续期/撤销、未来消息、后继材料、完整导出和磁盘未预约，也没有SDK/Service共同工作集完成保证。
 
 客户端dev.12单独调用`reserveCapacity()`启用v6及格式2备份；两端启用不是跨库原子操作。构建和复跑仍使用原`persistent_network.py build-reserve`、`service_backup.py build-new-client`及`service_capacity.py verify ... reserve|reserve-full|reserve-upgrade|reserve-upgrade-full`。完整范围与证据见[Service第12节](../docs/服务备份恢复.md#service-capacity-known-20261125)。
+
+
+### 重复工作集的显式启用（alpha.9）
+
+在原schema7实例正常停服封存、外部Evidence完整时执行：
+
+```sh
+im-service -config <原配置> -operation enable-repeated-workset
+```
+
+新增008迁移到schema8，保留当前轮并增加有界旧轮历史；不自动启用或修改001—007。随后使用dev.14的`prepareNextCapacityWorkset(previous)`，前轮必须已持久结清，所有原件及历史继续计入原预算。旧alpha.8拒载schema8/alpha.9新备份；新程序可读取旧合法备份，不能用旧快照撤销新承诺。未知外部预约仍按原流程阻断，禁止清pending恢复可用。详细契约与实际验收见[服务备份恢复14节](../docs/服务备份恢复.md#service-repeated-worksets-20261125)。

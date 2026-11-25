@@ -7,7 +7,7 @@ import uuid
 import persistent_release as release
 from persistent_signing_packages import LabIdentity, sign, verified_copy, write_json
 
-def build(run, upgrade=False, capacity=False, reserve=False, workset=False):
+def build(run, upgrade=False, capacity=False, reserve=False, workset=False, repeated=False):
     signer = None
     report = {'status': 'RUNNING'}
     record = Path(run).parent / (Path(run).name + '-signer.json')
@@ -35,6 +35,11 @@ def build(run, upgrade=False, capacity=False, reserve=False, workset=False):
             target=Path(run).parent/(Path(run).name+'-dev12')
             old=verified_copy(source,target,signer,'777c34f9b6293533c4ef47929446e630e0be0d540f9bcebc870cf8f68da66076')
             report['dev12']={'release':str(target),'archive_sha256':old['archive_sha256']}
+        if repeated:
+            source=release.OUTPUT/'runs/ad1ef4d1-0715-47c7-aad7-e6632d9b568a/dev13-r03'
+            target=Path(run).parent/(Path(run).name+'-dev13')
+            old=verified_copy(source,target,signer,'a0a2c29d27c0a2a768b82f6518a1a158bf7dda0867d5c3c87e81fd8f01e370f9')
+            report['dev13']={'release':str(target),'archive_sha256':old['archive_sha256']}
         result = release.main(Path(run),signer=lambda binary:sign(binary,signer))
         report['status'] = 'PASS_SCOPED' if result == 0 else 'FAIL'
         return result
@@ -44,5 +49,5 @@ def build(run, upgrade=False, capacity=False, reserve=False, workset=False):
         write_json(record, report)
 
 if __name__=='__main__':
-    if len(sys.argv)!=3 or sys.argv[1] not in ('build','build-upgrade','build-capacity','build-reserve','build-workset'): raise SystemExit('usage: persistent_network.py build|build-upgrade|build-capacity|build-reserve|build-workset ABSOLUTE_RUN_DIRECTORY')
-    sys.exit(build(sys.argv[2], upgrade=sys.argv[1]=='build-upgrade',capacity=sys.argv[1]=='build-capacity',reserve=sys.argv[1]=='build-reserve',workset=sys.argv[1]=='build-workset'))
+    if len(sys.argv)!=3 or sys.argv[1] not in ('build','build-upgrade','build-capacity','build-reserve','build-workset','build-repeated-workset'): raise SystemExit('usage: persistent_network.py build|build-upgrade|build-capacity|build-reserve|build-workset|build-repeated-workset ABSOLUTE_RUN_DIRECTORY')
+    sys.exit(build(sys.argv[2], upgrade=sys.argv[1]=='build-upgrade',capacity=sys.argv[1]=='build-capacity',reserve=sys.argv[1]=='build-reserve',workset=sys.argv[1]=='build-workset',repeated=sys.argv[1]=='build-repeated-workset'))

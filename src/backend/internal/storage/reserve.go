@@ -19,7 +19,7 @@ func (s *Store) knownReserve(ctx context.Context, tx pgx.Tx) (int64, int64, erro
 	if e = tx.QueryRow(ctx, s.queries["schema_version"]).Scan(&count, &version); e != nil {
 		return 0, 0, e
 	}
-	if version == 7 {
+	if version >= 7 {
 		additional, err := s.worksetGrowth(ctx, tx)
 		if err != nil {
 			return 0, 0, err
@@ -33,7 +33,7 @@ func (s *Store) checkKnownReserve(ctx context.Context, tx pgx.Tx) error {
 	if e := tx.QueryRow(ctx, s.queries["schema_version"]).Scan(&count, &version); e != nil {
 		return e
 	}
-	if version != 6 && version != 7 {
+	if version < 6 || version > 8 {
 		return nil
 	}
 	if count != 1 || !s.evidenced {
@@ -54,7 +54,7 @@ func (s *Store) checkKnownReserve(ctx context.Context, tx pgx.Tx) error {
 }
 func (s *Store) capacityReservation(ctx context.Context, tx pgx.Tx, out *m.Capacity) error {
 	out.Reserve = m.CapacityReserve{State: "not_enabled", Resources: []m.CapacityReservedResource{}, Work: []m.CapacityReservedWork{}}
-	if out.Schema != "6" && out.Schema != "7" {
+	if out.Schema != "6" && out.Schema != "7" && out.Schema != "8" {
 		return nil
 	}
 	controls, growth, e := s.knownReserve(ctx, tx)
@@ -80,6 +80,9 @@ func (s *Store) enableCapacityReserve(ctx context.Context) error {
 }
 func (s *Store) enableCapacityWorkset(ctx context.Context) error {
 	return s.enableCapacityVersion(ctx, 7, "007_common_workset.sql")
+}
+func (s *Store) enableRepeatedWorkset(ctx context.Context) error {
+	return s.enableCapacityVersion(ctx, 8, "008_repeated_workset.sql")
 }
 func (s *Store) enableCapacityVersion(ctx context.Context, want int, migration string) error {
 	g := s.maintenance
@@ -111,7 +114,7 @@ func (s *Store) enableCapacityVersion(ctx context.Context, want int, migration s
 	if count != 1 {
 		return m.Fail("schema_version_unsupported")
 	}
-	if version >= want && version <= 7 {
+	if version >= want && version <= 8 {
 		return nil
 	}
 	if version != want-1 {

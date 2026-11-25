@@ -89,6 +89,8 @@ pub(super) struct Page {
 pub(in crate::persistent) struct NetworkData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(in crate::persistent) workset: Option<super::CapacityWorksetState>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(in crate::persistent) workset_history: Vec<super::CapacityWorksetState>,
     pub(super) binding: Option<Binding>,
     pub(super) events: Vec<Event>,
     #[serde(default = "zero")]

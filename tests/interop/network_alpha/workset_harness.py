@@ -26,7 +26,8 @@ def observe(lab, index, label, local_phase, remote_phase):
     remote = service_state(lab, index)
     require(phase(local) == local_phase and phase(remote) == remote_phase, 'exact durable phases '+label)
     if local and remote:
-        require(local['workset'] == remote['workset'], 'same full owner context originals and ID')
+        predecessor = local['phase'] == 'prepared' and remote['phase'] == 'settled' and local['workset'].get('previous') == remote['workset']['id']
+        require(local['workset'] == remote['workset'] or predecessor, 'same manifest or explicit still-remote predecessor')
     capacity, global_value = capture(lab, label)
     row = {'label': label, 'device': index, 'local': local, 'service': remote,
            'local_capacity': capacity[index], 'service_capacity': global_value}
@@ -143,6 +144,9 @@ def manifest_id(w):
     fields = ['rocket-im/capacity-workset/1', w['version'], s['service'], s['account'], s['device'],
               w['owner']['identity_key'], w['sdk_instance'], w['conversation'], w['context'],
               w['first'], w['last'], w['originals_hash']]
+    if w['version'] == 'control-workset-v2':
+        fields[0] = 'rocket-im/capacity-workset/2'
+        fields.append(w['previous'])
     return hashlib.sha256(json.dumps(fields, separators=(',', ':')).encode()).hexdigest()
 
 

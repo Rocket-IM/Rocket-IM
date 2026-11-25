@@ -21,6 +21,10 @@ SELECT growth.n,growth.bytes+cursors.bytes FROM growth,cursors;
 SELECT capacity_workset FROM alpha_devices WHERE device_index=$1
 -- name: workset_write
 UPDATE alpha_devices SET capacity_workset=$2 WHERE device_index=$1
+-- name: workset_history_read
+SELECT capacity_workset_history FROM alpha_devices WHERE device_index=$1
+-- name: workset_history_append
+UPDATE alpha_devices SET capacity_workset_history=capacity_workset_history||jsonb_build_array($2::jsonb) WHERE device_index=$1
 -- name: workset_originals
 SELECT mb.event,m.request_id,m.message_id,m.accepted,m.envelope_hash,m.envelope,COALESCE(mb.disposition,''),m.delivered,m.context_retired
 FROM alpha_mailbox mb JOIN alpha_messages m ON m.sender=mb.device_index AND m.request_id=mb.event->'acceptance'->>'request_id'
