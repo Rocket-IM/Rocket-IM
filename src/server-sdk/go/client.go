@@ -122,6 +122,9 @@ func (c *Client) call(ctx context.Context, op string, input, output any) error {
 	if e != nil {
 		return e
 	}
+	return c.callHTTP(ctx, http.MethodPost, op, body, output)
+}
+func (c *Client) callHTTP(ctx context.Context, method, op string, body []byte, output any) error {
 	for attempt := 0; attempt < c.attempts; attempt++ {
 		if attempt > 0 {
 			timer := time.NewTimer(time.Duration(attempt) * 50 * time.Millisecond)
@@ -135,7 +138,7 @@ func (c *Client) call(ctx context.Context, op string, input, output any) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		req, e := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint+"/v1/business/"+op, bytes.NewReader(body))
+		req, e := http.NewRequestWithContext(ctx, method, c.endpoint+"/v1/business/"+op, bytes.NewReader(body))
 		if e != nil {
 			return e
 		}
@@ -191,7 +194,7 @@ func (c *Client) call(ctx context.Context, op string, input, output any) error {
 }
 func knownCode(s string) bool {
 	switch s {
-	case "unauthorized", "forbidden", "scope_mismatch", "invalid_request", "idempotency_conflict", "device_conflict", "device_limit", "device_not_bound", "request_limit", "credential_expired", "credential_revoked", "invalid_expiry", "storage_unavailable":
+	case "unauthorized", "forbidden", "scope_mismatch", "invalid_request", "idempotency_conflict", "device_conflict", "device_limit", "device_not_bound", "request_limit", "credential_expired", "credential_revoked", "invalid_expiry", "storage_unavailable", "service_reconciliation_required", "service_reconciliation_mismatch":
 		return true
 	}
 	return false

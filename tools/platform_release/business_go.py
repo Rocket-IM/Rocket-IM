@@ -10,7 +10,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE = 'rocket-im.local/server-sdk'
-VERSION = 'v0.1.0-alpha.1'
+VERSION = 'v0.1.0-alpha.2'
 
 def pack(destination):
     destination = Path(destination).resolve()

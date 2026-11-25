@@ -8,12 +8,13 @@ import subprocess
 import time
 from business_harness import BusinessLab
 from harness import ROOT, GO, PG, require, wait, port
+from business_go import pack
 
 
 class RenewalLab(BusinessLab):
     def build(self, proxy=False):
-        frozen=ROOT/'dist/platform-release/persistent/runs/e4634800-392f-46ce-a369-0513e64cade2/business-reviewed/go-release/report.json'
-        self.frozen_go_package=json.loads(frozen.read_text())
+        # 每轮冻结实际版本，旧轮代理与证据保持原样；消费者仍从独立模块缓存安装。
+        self.frozen_go_package=getattr(self,'frozen_go_package',None) or pack(self.run/'go-release')
         require(hashlib.sha256(Path(self.frozen_go_package['archive']).read_bytes()).hexdigest()==self.frozen_go_package['archive_sha256'],'frozen Go artifact bytes')
         for name,digest in self.frozen_go_package['source_sha256'].items():
             require(hashlib.sha256((ROOT/'src/server-sdk/go'/name).read_bytes()).hexdigest()==digest,'unchanged frozen Go SDK source')

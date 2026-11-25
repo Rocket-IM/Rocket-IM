@@ -1,0 +1,807 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rocket-im.invalid/http/capacity.schema.json",
+  "description": "同一受控RepeatableRead读事务的只读容量观察；无持久预留、无跨库快照、无执行许可。schema5导出使用256MiB证据读取后校验完整64MiB编码；旧64MiB-64KiB行预检单列not_applied。 未启用Evidence时对账预算enforcement=not_applied；此时limit/差额仅为该能力参考阈值，非当前准入额度。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "owner",
+    "observation_id",
+    "consistency",
+    "scope",
+    "schema",
+    "budgets",
+    "cursors",
+    "recovery",
+    "reserve",
+    "operations",
+    "physical",
+    "remote"
+  ],
+  "properties": {
+    "version": {
+      "enum": [
+        "service-capacity-alpha1"
+      ]
+    },
+    "owner": {
+      "enum": [
+        "service"
+      ]
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "consistency": {
+      "enum": [
+        "single_pg_read"
+      ]
+    },
+    "scope": {
+      "$ref": "#/$defs/Scope"
+    },
+    "schema": {
+      "enum": [
+        "4",
+        "5"
+      ]
+    },
+    "budgets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/Budget"
+      }
+    },
+    "cursors": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Cursors"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recovery": {
+      "enum": [
+        "none",
+        "reserved",
+        "offered",
+        "approved",
+        "ready",
+        "committed",
+        "closing",
+        "closed",
+        "complete"
+      ]
+    },
+    "reserve": {
+      "$ref": "#/$defs/Reserve"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/Operation"
+      }
+    },
+    "physical": {
+      "$ref": "#/$defs/Unavailable"
+    },
+    "remote": {
+      "$ref": "#/$defs/Unavailable"
+    }
+  },
+  "$defs": {
+    "Decimal": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$"
+    },
+    "Scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service",
+        "conversation",
+        "access",
+        "account",
+        "device",
+        "principal"
+      ],
+      "properties": {
+        "service": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "conversation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "access": {
+          "enum": [
+            "device",
+            "service"
+          ]
+        },
+        "account": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "device": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "principal": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "unit",
+        "enforcement",
+        "state",
+        "used",
+        "limit",
+        "hard_remaining",
+        "reason"
+      ],
+      "properties": {
+        "category": {
+          "enum": [
+            "accepted",
+            "business_requests",
+            "recovery_rounds",
+            "recovery_json_bytes",
+            "latest_round_bytes",
+            "reconciliation_row_bytes",
+            "export_row_bytes",
+            "export_file_bytes"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "items",
+            "bytes"
+          ]
+        },
+        "enforcement": {
+          "enum": [
+            "hard_limit",
+            "precheck",
+            "not_applied"
+          ]
+        },
+        "state": {
+          "enum": [
+            "measured",
+            "unavailable"
+          ]
+        },
+        "used": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "hard_remaining": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Decimal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "reconciliation_size_limit",
+                "maintenance_not_enrolled"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "measured"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "used": {
+                "$ref": "#/$defs/Decimal"
+              },
+              "hard_remaining": {
+                "$ref": "#/$defs/Decimal"
+              },
+              "reason": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "category": {
+                "const": "export_file_bytes"
+              },
+              "used": {
+                "type": "null"
+              },
+              "hard_remaining": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Cursors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tail",
+        "processed",
+        "pending_messages",
+        "pending_control"
+      ],
+      "properties": {
+        "tail": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "processed": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "pending_messages": {
+          "$ref": "#/$defs/Decimal"
+        },
+        "pending_control": {
+          "$ref": "#/$defs/Decimal"
+        }
+      }
+    },
+    "Reserve": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "protected_remaining",
+        "ordinary_available"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not_implemented"
+          ]
+        },
+        "protected_remaining": {
+          "type": "null"
+        },
+        "ordinary_available": {
+          "type": "null"
+        }
+      }
+    },
+    "Unavailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reserved"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "unavailable"
+          ]
+        },
+        "reserved": {
+          "const": false
+        }
+      }
+    },
+    "Operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "state",
+        "blockers"
+      ],
+      "properties": {
+        "operation": {
+          "enum": [
+            "new_send",
+            "retry_send",
+            "download",
+            "process",
+            "report",
+            "renew_credential",
+            "revoke_credential",
+            "new_recovery",
+            "export",
+            "import"
+          ]
+        },
+        "state": {
+          "enum": [
+            "requires_input",
+            "not_reserved",
+            "blocked"
+          ]
+        },
+        "blockers": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "message_limit",
+              "context_not_accepted",
+              "maintenance_seal_required",
+              "export_row_limit",
+              "reconciliation_size_limit",
+              "maintenance_not_enrolled",
+              "export_file_limit",
+              "request_limit",
+              "recovery_limit"
+            ]
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "blocked"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "blockers": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "blockers": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "properties": {
+              "access": {
+                "const": "device"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "properties": {
+              "account": {
+                "type": "string"
+              },
+              "device": {
+                "type": "string"
+              },
+              "principal": {
+                "type": "null"
+              }
+            }
+          },
+          "cursors": {
+            "$ref": "#/$defs/Cursors"
+          },
+          "budgets": {
+            "minItems": 1,
+            "maxItems": 1,
+            "allOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "accepted"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              }
+            ]
+          },
+          "operations": {
+            "minItems": 5,
+            "maxItems": 5,
+            "allOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "new_send"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "retry_send"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "download"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "process"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "report"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "scope": {
+            "properties": {
+              "account": {
+                "type": "null"
+              },
+              "device": {
+                "type": "null"
+              },
+              "principal": {
+                "type": "string"
+              }
+            }
+          },
+          "cursors": {
+            "type": "null"
+          },
+          "budgets": {
+            "minItems": 8,
+            "maxItems": 8,
+            "allOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "accepted"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "business_requests"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "recovery_rounds"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "recovery_json_bytes"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "latest_round_bytes"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "reconciliation_row_bytes"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "export_row_bytes"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "export_file_bytes"
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              }
+            ]
+          },
+          "operations": {
+            "minItems": 7,
+            "maxItems": 7,
+            "allOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "new_send"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "retry_send"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "export"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "import"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "renew_credential"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "revoke_credential"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "operation": {
+                      "const": "new_recovery"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

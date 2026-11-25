@@ -102,11 +102,11 @@ func (s *Store) ReserveRecovery(ctx context.Context, index int, input m.Recovery
 	} else if input.Previous != nil {
 		return nil, m.Fail("recovery_predecessor_mismatch")
 	}
-	var count, size int
-	if e = tx.QueryRow(ctx, s.queries["recovery_count"]).Scan(&count, &size); e != nil {
+	count, size, e := s.recoveryUsage(ctx, tx)
+	if e != nil {
 		return nil, e
 	}
-	if count >= 16 || size > 28*1024*1024 {
+	if count >= recoveryRoundLimit || size > recoveryJSONLimit {
 		return nil, m.Fail("recovery_limit")
 	}
 	round := &m.RecoveryRound{Reservation: input, Status: "reserved", Materials: map[string]string{}}
@@ -206,8 +206,12 @@ func (s *Store) allowContext(ctx context.Context, tx pgx.Tx, context string) err
 	if context != current {
 		return m.Fail("context_not_accepted")
 	}
-	if r != nil && r.Reservation.OldContext == context && r.Materials["approval"] != "" {
+	if contextFrozen(context, r) {
 		return m.Fail("context_not_accepted")
 	}
 	return nil
+}
+
+func contextFrozen(context string, r *m.RecoveryRound) bool {
+	return r != nil && r.Reservation.OldContext == context && r.Materials["approval"] != ""
 }

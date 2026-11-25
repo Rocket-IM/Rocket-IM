@@ -1,6 +1,6 @@
 # 可替换的业务身份接入示例
 
-这是独立 Go 模块，只依赖实际版本化 `rocket-im.local/server-sdk v0.1.0-alpha.1`。没有源码 `replace`、Service内部包或IM数据库连接。用本机模块代理安装后构建，运行 `business-backend -config <absolute-json>`。
+这是独立 Go 模块，只依赖实际版本化 `rocket-im.local/server-sdk v0.1.0-alpha.2`。没有源码 `replace`、Service内部包或IM数据库连接。用本机模块代理安装后构建，运行 `business-backend -config <absolute-json>`。
 
 配置包含 `listen`、`tls_cert`、`tls_key`、`service_url`、`service`、`ca_file`、`business_token_env` 和两个合成 `sessions`（`external_user`、`device`、`token_sha256`）。业务凭证仅从指定环境变量读取。示例的 `authenticate` 用已准备的合成会话模拟业务系统登录结果，不提供真实注册/密码管理；接入已有业务时用其认证中间件替换此函数，保留从认证上下文获取用户/设备的规则。
 

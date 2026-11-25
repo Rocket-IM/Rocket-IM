@@ -57,6 +57,28 @@ func (s *Store) AuthenticateDevice(ctx context.Context, token string) (int, time
 		return 0, time.Time{}, e
 	}
 	defer tx.Rollback(ctx)
+	index, deadline, e := s.authenticateCredential(ctx, tx, id)
+	if e != nil {
+		return 0, time.Time{}, e
+	}
+	return index, deadline, tx.Commit(ctx)
+}
+
+// 调用者持有受控读事务，避免诊断在认证与快照之间重新开放准入。
+func (s *Store) authenticateDevice(ctx context.Context, tx pgx.Tx, token string) (int, time.Time, error) {
+	if s.Config.Business == nil {
+		if i, ok := s.Config.Authenticate(token); ok {
+			return i, time.Time{}, nil
+		}
+		return 0, time.Time{}, m.Fail("unauthorized")
+	}
+	id, ok := auth.Verify(s.Config.Business.CredentialKey, s.Config.Service, token)
+	if !ok {
+		return 0, time.Time{}, m.Fail("unauthorized")
+	}
+	return s.authenticateCredential(ctx, tx, id)
+}
+func (s *Store) authenticateCredential(ctx context.Context, tx pgx.Tx, id string) (int, time.Time, error) {
 	now := time.Now().UTC()
 	c, e := s.validCredential(ctx, tx, id, now)
 	if e != nil {
@@ -72,5 +94,5 @@ func (s *Store) AuthenticateDevice(ctx context.Context, token string) (int, time
 	if p.ExpiresAt.Before(deadline) {
 		deadline = p.ExpiresAt
 	}
-	return index, deadline, tx.Commit(ctx)
+	return index, deadline, nil
 }

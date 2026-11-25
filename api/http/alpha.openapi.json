@@ -3,7 +3,7 @@
   "info": {
     "title": "Rocket-IM fixed-device Alpha",
     "version": "alpha1",
-    "description": "仅本机开发验收。两个显式配置设备，单会话E2EE；TLS1.3，独立公钥核验，设备Bearer凭证不建立E2EE信任。 successor-alpha1增加设备鉴权下的recovery_reserve/recovery_query/recovery_publish；转交不代替端侧签名、信任或双方批准。schema3保留旧接受与信箱事实，旧消息不可解密终态与delivered分离。 Service 0.1.0-alpha.4新增schema4与service-backup-alpha1离线维护CLI；HTTP/WSS契约不变。受控恢复要求停服、原配置/身份/秘密和独立维护记录一致；过旧、未封存或错目标明确拒绝，不提供HTTP备份或通用管理员解密。"
+    "description": "仅本机开发验收。两个显式配置设备，单会话E2EE；TLS1.3，独立公钥核验，设备Bearer凭证不建立E2EE信任。 successor-alpha1增加设备鉴权下的recovery_reserve/recovery_query/recovery_publish；转交不代替端侧签名、信任或双方批准。schema3保留旧接受与信箱事实，旧消息不可解密终态与delivered分离。 Service 0.1.0-alpha.4新增schema4与service-backup-alpha1离线维护CLI；HTTP/WSS契约不变。受控恢复要求停服、原配置/身份/秘密和独立维护记录一致；过旧、未封存或错目标明确拒绝，不提供HTTP备份或通用管理员解密。 Service 0.1.0-alpha.6增加service-capacity-alpha1只读容量查询，不改既有准入/持久格式。"
   },
   "servers": [
     {
@@ -81,6 +81,47 @@
           },
           "401": {
             "description": "鉴权失败"
+          }
+        }
+      }
+    },
+    "/v1/capacity": {
+      "get": {
+        "operationId": "deviceCapacity",
+        "security": [
+          {
+            "deviceBearer": []
+          }
+        ],
+        "description": "仅认证设备自身固定会话的累计接受、游标和积压，不包含全主体业务或维护用量。 无query/body/request_id。完整读事务结束后返回；权限、过期/撤销、维护未知继续拒绝。响应Cache-Control:no-store。",
+        "responses": {
+          "200": {
+            "description": "完整范围的只读观察，unavailable不是0。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "capacity.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "不支持的输入"
+          },
+          "401": {
+            "description": "无效或过期凭证"
+          },
+          "403": {
+            "description": "缺少全局诊断权限"
+          },
+          "409": {
+            "description": "设备凭证过期或撤销"
+          },
+          "429": {
+            "description": "并发请求限额"
+          },
+          "503": {
+            "description": "存储/外部对账未确认"
           }
         }
       }

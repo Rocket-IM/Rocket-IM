@@ -85,11 +85,12 @@ def run(normal, fault, consumer, directory, independent, package=None, negative_
             try: audit_result(d.call({'op':'audit_protection'}))
             finally: d.close()
             return {'status':0}
-        if op=='late_lock':
-            barrier=directory/'late-commit'; env={'ROCKET_IM_TEST_BARRIER_PHASE':'after_commit','ROCKET_IM_TEST_BARRIER':str(barrier)}
+        if op in ('late_lock','late_capacity'):
+            barrier=directory/op; env={'ROCKET_IM_TEST_BARRIER_PHASE':'capacity_after_read' if op=='late_capacity' else 'after_commit','ROCKET_IM_TEST_BARRIER':str(barrier)}
             d=launch(fault,request['database'],account,keychain=path,extra_env=env)
             try:
                 request_json={'id':'1','operation':{'op':'execute','request_id':'late-send','action':{'kind':'send','message_id':'late-message','text':'late protected result'}}}
+                if op=='late_capacity': request_json={'id':'1','operation':{'op':'capacity'}}
                 d.process.stdin.write((json.dumps(request_json)+'\n').encode());d.process.stdin.flush()
                 deadline=time.monotonic()+15
                 while not Path(str(barrier)+'.ready').exists():

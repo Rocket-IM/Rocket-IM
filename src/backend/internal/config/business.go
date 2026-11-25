@@ -17,10 +17,12 @@ type Business struct {
 	Principals       []Principal `json:"principals"`
 }
 type Principal struct {
-	ID          string    `json:"id"`
-	TokenSHA256 string    `json:"token_sha256"`
-	NotBefore   time.Time `json:"not_before"`
-	ExpiresAt   time.Time `json:"expires_at"`
+	// 显式授予全局容量只读权限；省略时旧配置摘要保持不变。
+	CapacityRead bool      `json:"capacity_read,omitempty"`
+	ID           string    `json:"id"`
+	TokenSHA256  string    `json:"token_sha256"`
+	NotBefore    time.Time `json:"not_before"`
+	ExpiresAt    time.Time `json:"expires_at"`
 	// 仅旧Alpha升级使用：部署方显式授权既有账号归属，禁止API自行认领。
 	LegacyUsers map[string]string `json:"legacy_users,omitempty"`
 }

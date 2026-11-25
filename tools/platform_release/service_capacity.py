@@ -18,13 +18,29 @@ def verify(task, release, label, suite):
     root=Path('/private/tmp')/('Rocket IM Capacity '+uuid.uuid4().hex[:12]); lab=None
     try:
         prepare(root)
-        lab=CapacityLab(release,root/'environment.json',run)
+        if suite.startswith('diagnostics'):
+            from diagnostics_harness import DiagnosticsLab
+            lab=DiagnosticsLab(release,root/'environment.json',run)
+        else:lab=CapacityLab(release,root/'environment.json',run)
         new_client=lab.release
+        if suite=='diagnostics-upgrade':
+            from diagnostics_harness import old_client
+            lab.release=old_client(task,new_client)
+            lab.old_service=True;lab.operator=False
         if suite in ('rejection-upgrade','rejection-upgrade-guarded'):
             from rejection_upgrade import baseline
             lab.release=baseline(task,new_client)
         lab.build(proxy=True)
-        if suite=='startup':lab.case('first_device_waits_for_peer_group_material',lambda:startup(lab))
+        if suite=='diagnostics':
+            from diagnostics_cases import run as diagnostics_run
+            diagnostics_run(lab)
+        elif suite=='diagnostics-full':
+            from diagnostics_cases import full as diagnostics_full
+            diagnostics_full(lab)
+        elif suite=='diagnostics-upgrade':
+            from diagnostics_upgrade import run as diagnostics_upgrade_run
+            diagnostics_upgrade_run(lab,new_client)
+        elif suite=='startup':lab.case('first_device_waits_for_peer_group_material',lambda:startup(lab))
         elif suite=='baseline':baseline(lab)
         elif suite=='overflow':overflow(lab)
         elif suite in ('rejection','rejection-multiple'):
@@ -89,5 +105,5 @@ def verify(task, release, label, suite):
 
 if __name__=='__main__':
     if len(sys.argv)!=6 or sys.argv[1]!='verify':
-        raise SystemExit('verify <task-root> <frozen-service-release> <new-label> startup|baseline|overflow|rejection|rejection-multiple|rejection-faults|rejection-upgrade|rejection-upgrade-guarded|large-local|recovery|renewal|lifecycle|successor|unknown')
+        raise SystemExit('verify <task-root> <frozen-service-release> <new-label> diagnostics|diagnostics-upgrade|diagnostics-full|startup|baseline|overflow|rejection|rejection-multiple|rejection-faults|rejection-upgrade|rejection-upgrade-guarded|large-local|recovery|renewal|lifecycle|successor|unknown')
     sys.exit(verify(*sys.argv[2:]))

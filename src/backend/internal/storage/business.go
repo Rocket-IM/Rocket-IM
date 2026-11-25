@@ -55,11 +55,11 @@ func (s *Store) Business(ctx context.Context, principal config.Principal, op str
 			}
 		}
 	} else if e == pgx.ErrNoRows {
-		var count int
-		if e = tx.QueryRow(ctx, s.queries["business_count"]).Scan(&count); e != nil {
-			return out, e
+		count, err := s.businessUsage(ctx, tx)
+		if err != nil {
+			return out, err
 		}
-		if count >= 4096 {
+		if count >= businessRequestLimit {
 			return out, m.Fail("request_limit")
 		}
 		if out, e = s.businessApply(ctx, tx, principal, op, c, now); e != nil {

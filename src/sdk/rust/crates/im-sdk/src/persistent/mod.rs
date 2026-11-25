@@ -2,6 +2,10 @@
 //! 每实例一个数据库线程；调用方在工作线程串行调用本同步接口。只有提交成功才返回成功。
 //! 进程中断若留下 Pending，库保留有效前态并拒绝新密码操作，不自动重置/重放秘密状态。
 mod candidate;
+mod capacity;
+mod capacity_types;
+mod metering;
+pub use capacity_types::*;
 mod journal;
 pub mod network;
 mod recovery;
@@ -90,6 +94,14 @@ impl PersistentDevice {
         let protection = protection::Protection::locator(path, scope, keychain)?;
         let _lock = protection.lock()?;
         protection.confirm_logout()
+    }
+    /// 单库同快照只读观察；没有持久预留。所有访问门禁成功后交付，不能作为下一次执行许可。
+    pub fn capacity(&self) -> Result<Capacity> {
+        self.database.call(|db| {
+            let snapshot = db.read(capacity::snapshot)?;
+            checkpoint("capacity_after_read");
+            Ok(snapshot)
+        })
     }
     pub fn state(&self) -> Result<State> {
         self.database.call(|db| db.read(|s| Ok(s.data.state)))
@@ -239,3 +251,12 @@ mod recovery_tests;
 
 #[cfg(test)]
 mod history_tests;
+
+#[cfg(test)]
+mod budget_tests;
+
+#[cfg(test)]
+mod recovery_budget_tests;
+
+#[cfg(test)]
+mod capacity_tests;

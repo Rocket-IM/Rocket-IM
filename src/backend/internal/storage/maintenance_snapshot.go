@@ -9,7 +9,7 @@ import (
 	m "rocket-im/service/internal/messaging"
 )
 
-const ServiceVersion = "0.1.0-alpha.5"
+const ServiceVersion = "0.1.0-alpha.6"
 const maintenanceVersion = "service-backup-alpha1"
 
 // 顺序同时满足外键导入依赖；表名与排序列来自此封闭清单，不接受外部SQL。
@@ -46,13 +46,13 @@ func digestJSON(value any) string {
 }
 
 func snapshot(ctx context.Context, tx pgx.Tx) (databaseSnapshot, error) {
-	return snapshotWithLimit(ctx, tx, backupLimit-65536)
+	return snapshotWithLimit(ctx, tx, backupRowsLimit)
 }
 
 // 完整接受/信箱原件可能超过64MiB备份文件预算；证据核对不能把备份预算
 // 变成新的消息上限。256MiB覆盖现有256消息、4096业务请求及16恢复轮的有界状态。
 func evidenceSnapshot(ctx context.Context, tx pgx.Tx) (databaseSnapshot, error) {
-	return snapshotWithLimit(ctx, tx, 256*1024*1024)
+	return snapshotWithLimit(ctx, tx, evidenceLimit)
 }
 
 func snapshotWithLimit(ctx context.Context, tx pgx.Tx, limit int) (databaseSnapshot, error) {
@@ -102,7 +102,7 @@ func snapshotWithLimit(ctx context.Context, tx pgx.Tx, limit int) (databaseSnaps
 	out.Structure = digestJSON(json.RawMessage(structure))
 	size := 0
 	for _, table := range maintenanceTables {
-		rows, e := tx.Query(ctx, "SELECT to_jsonb(t)::text FROM "+pgx.Identifier{table.Name}.Sanitize()+" t ORDER BY "+table.Order)
+		rows, e := tx.Query(ctx, "SELECT "+maintenanceRowJSON+" FROM "+pgx.Identifier{table.Name}.Sanitize()+" t ORDER BY "+table.Order)
 		if e != nil {
 			return out, e
 		}

@@ -19,7 +19,7 @@ impl NetworkData {
         b.peer.validate().map_err(|_| bad())?;
         if b.peer.scope.service != data.state.scope.service
             || b.peer.scope == data.state.scope
-            || self.events.len() > 512
+            || self.events.len() > super::super::metering::MAX_EVENTS
             || number(&self.reported)? > number(&self.processed)?
             || number(&self.processed)? > self.events.len() as u64
         {

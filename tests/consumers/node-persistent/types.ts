@@ -70,3 +70,12 @@ async function backupTypes(device: PersistentDevice) {
   void version; void digest;
 }
 void backupTypes;
+
+// capacity数字保持字符串，未知预留显式null。
+async function capacityTypes(device: import("@rocket-im/desktop-dev").PersistentDevice) {
+  const observation: import("@rocket-im/desktop-dev").Capacity = await device.capacity();
+  const revision: string = observation.revision;
+  const unavailable: null = observation.reserve.protected_remaining;
+  return {revision, unavailable};
+}
+void capacityTypes;

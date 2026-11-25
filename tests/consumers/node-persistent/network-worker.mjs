@@ -44,6 +44,9 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
       case 'networkUnavailable': result = await device.networkUnavailable(request.sequence); break;
       case 'recovery': result = await device.recovery(request.command); break;
       case 'recoverRequest': result = await device.recoverRequest(request.requestId, request.action); break;
+      case 'capacity': result = await device.capacity(); break;
+      case 'capacityCancel': { const signal = new AbortController(); signal.abort(); result = await device.capacity({signal:signal.signal}); break; }
+      case 'capacityClose': { const promise = device.capacity(); const closing = device.close(); closed = true; try { result = await promise; } finally { await closing; } break; }
       case 'state': result = await device.state(); break;
       case 'backup': result = await device.createBackup(request.path); break;
       case 'restoreBackup': result = await PersistentDevice.restoreBackup(request.options ?? options, request.path); break;

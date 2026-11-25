@@ -64,7 +64,7 @@ Rocket-IM 的目标是让开发者部署独立 IM Service、安装客户端 SDK�
 
 ### 当前进展
 
-状态核对：**2026-11-24**。阶段0仍未通过；用户已授权先整合有限的双持久端 SDK 开发版本，其验收单独记录。
+状态核对：**2026-11-25**。阶段0仍未通过；用户已授权先整合有限的双持久端 SDK 开发版本，其验收单独记录。
 
 | 已有工作 | 当前边界与记录 |
 |---|---|
@@ -80,6 +80,9 @@ Rocket-IM 的目标是让开发者部署独立 IM Service、安装客户端 SDK�
 | Service异常退出对账 | alpha.5新增显式启用schema5及离线`reconcile`，提交前将完整候选承诺保存在独立维护记录中，提交后持久确认才开放成功结果。仅精确对应的完整状态允许重开，缺证据/分叉继续拒绝；真实产物与独立SDK消费83组、Go/race32项通过。见[异常对账契约](docs/服务备份恢复.md#7-异常退出对账契约与验收)。独立记录幸存、无其他写入者为前提，共同回退仍不可判定 |
 | 现有限额容量与时延 | 同机独立两轮各完成256条真实E2EE，另实测Service第257条明确拒绝；9套91组、35项Go/race通过，短凭证续期、取消、近满/满额恢复和原件连续性已验收。该dev.9基线中的未接受队列会阻塞补拉，大正文可能先触及端侧字节预算；该轮限额及运行版本未变。测量口径和限制见[容量与时延验收](docs/服务备份恢复.md#8-现有限额容量与时延验收)，不作生产容量承诺 |
 | 永久容量拒绝与补拉 | dev.10将已证明的Service容量拒绝持久化为rejected，原请求、密文和历史留在既有有界账本。真实第257条拒绝后双方游标达到256；原库升级、恢复、故障和续期共12套122组通过。普通256消息/1024请求及字节预算不变，Service仍alpha.5；请求或字节耗尽仍明确失败。见[契约、产物与验收](docs/端侧存储与附件管理.md#30-永久容量拒绝与补拉连续性2026-11-24)，仅限macOS arm64/Node本机范围 |
+| 长期预算策略 | 已完成当前源码和策略文档核对：保留已持久原件/幂等、到限停止相应新写，区分恢复有效状态与释放容量。备份不重置额度，任意满额库同步追平未保证；该策略轮的容量诊断、同步/恢复专用余量、扩容和归档尚未实现。见[策略与验收边界](docs/端侧存储与附件管理.md#budget-policy-20261125)，本项无新增运行验收 |
+| 容量诊断与有限余量设计 | 完成一致快照/公开诊断契约、按完整候选与原件计额的有限预留设计及内部验证。实际MLS最大控制字符正文接收22条后字节拒绝；1024请求、近Data/Meta、完整候选、16轮及4096认证/撤销边界分列核验。现有预算不能保证所有合法输入追平或全量导出；该设计轮未实现诊断API和预留机制，未重发包。见[设计与证据](docs/端侧存储与附件管理.md#capacity-reserve-design-20261125) |
+| 只读容量诊断 | dev.11提供Rust/TS同SQLite快照查询，Service alpha.6提供设备自身范围及显式授权的全局查询，Go SDK alpha.2封装公开接口。精确字节、候选/恢复阶段与多项阻断分列；硬余量不代表预留或成功许可。实际包、旧库/备份兼容及验证范围见[端侧第33节](docs/端侧存储与附件管理.md#capacity-readonly-20261125)与[Service第11节](docs/服务备份恢复.md#service-capacity-readonly-20261125)。未改变原准入、限额或持久格式，受保护预留仍未实现 |
 | 密码与消息协议 POC | 隔离验证设备注册与首次信任、签名权限、发送顺序、精确重试、双游标、已读及回收恢复等路径。网络 Relay 是 Python HTTP/SQLite 实验装置，身份与独立信任输入仍有合成边界。见[安全模型](docs/安全与身份模型.md)、[协议草案](docs/消息协议草案.md) |
 | 原生与浏览器存储 POC | 验证 Rust 管理的显式事务、密码状态共同提交、崩溃恢复及独立锚；另有 macOS 受保护存储实验。尚未整合到四端内存 SDK。见[端侧存储](docs/端侧存储与附件管理.md)、[浏览器存储](docs/浏览器存储验证.md) |
 
@@ -232,7 +235,7 @@ All 21 phase-one items and independent delivery of all four SDKs belong to phase
 
 ### Current progress
 
-Status reviewed: **2026-11-24**. Stage 0 remains incomplete. The user has authorized an earlier, limited SDK development package with two persistent endpoints; its acceptance is recorded separately.
+Status reviewed: **2026-11-25**. Stage 0 remains incomplete. The user has authorized an earlier, limited SDK development package with two persistent endpoints; its acceptance is recorded separately.
 
 | Existing work | Scope and records |
 |---|---|
@@ -248,6 +251,9 @@ Status reviewed: **2026-11-24**. Stage 0 remains incomplete. The user has author
 | Service reconciliation after abnormal exit | alpha.5 adds explicit schema5 enablement and offline `reconcile`. An independent record commits to the full candidate before the database commit; success is exposed only after durable external completion. Only exact matching states may reopen; missing evidence and forks remain blocked. Scoped acceptance passed 83 actual-artifact/independent-consumer groups and 32 Go/race tests; see [Reconciliation contract](docs/服务备份恢复.md#7-异常退出对账契约与验收). The independent record must survive without rollback and there must be no other writers; joint rollback remains indeterminate |
 | Capacity and latency within existing limits | Two independent local runs each completed 256 real E2EE messages; a separate real 257th send was explicitly rejected by the Service. Nine suites/91 groups and 35 Go/race tests passed, covering short credential renewal, cancellation, near/full-capacity recovery and original-fact continuity. In that dev.9 baseline, a retained unaccepted send blocks further synchronization, and larger payloads may hit local byte budgets first. That run kept limits and runtime versions unchanged. See [Capacity and latency acceptance](docs/服务备份恢复.md#8-现有限额容量与时延验收) for measurements and scope; this is not a production capacity claim |
 | Permanent capacity rejection and continued synchronization | dev.10 durably marks proven Service capacity refusals as rejected while preserving original requests, ciphertext and history in the existing bounded ledger. After a real 257th rejection, both endpoints reach cursor 256; twelve suites/122 groups cover original-database upgrade, recovery, faults and renewal. The 256 ordinary-message/1024-request and byte budgets remain unchanged, as does Service alpha.5; exhausted request or byte budgets still fail explicitly. See [Contract, artifacts and acceptance](docs/端侧存储与附件管理.md#30-永久容量拒绝与补拉连续性2026-11-24), scoped to local macOS arm64/Node |
+| Long-term budget policy | Current source and policy documentation reviewed: preserve persisted originals and idempotency, stop affected new writes at capacity, and distinguish restoring valid state from freeing capacity. Backups do not reset quotas; synchronization cannot be guaranteed for every full database. At that policy-only checkpoint, capacity diagnostics, protected synchronization/recovery reserves, expansion and archival were unimplemented. See [Policy and acceptance boundaries](docs/端侧存储与附件管理.md#budget-policy-20261125); no new runtime acceptance was performed |
+| Capacity diagnostics and finite reserve design | Completed the consistent-snapshot/public diagnostic contract, a finite reserve design counting complete candidates and retained originals, and internal verification. Real MLS reception hit the byte preflight after 22 maximum control-character messages; 1024 requests, near Data/Meta limits, complete candidates, 16 rounds and full-ledger authentication/revocation were checked separately. Existing budgets cannot guarantee catch-up or full export for every valid input. At that design checkpoint, diagnostic APIs and reserves were unimplemented; no package was reissued. See [Design and evidence](docs/端侧存储与附件管理.md#capacity-reserve-design-20261125) |
+| Read-only capacity diagnostics | dev.11 exposes a Rust/TypeScript query from one SQLite snapshot; Service alpha.6 adds own-device and explicitly authorized global queries, wrapped by Go SDK alpha.2. Exact byte usage, candidate/recovery stages and multiple blockers are reported separately; hard headroom grants neither a reservation nor execution permission. See [Client section 33](docs/端侧存储与附件管理.md#capacity-readonly-20261125) and [Service section 11](docs/服务备份恢复.md#service-capacity-readonly-20261125) for actual-package, old-store/backup compatibility and scoped verification. Existing admission, limits and persistence formats remain unchanged; protected reserves are still unimplemented |
 | Cryptographic and message protocol POCs | Isolated paths for device registration and first trust, signed permissions, send ordering, exact retries, dual cursors, read receipts and reclamation recovery. The network Relay is a Python HTTP/SQLite test harness; identity and independent trust inputs retain synthetic boundaries. See [Security Model](docs/安全与身份模型.md) and [Protocol Draft](docs/消息协议草案.md) |
 | Native and browser storage POCs | Rust-owned explicit transactions, joint cryptographic-state commits, crash recovery and independent anchors, plus a macOS protected-storage experiment. These are not integrated into the in-memory platform SDKs. See [Client Storage](docs/端侧存储与附件管理.md) and [Browser Storage](docs/浏览器存储验证.md) |
 

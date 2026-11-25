@@ -116,3 +116,10 @@ Service `0.1.0-alpha.5`新增005迁移（schema5）和显式离线对账，本�
 实际alpha.5/dev.9在两个独立本机环境各完成256条E2EE；另一个环境中的真实第257条被Service拒绝，原密文队列保留。当前未接受队列会阻塞后续补拉；32KiB正文也可能先触及端侧字节预算，不能仅按消息条数规划。近满/满额正常备份、新空目标恢复、SIGKILL后显式对账及短凭证续期的测量见[服务备份恢复第8节](../docs/服务备份恢复.md#8-现有限额容量与时延验收)。这是有限本机基线，不是生产QPS或SLO。
 
 复跑使用`python3 tools/platform_release/service_capacity.py verify <task-root> <frozen-service-release> <new-label> baseline|overflow|large-local|recovery|renewal|lifecycle|successor|unknown`，baseline顺序执行两个独立新label。装置通过公开SDK驱动真实包，创建新隔离PG/TLS及专用钥匙串，结束后清理所属进程/PG并锁定钥匙串；不扩额、清库或淘汰幂等事实。64MiB导出文件预算与256MiB完整状态行JSON读取预算分别验证，维护摘要不是数据备份。
+
+
+## 只读容量诊断
+
+Service `0.1.0-alpha.6`增加 `GET /v1/capacity`（设备自身固定会话/同步范围）和 `GET /v1/business/capacity`（显式全局计量权限）；无query、正文或请求号。两者都使用原Bearer鉴权、维护门与受控只读事务，返回 `Cache-Control: no-store`。业务Go SDK `v0.1.0-alpha.2`提供 `Capacity(ctx)`，全局接口要求对应principal在新实例初始化前配置 `capacity_read: true`；默认普通业务返回forbidden。未配置保持旧配置摘要，不能向已登记旧实例直接添加权限来绕过配置对账。
+
+用量/硬余量不代表持久预留或执行成功，reserve固定not_implemented、受保护余量与普通可用量为null。SDK/Service无跨库原子快照；64MiB最终导出与256MiB行JSON对账分开，schema5旧导出行预检标not_applied。实际计量、超限含义及兼容验证见[Service第11节](../docs/服务备份恢复.md#service-capacity-readonly-20261125)。迁移001—005及普通准入/限额保持；Windows、生产与分发仍未验收/批准。

@@ -62,6 +62,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "connection_limit", 429)
 		return
 	}
+	if r.URL.Path == "/v1/capacity" || r.URL.Path == "/v1/business/capacity" {
+		s.capacity(w, r)
+		return
+	}
 	if strings.HasPrefix(r.URL.Path, "/v1/business/") {
 		s.business(w, r)
 		return

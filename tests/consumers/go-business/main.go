@@ -53,6 +53,8 @@ func main() {
 		}
 		var out any
 		switch r.Op {
+		case "capacity":
+			out, e = client.Capacity(ctx)
 		case "users":
 			var input rocketim.UserRequest
 			e = json.Unmarshal(r.Body, &input)

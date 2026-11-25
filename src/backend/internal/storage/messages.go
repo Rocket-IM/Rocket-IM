@@ -60,7 +60,7 @@ func (s *Store) Accept(ctx context.Context, index int, input m.Send) (m.Acceptan
 	if err = tx.QueryRow(ctx, s.queries["lock"]).Scan(&seq); err != nil {
 		return m.Acceptance{}, err
 	}
-	if seq >= 256 {
+	if seq >= messageLimit {
 		return m.Acceptance{}, m.Fail("message_limit")
 	}
 	seq++

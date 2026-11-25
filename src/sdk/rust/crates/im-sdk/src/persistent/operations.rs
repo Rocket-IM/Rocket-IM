@@ -1,5 +1,6 @@
 use super::{
     data::{action_name, Record, Saved},
+    metering::{EncodedSaved, MAX_MESSAGES, MAX_REQUESTS},
     types::*,
 };
 pub(super) enum Preparation {
@@ -37,21 +38,13 @@ pub(super) fn prepare(s: &mut Saved, request_id: &str, action: &Action) -> Resul
     if s.data.state.pending_request.is_some() {
         return Err(Error::paused("operation_pending"));
     }
-    if s.data.requests.len() >= 1024 {
+    if s.data.requests.len() >= MAX_REQUESTS {
         return Err(Error::new("request_limit"));
     }
     // 在密码处理前预留有界结果空间；容量拒绝不能留下不可恢复的密码预约。
-    let growth = encode(action)?.len().saturating_mul(6).max(1024 * 1024);
-    if encode(&s.data)?.len().saturating_add(growth) > super::data::MAX_DATA {
-        return Err(Error::new("storage_limit"));
-    }
-    if encode(&s.meta)?
-        .len()
-        .saturating_add(encode(&s.data)?.len())
-        .saturating_add(s.crypto.len())
-        .saturating_add(growth)
-        > super::store::MAX_META
-    {
+    let growth = super::metering::growth(action)?;
+    let measured = EncodedSaved::new(s)?;
+    if measured.data_preflight_exceeded(growth) || measured.meta_preflight_exceeded(growth) {
         return Err(Error::new("storage_limit"));
     }
     let st = &s.data.state;
@@ -143,7 +136,7 @@ pub(super) fn prepare(s: &mut Saved, request_id: &str, action: &Action) -> Resul
         }
     }
     if matches!(action, Action::Send { .. } | Action::Receive { .. })
-        && s.data.messages.len() >= 256
+        && s.data.messages.len() >= MAX_MESSAGES
     {
         return Err(Error::new("message_limit"));
     }

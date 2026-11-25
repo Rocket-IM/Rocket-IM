@@ -55,7 +55,7 @@ func connect(ctx context.Context, c config.Config) (*Store, error) {
 		return nil, errors.New("database_connect_failed")
 	}
 	s := &Store{Pool: p, Config: c, queries: map[string]string{}, operations: make(chan struct{}, 1)}
-	for _, file := range []string{"alpha.sql", "business.sql", "recovery.sql"} {
+	for _, file := range []string{"alpha.sql", "business.sql", "recovery.sql", "capacity.sql"} {
 		raw, e := db.Files.ReadFile("queries/" + file)
 		if e != nil {
 			p.Close()

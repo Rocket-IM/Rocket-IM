@@ -38,10 +38,29 @@ try {
     assert.equal((await a.receive(`${prefix}-back`, reply.value.envelope)).value.message.text, `protected plaintext ${prefix} Bob`);
   }
   await pass('protected_bidirectional', () => exchange('initial'));
+  await pass('capacity_same_scope_read_only_and_lifecycle', async () => {
+    const before = await a.state(), bytes = await readFile(options('alice').path);
+    let count = 0; const cancel = a.subscribe(() => count++);
+    const first = await a.capacity(), second = await a.capacity();
+    assert.equal(first.version, 'sdk-capacity-alpha1'); assert.deepEqual(first.scope, before.scope);
+    assert.equal(first.revision, before.revision); assert.notEqual(first.observation_id, second.observation_id);
+    assert.deepEqual({...first,observation_id:''}, {...second,observation_id:''});
+    assert.equal(first.reserve.protected_remaining, null); assert.equal(first.reserve.ordinary_available, null);
+    assert.deepEqual(await a.state(), before); assert.deepEqual(await readFile(options('alice').path), bytes);
+    assert.notDeepEqual((await b.capacity()).scope, first.scope); assert.equal(count, 0); cancel();
+    for (const invalid of [null, false, 'scope', [], {account:'other'}, {signal:null}, {signal:{}}, {signal:new AbortController().signal,extra:true}]) {
+      await denied(() => a.capacity(invalid), 'invalid_options');
+    }
+    assert.deepEqual(await a.state(), before); assert.deepEqual(await readFile(options('alice').path), bytes);
+    const abort = new AbortController(); abort.abort(); await denied(() => a.capacity({signal:abort.signal}), 'cancelled');
+    const closingDevice = await open('capacity_close', true);
+    const pending = closingDevice.capacity(); const closing = closingDevice.close();
+    await denied(() => pending, 'closed'); await closing; await denied(() => closingDevice.capacity(), 'closed');
+  });
   await pass('actual_lock_existing_and_new_instance', async () => {
     let events = 0; a.subscribe(() => events++);
     await ctl('lock');
-    for (const fn of [() => a.state(), () => a.send('blocked', 'blocked', 'must not save'), () => a.message('bob', 'one', 'initial-b'), () => a.joiningMaterial(), () => a.recovery({ kind: 'status' })]) await denied(fn, 'keychain_locked');
+    for (const fn of [() => a.capacity(), () => a.state(), () => a.send('blocked', 'blocked', 'must not save'), () => a.message('bob', 'one', 'initial-b'), () => a.joiningMaterial(), () => a.recovery({ kind: 'status' })]) await denied(fn, 'keychain_locked');
     await denied(() => open('alice'), 'keychain_locked'); assert.equal(events, 0);
     await b.state();
     await ctl('unlock'); assert.equal((await a.request('blocked')).status, 'missing');
@@ -157,6 +176,13 @@ try {
     assert.equal((await t.request('late-send')).status, 'complete');
     const late = await t.send('late-send', 'late-message', 'late protected result'); assert.equal(late.cached, true);
     await p.receive('late-rx', late.value.envelope); await t.close(); await p.close();
+  });
+  await pass('capacity_after_read_lock_withholds_snapshot', async () => {
+    const d = await provision('late_capacity'); await d.initialize('init');
+    const before = await d.state();
+    await ctl('late_capacity', fixtureOptions(options('late_capacity')));
+    await denied(() => d.capacity(), 'keychain_locked'); await ctl('unlock');
+    assert.deepEqual(await d.state(), before); await d.capacity(); await d.close();
   });
   await pass('logout_locked_failure_can_retry', async () => {
     const d = await open('logout_fail', true); await d.initialize('init'); await ctl('lock');

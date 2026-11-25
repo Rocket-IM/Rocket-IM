@@ -1,6 +1,9 @@
 import { Transport, SdkError, VERSION } from './transport.mjs';
 import * as v from './validation.js';
 import type * as T from './types.js';
+import { capacity } from './capacity.js';
+import type { Capacity } from './capacity.js';
+export type { Capacity, CapacityBudget, CapacityOperation, CapacityBlocker } from './capacity.js';
 import { AuthenticationBridge } from './authentication.js';
 export { SdkError, VERSION };
 export type * from './types.js';
@@ -165,6 +168,18 @@ export class PersistentDevice {
   /** 已提交收发消息按本地追加顺序分页。原样续传游标；新查询才包含后续提交。 */
   history(query: T.HistoryQuery, options?: T.CallOptions): Promise<T.HistoryPage> {
     return this.#call({ op: 'history', query }, v.history, options);
+  }
+  /** 同一SQLite读事务的容量观察；没有受保护余量，不代表后续操作必成功。 */
+  async capacity(options?: T.CallOptions): Promise<Capacity> {
+    if (this.#closing) throw new SdkError('closed');
+    if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options) ||
+        Object.keys(options).some(key => key !== 'signal') ||
+        (options.signal !== undefined && !(options.signal instanceof AbortSignal)))) throw new SdkError('invalid_options');
+    return this.#call({ op: 'capacity' }, data => {
+      const result = capacity(data);
+      if (!v.sameScope(result.scope, this.#scope)) throw new SdkError('scope_mismatch', true);
+      return result;
+    }, options);
   }
   state(options?: T.CallOptions) { return this.#call({ op: 'state' }, data => {
     const result = v.state(data); if (!v.sameScope(result.scope, this.#scope)) throw new SdkError('scope_mismatch', true); return result;

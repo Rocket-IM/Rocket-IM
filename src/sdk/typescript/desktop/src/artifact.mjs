@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-export const VERSION = '0.2.0-dev.10';
+export const VERSION = '0.2.0-dev.11';
 export class SdkError extends Error {
   constructor(code, paused = false) { super(code); this.name = 'SdkError'; this.code = code; this.paused = paused; }
 }

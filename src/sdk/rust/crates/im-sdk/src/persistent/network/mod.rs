@@ -3,7 +3,9 @@
 mod auth;
 #[cfg(feature = "network")]
 mod auth_types;
+mod capacity;
 mod ledger;
+pub(in crate::persistent) use capacity::capacity;
 mod rejection;
 pub(in crate::persistent) use rejection::{
     original as rejected_original, validate as validate_rejection,
@@ -38,6 +40,8 @@ mod socket;
 mod sync;
 #[cfg(feature = "network")]
 pub use session::NetworkSession;
+#[cfg(all(test, feature = "network"))]
+mod budget_tests;
 #[cfg(all(test, feature = "network"))]
 mod recovery_tests;
 #[cfg(all(test, feature = "network"))]

@@ -12,12 +12,15 @@ func (s *Store) exportService(ctx context.Context, path string) error {
 	if e != nil {
 		return e
 	}
-	st := s.maintenance.state
+	return writePrivate(path, makeServiceBackup(data, s.maintenance.state), false)
+}
+
+func makeServiceBackup(data databaseSnapshot, st maintenanceState) serviceBackup {
 	backup := serviceBackup{Version: maintenanceVersion, ServiceVersion: ServiceVersion, GuardID: st.GuardID, Checkpoint: st.Checkpoint, Configuration: st.Configuration, Digest: st.Digest, Snapshot: data}
 	if st.Evidence != nil {
 		backup.Version = reconciliationBackupVersion
 	}
-	return writePrivate(path, backup, false)
+	return backup
 }
 
 func (s *Store) restoreService(ctx context.Context, path string) error {
@@ -34,7 +37,7 @@ func (s *Store) restoreService(ctx context.Context, path string) error {
 	if st.Evidence != nil {
 		wantVersion = reconciliationBackupVersion
 	}
-	if backup.Version != wantVersion || (backup.ServiceVersion != ServiceVersion && !(st.Evidence == nil && backup.ServiceVersion == "0.1.0-alpha.4")) {
+	if backup.Version != wantVersion || (backup.ServiceVersion != ServiceVersion && backup.ServiceVersion != "0.1.0-alpha.5" && !(st.Evidence == nil && backup.ServiceVersion == "0.1.0-alpha.4")) {
 		return m.Fail("service_backup_version_unsupported")
 	}
 	if backup.GuardID != st.GuardID || backup.Configuration != st.Configuration {

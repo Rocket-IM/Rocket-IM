@@ -9,7 +9,7 @@ export function string(value: unknown): string { if (typeof value !== 'string') 
 export function bool(value: unknown): boolean { if (typeof value !== 'boolean') return bad(); return value; }
 function id(v: unknown): string { const s = string(v); if (!/^[A-Za-z0-9_-]{1,64}$/.test(s)) return bad(); return s; }
 function hex(v: unknown): string { const s = string(v); if (!/^(?:[0-9a-f]{2})+$/.test(s)) return bad(); return s; }
-function count(v: unknown): string {
+export function count(v: unknown): string {
   const s = string(v); if (!/^(0|[1-9][0-9]{0,19})$/.test(s) || BigInt(s) > 18446744073709551615n) return bad(); return s;
 }
 function nullable<T>(v: unknown, parser: (v: unknown) => T): T | null { return v === null ? null : parser(v); }

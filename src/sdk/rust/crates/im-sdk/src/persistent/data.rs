@@ -1,5 +1,8 @@
 //! 有界开发库账本。有效状态、请求原摘要、消息与快照一同保存；不清理幂等记录。
-use super::types::*;
+use super::{
+    metering::{MAX_CRYPTO, MAX_MESSAGES, MAX_REQUESTS, MAX_ROUNDS},
+    types::*,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -71,7 +74,9 @@ impl Data {
         }
         self.state.scope.validate().map_err(|_| bad())?;
         let rev = number(&self.state.revision)?;
-        if self.requests.len() > 1024 || self.messages.len() > 256 || crypto.len() > 4 * 1024 * 1024
+        if self.requests.len() > MAX_REQUESTS
+            || self.messages.len() > MAX_MESSAGES
+            || crypto.len() > MAX_CRYPTO
         {
             return Err(bad());
         }
@@ -176,7 +181,7 @@ impl Data {
                 return Err(bad());
             }
         }
-        if self.transitions.len() > 16
+        if self.transitions.len() > MAX_ROUNDS
             || self.state.context
                 != self
                     .transitions

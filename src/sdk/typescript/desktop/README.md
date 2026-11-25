@@ -1,6 +1,6 @@
 # Rocket-IM macOS 持久 SDK 开发包
 
-`@rocket-im/desktop-dev@0.2.0-dev.10`：仅 macOS arm64 + Node >=22，固定两个成员设备、测试身份、每端一个 SQLite 数据库。预编译 Rust 程序随包提供；消费方无需 Rust、Cargo 或生成器。
+`@rocket-im/desktop-dev@0.2.0-dev.11`：仅 macOS arm64 + Node >=22，固定两个成员设备、测试身份、每端一个 SQLite 数据库。预编译 Rust 程序随包提供；消费方无需 Rust、Cargo 或生成器。
 
 本版联网后继恢复通过 `networkRecovery` 明确授权，Rust 自动交换材料。原请求无完整候选且返回 `successor_required` 时，发起端调用 `{kind:'begin', request_id, action}`；对端从 `networkState().recovery` 取得已核验的 `round_id`，调用 `{kind:'approve', round_id}` 或 `{kind:'reject', round_id}`。不把登录成功、Service 目录或通知当作批准。双方安装证明齐备后 `phase==='complete'` 才能继续新发送，新消息必须用新请求/消息 ID。
 
@@ -10,9 +10,9 @@
 
 联网材料协议为 `successor-alpha1`，与既有离线签名材料及设备访问凭证分离；最多16轮。新预约及对端首次批准的窗口为15分钟；已经持久授权的传输不因窗口结束被撤销，Ready 后没有自动关闭。若Service确认首次预约已过期且从未接受，SDK结束这次未产生密码材料的意图并报告 `recovery_deadline`，原未决请求仍保留，重新发起需要显式Begin。已经预约的同ID重传优先返回原记录，不会被当作未预约超时清除。进入联网恢复管理后，原离线材料变更入口明确拒绝 `network_recovery_managed`，状态/已归档材料只读查询仍可用。实际验收见仓库端侧存储文档第27节，完整阶段0/生产/分发未获批准。
 
-安装本地真实 TGZ：`npm install --ignore-scripts /absolute/path/rocket-im-desktop-dev-0.2.0-dev.10.tgz`。导入 `PersistentDevice`，使用规范绝对路径、`{service, account, device}` 和显式 `keychain` 文件路径打开实例。新库须显式 `create: true`；已存在库使用 `false`，不自动新建/重置/迁移旧 POC 库。
+安装本地真实 TGZ：`npm install --ignore-scripts /absolute/path/rocket-im-desktop-dev-0.2.0-dev.11.tgz`。导入 `PersistentDevice`，使用规范绝对路径、`{service, account, device}` 和显式 `keychain` 文件路径打开实例。新库须显式 `create: true`；已存在库使用 `false`，不自动新建/重置/迁移旧 POC 库。
 
-公开方法：`connect`、`disconnect`、`networkState`、`networkRecovery`、`networkUnavailable`、`initialize`、`joiningMaterial`、`createGroup`、`joinGroup`、`send`、`receive`、`message`、`history`、`request`、`state`、`subscribe`、`recoverRequest`、`recovery`、`close`、`logout`。身份和协议材料采用小写十六进制；所有计数为十进制字符串。每端仅支持一个群，公钥必须由接入方核验/固定，不能因登录或收到 KeyPackage 自动信任。完整可执行接入示例随仓库外独立消费工程提供。
+公开方法：`connect`、`disconnect`、`networkState`、`networkRecovery`、`networkUnavailable`、`initialize`、`joiningMaterial`、`createGroup`、`joinGroup`、`send`、`receive`、`message`、`history`、`request`、`state`、`capacity`、`subscribe`、`recoverRequest`、`recovery`、`close`、`logout`。身份和协议材料采用小写十六进制；所有计数为十进制字符串。每端仅支持一个群，公钥必须由接入方核验/固定，不能因登录或收到 KeyPackage 自动信任。完整可执行接入示例随仓库外独立消费工程提供。
 
 `send(requestId, messageId, text)` 共同保存密码状态、原密文和消息；以完全相同参数重试返回原结果。请求 ID 异内容和消息 ID 冲突明确失败。`receive` 共同保存去重、明文消息、密码状态和本地成功接收计数；重复密文不再次解密或发成功事件。消息正文上限 32768 UTF-8 字节，单库最多 256 条收发消息和 1024 个请求；到限明确失败，不隐式淘汰精确重试记录。
 
@@ -129,3 +129,35 @@ const history = await device.history({direction:'forward', page_size:20});
 普通消息槽仍为256（收/发合计，包含未接受发送）；永久拒绝后，重复消息投影移除，原输入、原密文、原request/message ID、结果及修订留在原1024条请求账本，通过同一账本重建历史。拒绝标记与投影移除在同一SQLite事务中提交，不新增另一份原件、不淘汰幂等记录。故历史可多于256条，但始终受原请求数上限以及16MiB数据、4MiB密码快照、32MiB元数据和预约预算约束；字节/请求耗尽仍明确失败。满额后新消息仍拒绝，不通过清库恢复发送。
 
 dev.9的有效加密v3/v4库可由dev.10原身份原路径打开；首次拒绝与数据库v5格式门禁原子提交，dev.9随后明确拒载。未知字段/坏状态拒载，失败保留原状态。备份容器仍为v1，内部新账本字段由旧包严格拒绝；新包完整保存和恢复。取消/超时不能撤销已提交事实；未完整提交的拒绝不对外冒充终态。
+
+## 请求和字节预算耗尽后的使用边界
+
+当前策略是保留已持久原件和幂等依据，到限停止相应新写；备份/恢复不会释放请求、消息或字节额度。Data包含原输入/结果、消息、网络事件和接受事实；32MiB元数据还包括完整执行候选、恢复材料及旧快照，不能只按正文大小或历史条数估算余量。没有公开的字节/请求余量诊断接口，`storage_limit`仍不区分Data与Meta预检。
+
+- 对新请求，预约前的 `request_limit/storage_limit/message_limit` 不增加请求或执行该次群密码输入；停止生成新请求号反复尝试。若已经预约/执行或结果未知，先用原request ID查询，不能套用“没有提交”。
+- 相同request ID及完整输入优先核对原记录，绕过新请求的数量/预留检查；complete复用原结果，failed/retired/pending保留原语义。相同密文但**新request ID**的Receive仍需额度，并新增一条请求结果。本地complete不等于Service接受。
+- `request/state/message/history/networkState`及恢复status/inspect可用于查询已存业务状态，仍需完整库、可用系统秘密及匹配外部进度。SDK没有独立只读打开模式；普通操作的缓存路径仍会经过写事务，不能保证物理磁盘满时成功。
+- 已接受消息仍需本地下载/处理/报告的写入空间；满请求或字节预算可能使网络blocked。保留原件和三个游标，不跳过事件或伪报送达；disconnect/connect不改变容量。仅认证Service的关联send返回 `message_limit` 才可记永久拒绝，超时、认证失败及其他错误均不能替代该证明。
+- 第一次备份会写入guard和外部进度，须在有余量时启用并验证；不能保证Meta近满时首次启用成功。后继恢复保留旧快照并占原32MiB，仍需双方授权及原未知执行门禁。`logout`破坏本空间访问能力，不是释放容量后的恢复办法。
+- Service成功业务请求累计4096，新的凭证续期和撤销也占该预算。到期不回收原件，精确重试不使过期/撤销凭证重新有效；因此有消息槽也未必能继续联网。
+
+“恢复成功”只说明支持的完整状态已恢复；是否可继续新写、是否有余量处理至Service尾部须另行验证。有限固定总空间不能同时支持无限新输入和永久保留全部原件。容量诊断、同步/恢复专用余量、扩大总容量及长期归档目前均未实施；本节仅补充现有版本的边界，不发布新包。完整策略与待验收矩阵见[端侧存储第31节](../../../../docs/端侧存储与附件管理.md#budget-policy-20261125)。
+
+## 容量诊断与有限余量设计进展（2026-11-25）
+
+后续已完成[诊断契约与有限预留设计、内部边界验证](../../../../docs/端侧存储与附件管理.md#capacity-reserve-design-20261125)：拟议 `device.capacity()` 由Rust一次一致快照生成，各用量/上限/游标均用十进制字符串，分别报告硬余量、未建立的预留及受影响操作。**当前dev.10尚无此API，也未启用预留**；本轮仅新增内部测试，未修改TS接口或重发包。
+
+实际MLS内部测试在22条32KiB全NUL接收后因字节预算拒绝第23条，满1024请求和近Data/Meta可阻断已下载事件处理；原件、请求和游标保持。近满Meta的完整候选可精确安装，但首次备份guard可能无法写入。结果不保证任意满额库可追平；Go/WSS独立Release联合验收、首次备份钥匙串交叉窗口和真正预留机制仍未完成。接入方继续使用现有状态/错误查询，不照草案调用不存在的API或根据文件大小自行绕过准入。
+
+
+## 只读容量观察（dev.11）
+
+`await device.capacity()` 返回 `sdk-capacity-alpha1`。可选参数只接受 `{ signal?: AbortSignal }`；null、未知字段或非宿主AbortSignal返回invalid_options，不会改账号范围。Rust在唯一SQLite线程的一次显式读事务内计量同一个完整状态，读事务结束、原访问与外部进度门禁成功后交付。查询不新增request、不执行密码步骤、不改库格式；既有准确外部进度预约仍可能由原核验路径结清。锁定、注销、关闭或取消沿用原错误；迟到结果不交付，不发提交事件。
+
+`budgets`分别报告requests 1024、ordinary_messages 256、events 512、Data 16MiB、原crypto 4MiB、Meta 32MiB以及history/archives/transitions各16的用量、上限与硬余量。所有计数/字节/修订/游标都是u64规范十进制字符串；需要运算时用`BigInt`，禁止转成`Number`。candidate/session/archives/legacy字节是Meta包含项，不能重复相加；候选中的crypto按JSON字节数组真实编码计算。
+
+`reserve.state`始终为`not_implemented`，`protected_remaining`和`ordinary_available`始终为`null`。`requires_input`表示还需原输入，`not_reserved`表示没有预留；二者都不保证执行成功。`blocked`只列当前能确定的阻断原因，执行仍重新核验。普通新接收与当前下载事件处理分别判断；缓存原件、旧上下文和控制事件不按新解密消息统一扣额。
+
+`retry_request`须提供具体原请求，当前未知请求不能阻断其他历史精确重试；`recover_pending`专指当前未决请求。`recovery.pending`区分reserved、initialization_retry、executing_unknown、legacy_unknown和complete_candidate；`locally_authorized`仅表示本机已有恢复意图/决定或本地恢复会话，绝不表示双方已经授权或安装完成。完整候选安装、恢复、首次备份与导入导出仍受各自原门禁约束。
+
+`observation_id`是临时标识，业务revision不包含所有网络变化，均不是执行许可。`physical`和`remote`为`unavailable`且`reserved=false`；这不是磁盘预留或SDK与Service的跨库原子快照。当前仅macOS arm64 Node路径；未扩展Windows、其他平台或UI。实际本轮验收与限制见仓库《端侧存储与附件管理》第33节。

@@ -1,6 +1,7 @@
 //! SQLite 只在专属线程打开；所有结构/数据读取写入均使用显式事务。
 use super::{
     data::{Data, Saved, MAX_DATA},
+    metering::{EncodedSaved, MAX_CRYPTO},
     types::*,
 };
 use rusqlite::{params, Connection, OpenFlags, Transaction, TransactionBehavior};
@@ -133,7 +134,7 @@ impl Store {
                     |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )?;
                 if data.len() > MAX_DATA
-                    || crypto.len() > 4 * 1024 * 1024
+                    || crypto.len() > MAX_CRYPTO
                     || digest != hash(&[data.as_slice(), crypto.as_slice()].concat())
                 {
                     return Err(Error::paused("store_invalid"));
@@ -339,7 +340,7 @@ pub(super) fn load(tx: &Transaction<'_>, scope: &Scope) -> Result<Saved> {
         |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
     )?;
     if data.len() > MAX_DATA
-        || crypto.len() > 4 * 1024 * 1024
+        || crypto.len() > MAX_CRYPTO
         || meta.len() > MAX_META
         || digest != hash(&[data.as_slice(), crypto.as_slice(), meta.as_slice()].concat())
     {
@@ -367,11 +368,12 @@ pub(super) fn digest(saved: &Saved) -> Result<String> {
 pub(super) fn write(tx: &Transaction<'_>, saved: &Saved) -> Result<()> {
     saved.data.validate(&saved.crypto)?;
     saved.meta.validate(&saved.data, &saved.crypto)?;
-    let meta = encode(&saved.meta)?;
+    let measured = EncodedSaved::new(saved)?;
+    let meta = measured.meta;
     if meta.len() > MAX_META {
         return Err(Error::new("storage_limit"));
     }
-    let data = encode(&saved.data)?;
+    let data = measured.data;
     if data.len() > MAX_DATA {
         return Err(Error::new("storage_limit"));
     }

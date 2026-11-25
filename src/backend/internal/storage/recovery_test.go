@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"rocket-im/service/internal/config"
 	m "rocket-im/service/internal/messaging"
 	"strconv"
 	"strings"
@@ -21,6 +22,9 @@ type recoveryFixture struct {
 }
 
 func recoveryStore(t *testing.T) *recoveryFixture {
+	return recoveryStoreConfig(t, func(c config.Config) config.Config { return c })
+}
+func recoveryStoreConfig(t *testing.T, change func(config.Config) config.Config) *recoveryFixture {
 	t.Helper()
 	c := testConfig(t)
 	f := &recoveryFixture{}
@@ -33,6 +37,7 @@ func recoveryStore(t *testing.T) *recoveryFixture {
 		c.Devices[i].IdentityKey = hex.EncodeToString(pub)
 	}
 	var e error
+	c = change(c)
 	f.s, e = Open(context.Background(), c)
 	if e != nil {
 		t.Fatal(e)

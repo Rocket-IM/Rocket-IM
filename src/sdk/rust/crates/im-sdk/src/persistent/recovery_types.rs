@@ -40,7 +40,9 @@ impl Meta {
         }) {
             return Err(bad());
         }
-        if self.history.len() > 16 || self.archives.len() > 16 {
+        if self.history.len() > super::metering::MAX_ROUNDS
+            || self.archives.len() > super::metering::MAX_ROUNDS
+        {
             return Err(bad());
         }
         if let Some(j) = &self.journal {

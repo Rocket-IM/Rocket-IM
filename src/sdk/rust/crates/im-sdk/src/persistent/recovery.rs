@@ -338,13 +338,10 @@ pub(super) fn session_mut(saved: &mut Saved) -> Result<&mut Session> {
         .ok_or_else(|| Error::new("recovery_missing"))
 }
 pub(super) fn retire_session(saved: &mut Saved) -> Result<Option<String>> {
-    if saved.meta.history.len() >= 16
-        || saved.data.transitions.len() >= 16
-        || encode(&saved.meta)?.len()
-            + encode(&saved.data)?.len()
-            + saved.crypto.len()
-            + 8 * 1024 * 1024
-            > super::store::MAX_META
+    if saved.meta.history.len() >= super::metering::MAX_ROUNDS
+        || saved.data.transitions.len() >= super::metering::MAX_ROUNDS
+        || super::metering::EncodedSaved::new(saved)?
+            .meta_preflight_exceeded(super::metering::RECOVERY_GROWTH)
     {
         return Err(Error::new("recovery_limit"));
     }
