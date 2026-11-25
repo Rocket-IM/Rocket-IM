@@ -1,5 +1,5 @@
 {
-  "name": "@rocket-im/desktop-dev", "version": "0.2.0-dev.12", "private": true,
+  "name": "@rocket-im/desktop-dev", "version": "0.2.0-dev.13", "private": true,
   "type": "module", "license": "UNLICENSED",
   "description": "Fixed two-device persistent SDK development package for macOS arm64; test identities only",
   "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},

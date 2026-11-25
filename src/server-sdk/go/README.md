@@ -1,6 +1,6 @@
 # Go 业务服务端 SDK（本机 Alpha）
 
-模块 `rocket-im.local/server-sdk`，版本 `v0.1.0-alpha.3`，Go 1.27.4，仅标准库。`.local` 是本机版本化模块代理标识，尚未对外发布，也不表示许可或分发获准。接入方只需 Go 与本模块，不需要 Rust、Service 源码或数据库访问。
+模块 `rocket-im.local/server-sdk`，版本 `v0.1.0-alpha.4`，Go 1.27.4，仅标准库。`.local` 是本机版本化模块代理标识，尚未对外发布，也不表示许可或分发获准。接入方只需 Go 与本模块，不需要 Rust、Service 源码或数据库访问。
 
 ```go
 import rocketim "rocket-im.local/server-sdk"
@@ -37,9 +37,16 @@ Client可并发使用，拥有自己的HTTP连接池；`Close`只清理空闲连
 
 `client.Capacity(ctx)` 调用无正文、无请求号的 `GET /v1/business/capacity`。需要为运维使用的业务主体显式配置 `capacity_read: true`；默认普通业务主体返回 `forbidden`。此权限允许读取全实例业务请求、恢复轮及完整12表逻辑预算，不能配置给不应看到全局计数的主体。配置未启用时序列化保持兼容；启用会改变既有配置摘要，当前仅在新实例初始化时设置，不允许为诊断绕过旧库配置对账。
 
-结果为同一受控读事务的观察，所有计数和字节是规范十进制字符串。alpha.2历史契约的`reserve.state`为`not_implemented`；当前alpha.3的显式有限预留见下文，硬余量仍不表示下一操作必定成功。SDK严格校验未知字段、缺失、可空性、枚举及u64范围，设备自身诊断不通过本业务SDK调用。64MiB完整备份编码、256MiB对账行JSON分别报告；schema5不再采用的旧导出行预检标记 `not_applied`，不用于虚构阻断。接口不创建业务请求，4096账本已满也可在正确权限内读取；锁定或对账未确认仍明确失败。公开契约见仓库 `api/http/capacity.schema.json` 与 Service 备份恢复文档。
+结果为同一受控读事务的观察，所有计数和字节是规范十进制字符串。alpha.2历史契约的`reserve.state`为`not_implemented`；自alpha.3起的显式有限预留见下文，硬余量仍不表示下一操作必定成功。SDK严格校验未知字段、缺失、可空性、枚举及u64范围，设备自身诊断不通过本业务SDK调用。64MiB完整备份编码、256MiB对账行JSON分别报告；schema5不再采用的旧导出行预检标记 `not_applied`，不用于虚构阻断。接口不创建业务请求，4096账本已满也可在正确权限内读取；锁定或对账未确认仍明确失败。公开契约见仓库 `api/http/capacity.schema.json` 与 Service 备份恢复文档。
 
 业务凭证/签发密钥轮换、完备限流、多租户、动态设备和生产运维并未随本模块交付。Service本轮禁止移除已启用的业务认证配置或更换签发密钥后直接打开旧库，避免静默回退旧固定令牌。本模块没有新增第三方依赖或选择项目许可证，既有许可待决保持。
 
 
 v0.1.0-alpha.3消费`service-capacity-alpha2`：schema4/5为`reserve.state=not_enabled`，schema6的`bounded_ready`仅表示各设备下一个未知消息之前的已知控制报告具有本地256MiB对账余量。`reserve.resources`按资源给出十进制字符串的保护余量和普通可用量，顶层两个标量仍为null，不混合单位。`reserve.work`给出明确范围计数；全局观察仍必须显式`capacity_read:true`，权限false省略且不改变旧配置摘要。设备入口不暴露全局业务用量。此SDK没有预留写接口；启用只经Service原离线维护`enable-capacity-reserve`，需要封存且已启用外部对账，schema6让旧Service拒载。未承诺认证续期/撤销、未知消息报告、新后继、64MiB导出或物理空间；实际交付验证见仓库《服务备份恢复》第12节。
+
+
+v0.1.0-alpha.4增加`client.CapacityWorksets(ctx)`，通过无正文GET `/v1/business/capacity-worksets`读取固定两个设备各自的一条工作集记录（未准备项为nil）。沿用`capacity_read:true`，不消耗4096业务请求账本；普通业务主体仍forbidden。每条含`control-workset-v1`、完整设备身份/SDK实例、会话/上下文、规范字符串闭区间及原件摘要。SDK严格校验字段、范围、摘要和重复所有者；不接受SDK专有的active作为Service阶段。
+
+Service阶段prepared只表示Service本地持久准备；confirmed表示收到了同一工作集的参加者确认；settled表示原范围的报告均已提交。该GET不能证明SDK已收到最近回复，不是双方原子快照。真正确认与结清由客户端Rust和设备认证RPC完成，业务SDK没有写入、替换或解除工作集接口。schema7显式启用`enable-capacity-workset`，仍依赖原sealed、外部Evidence与schema6；旧格式不自动升级。schema7的alpha2容量查询在同一256MiB预算中计入新记录及最长确认阶段差额，控制报告工作数的原口径不变。
+
+超时、取消、已提交丢回复、关闭及维护阻断均不能回收承诺；仅匹配原完整状态和外部进度时允许重开。外部候选存在但数据库只有前态时，继续`service_reconciliation_incomplete`，不可清pending或按期限放行。本机共同范围只有已下载连续控制报告，每设备一个不可替换记录，不包含未来消息、新密码步骤、认证续期、磁盘和网络可用性。完整契约与验证见仓库《服务备份恢复》第13节。

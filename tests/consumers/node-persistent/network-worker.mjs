@@ -45,6 +45,9 @@ for await (const line of readline.createInterface({ input: process.stdin })) {
       case 'recovery': result = await device.recovery(request.command); break;
       case 'recoverRequest': result = await device.recoverRequest(request.requestId, request.action); break;
       case 'reserveCapacity': result = await device.reserveCapacity(); break;
+      case 'prepareWorkset': result = await device.prepareCapacityWorkset(); break;
+      case 'workset': result = await device.capacityWorkset(); break;
+      case 'worksetCancel': { const signal = new AbortController(); signal.abort(); result = await device.prepareCapacityWorkset({signal:signal.signal}); break; }
       case 'reserveCancel': { const signal = new AbortController(); signal.abort(); result = await device.reserveCapacity({signal:signal.signal}); break; }
       case 'capacity': result = await device.capacity(); break;
       case 'capacityCancel': { const signal = new AbortController(); signal.abort(); result = await device.capacity({signal:signal.signal}); break; }

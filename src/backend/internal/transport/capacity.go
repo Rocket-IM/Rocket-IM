@@ -28,8 +28,10 @@ func (s *Server) capacity(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
-	var out m.Capacity
-	if r.URL.Path == "/v1/business/capacity" {
+	var out any
+	if r.URL.Path == "/v1/business/capacity-worksets" {
+		out, e = s.Store.CapacityWorksets(ctx, token)
+	} else if r.URL.Path == "/v1/business/capacity" {
 		out, e = s.Store.CapacityBusiness(ctx, token)
 	} else {
 		out, e = s.Store.CapacityDevice(ctx, token)

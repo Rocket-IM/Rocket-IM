@@ -109,9 +109,9 @@ impl Store {
             let version: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
             if app != APP_ID
                 || (if protected {
-                    !matches!(version, 3..=6)
+                    !matches!(version, 3..=7)
                 } else {
-                    !matches!(version, 1 | 2 | 5 | 6)
+                    !matches!(version, 1 | 2 | 5 | 6 | 7)
                 })
             {
                 return Err(Error::paused("store_format_unsupported"));
@@ -161,8 +161,9 @@ impl Store {
                 super::checkpoint("before_migration_commit");
             }
             let saved = load(&tx, &scope)?;
-            if (version == 6) != saved.meta.reserve_version.is_some()
-                || (version != 6 && (version == 5) != saved.data.has_rejections())
+            if (version >= 6) != saved.meta.reserve_version.is_some()
+                || (version == 7) != saved.data.has_workset()
+                || (version < 6 && (version == 5) != saved.data.has_rejections())
                 || (!protected && saved.meta.backup_guard.is_some())
                 || (version < 5 && (version == 4) != saved.meta.backup_guard.is_some())
             {
@@ -283,14 +284,30 @@ impl Store {
             p.check_progress(&saved)?;
         }
         let reserve_before = saved.meta.reserve_version.clone();
+        let workset_before = saved.data.network.as_ref().and_then(|n| n.workset.clone());
         let value = f(&mut saved)?;
         if reserve_before.is_some() && saved.meta.reserve_version != reserve_before {
             return Err(Error::paused("reserve_changed"));
         }
+        super::network::check_workset_transition(
+            workset_before.as_ref(),
+            saved.data.network.as_ref().and_then(|n| n.workset.as_ref()),
+        )?;
+        let workset_changed =
+            workset_before.as_ref() != saved.data.network.as_ref().and_then(|n| n.workset.as_ref());
+        if workset_changed {
+            super::checkpoint("workset_before_write");
+        }
         write(&tx, &saved)?;
+        if workset_changed {
+            super::checkpoint("workset_after_write");
+        }
         #[cfg(feature = "protected-storage")]
         if let Some(p) = &self.protection {
             p.prepare_progress(&before, &saved)?;
+        }
+        if workset_changed {
+            super::checkpoint("workset_after_progress_reserve");
         }
         #[cfg(all(feature = "protected-storage", feature = "persistent-test-hooks"))]
         if let (Some(protection), Ok(path)) =
@@ -326,11 +343,17 @@ impl Store {
             super::checkpoint("before_commit");
         }
         tx.commit()?;
+        if workset_changed {
+            super::checkpoint("workset_after_sql_commit");
+        }
         #[cfg(feature = "protected-storage")]
         if let Some(p) = &self.protection {
             super::checkpoint("backup_after_sql_commit");
             p.check_progress(&saved)?;
             super::checkpoint("backup_after_progress_confirm");
+        }
+        if workset_changed {
+            super::checkpoint("workset_after_progress_confirm");
         }
         if committing {
             super::checkpoint("after_commit");
@@ -385,7 +408,12 @@ pub(super) fn write(tx: &Transaction<'_>, saved: &Saved) -> Result<()> {
     }
     let digest = hash(&[data.as_slice(), saved.crypto.as_slice(), meta.as_slice()].concat());
     // 首个终态和格式门禁在同一提交中生效；旧包必须拒绝，不能误读已压缩的消息投影。
-    if saved.meta.reserve_version.is_some() {
+    if saved.data.has_workset() {
+        let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
+        if app == APP_ID {
+            tx.execute_batch("PRAGMA user_version=7;")?;
+        }
+    } else if saved.meta.reserve_version.is_some() {
         let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
         if app == APP_ID {
             tx.execute_batch("PRAGMA user_version=6;")?;

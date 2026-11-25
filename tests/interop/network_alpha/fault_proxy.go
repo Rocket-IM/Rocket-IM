@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,6 +23,7 @@ type Fault struct {
 	Consumed  bool   `json:"consumed"`
 	Material  string `json:"material"`
 	Field     string `json:"field"`
+	Hits      int    `json:"hits"`
 }
 type Envelope struct {
 	Service       string `json:"service"`
@@ -127,7 +129,11 @@ func main() {
 				}
 				mu.Unlock()
 			}
-			if req.Op == "send" || req.Op == "recovery_publish" {
+			if strings.HasPrefix(req.Op, "capacity_workset_") && worksetRequestFault(c, r, req.Op) {
+				time.Sleep(1500 * time.Millisecond)
+				return
+			}
+			if req.Op == "send" || req.Op == "recovery_publish" || strings.HasPrefix(req.Op, "capacity_workset_") {
 				var body struct {
 					Request  string `json:"request_id"`
 					Round    string `json:"id"`
@@ -136,6 +142,9 @@ func main() {
 				_ = json.Unmarshal(req.Body, &body)
 				if req.Op == "recovery_publish" {
 					body.Request = body.Round + ":" + body.Material
+				}
+				if strings.HasPrefix(req.Op, "capacity_workset_") {
+					body.Request = body.Round
 				}
 				sum := sha256.Sum256(req.Body)
 				mu.Lock()
@@ -174,6 +183,18 @@ func main() {
 			recoveryFault := req.Op == "recovery_publish" && (fault.Material == "" || fault.Material == material.Kind) && (fault.Mode == "drop_recovery_ack" || fault.Mode == "delay_recovery_ack" || fault.Mode == "duplicate_recovery")
 			active := target && !fault.Consumed && string(response["ok"]) == "true" && ((req.Op == "send" && (fault.Mode == "drop_send_ack" || fault.Mode == "delay_send_ack")) || (req.Op == "processed" && fault.Mode == "drop_processed_ack") || (req.Op == "poll" && fault.Mode == "tamper_message"))
 			active = active || (target && !fault.Consumed && string(response["ok"]) == "true" && recoveryFault)
+			worksetFault := strings.HasPrefix(req.Op, "capacity_workset_") && req.Op == fault.Field && (fault.Mode == "hold_workset_ack" || fault.Mode == "delay_workset_ack" || fault.Mode == "tamper_workset_ack")
+			active = active || (target && !fault.Consumed && string(response["ok"]) == "true" && worksetFault)
+			if active && fault.Mode == "tamper_workset_ack" {
+				var result map[string]json.RawMessage
+				var workset map[string]json.RawMessage
+				_ = json.Unmarshal(response["result"], &result)
+				_ = json.Unmarshal(result["workset"], &workset)
+				workset["sdk_instance"] = json.RawMessage(`"` + strings.Repeat("0", 64) + `"`)
+				result["workset"], _ = json.Marshal(workset)
+				response["result"], _ = json.Marshal(result)
+				reply, _ = json.Marshal(response)
+			}
 			var failure struct {
 				Code string `json:"code"`
 			}
@@ -252,12 +273,13 @@ func main() {
 				}
 			}
 			if active {
-				fault.Consumed = fault.Mode != "hold_send_rejection"
+				fault.Consumed = fault.Mode != "hold_send_rejection" && fault.Mode != "hold_workset_ack"
+				fault.Hits++
 				b, _ := json.Marshal(fault)
 				_ = os.WriteFile(c.Control, b, 0o600)
 			}
 			mu.Unlock()
-			if active && fault.Mode == "hold_send_rejection" {
+			if active && (fault.Mode == "hold_send_rejection" || fault.Mode == "hold_workset_ack") {
 				// 持续丢弃真实Service拒绝；每个连接仍有固定时限，由控制文件解除故障。
 				time.Sleep(1500 * time.Millisecond)
 				return
@@ -265,7 +287,7 @@ func main() {
 			if active && (fault.Mode == "drop_send_ack" || fault.Mode == "drop_processed_ack" || fault.Mode == "drop_recovery_ack" || fault.Mode == "drop_send_rejection") {
 				return
 			}
-			if active && (fault.Mode == "delay_send_ack" || fault.Mode == "delay_recovery_ack" || fault.Mode == "delay_send_rejection") {
+			if active && (fault.Mode == "delay_send_ack" || fault.Mode == "delay_recovery_ack" || fault.Mode == "delay_send_rejection" || fault.Mode == "delay_workset_ack") {
 				time.Sleep(1500 * time.Millisecond)
 			}
 			if active && fault.Mode == "duplicate_recovery" {
@@ -304,4 +326,22 @@ func main() {
 	if server.ListenAndServeTLS(c.Cert, c.Key) != nil {
 		os.Exit(1)
 	}
+}
+
+func worksetRequestFault(c Config, r *http.Request, op string) bool {
+	mu.Lock()
+	defer mu.Unlock()
+	var fault Fault
+	if b, e := os.ReadFile(c.Control); e == nil {
+		_ = json.Unmarshal(b, &fault)
+	}
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	digest := sha256.Sum256([]byte(token))
+	if fault.Mode != "hold_workset_request" || fault.Field != op || (fault.TokenHash != "" && fault.TokenHash != hex.EncodeToString(digest[:])) {
+		return false
+	}
+	fault.Hits++
+	b, _ := json.Marshal(fault)
+	_ = os.WriteFile(c.Control, b, 0600)
+	return true
 }

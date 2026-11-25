@@ -5,7 +5,14 @@ mod auth;
 mod auth_types;
 mod capacity;
 mod reserve;
+mod workset;
+#[cfg(feature = "network")]
+mod workset_sync;
+mod workset_types;
 pub(in crate::persistent) use reserve::{install_receipt, project_known};
+pub(in crate::persistent) use workset::check_transition as check_workset_transition;
+pub(in crate::persistent) use workset::project_phase as project_workset_phase;
+pub use workset_types::{CapacityWorkset, CapacityWorksetState, WorksetPhase};
 mod ledger;
 pub(in crate::persistent) use capacity::capacity;
 mod rejection;
@@ -55,3 +62,5 @@ mod tests;
 
 #[cfg(all(test, feature = "network"))]
 mod reserve_tests;
+#[cfg(all(test, feature = "network"))]
+mod workset_tests;

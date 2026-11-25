@@ -34,6 +34,16 @@ impl Meta {
     }
     pub fn validate(&self, data: &Data, crypto: &[u8]) -> Result<()> {
         let bad = || Error::paused("store_invalid");
+        if let Some(w) = data.network.as_ref().and_then(|n| n.workset.as_ref()) {
+            if self.reserve_version.is_none()
+                || self
+                    .backup_guard
+                    .as_ref()
+                    .is_some_and(|g| g != &w.workset.sdk_instance)
+            {
+                return Err(bad());
+            }
+        }
         if self
             .reserve_version
             .as_deref()

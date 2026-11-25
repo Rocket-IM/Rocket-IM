@@ -62,7 +62,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "connection_limit", 429)
 		return
 	}
-	if r.URL.Path == "/v1/capacity" || r.URL.Path == "/v1/business/capacity" {
+	if r.URL.Path == "/v1/capacity" || r.URL.Path == "/v1/business/capacity" || r.URL.Path == "/v1/business/capacity-worksets" {
 		s.capacity(w, r)
 		return
 	}
@@ -97,7 +97,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "request_too_large", 413)
 		return
 	}
-	response := s.dispatch(r.Context(), index, raw)
+	response := s.dispatch(r.Context(), index, raw, token)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
 }
@@ -134,7 +134,7 @@ func (s *Server) websocket(w http.ResponseWriter, r *http.Request, token string,
 			_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "unauthorized"), time.Now().Add(time.Second))
 			return
 		}
-		response := s.dispatch(r.Context(), index, raw)
+		response := s.dispatch(r.Context(), index, raw, token)
 		_ = conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 		if conn.WriteJSON(response) != nil {
 			return
@@ -162,14 +162,14 @@ func (s *Server) Drain(ctx context.Context) error {
 		return ctx.Err()
 	}
 }
-func (s *Server) dispatch(parent context.Context, index int, raw []byte) m.Reply {
+func (s *Server) dispatch(parent context.Context, index int, raw []byte, token string) m.Reply {
 	var req m.Request
 	if m.Decode(raw, &req) != nil || !m.ID(req.ID) {
 		return m.Reply{Error: &m.Failure{Code: "invalid_request"}}
 	}
 	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
 	defer cancel()
-	result, e := s.call(ctx, index, req)
+	result, e := s.call(ctx, index, req, token)
 	reply := m.Reply{ID: req.ID, OK: e == nil, Result: result}
 	if e != nil {
 		reply.Result = nil
@@ -177,9 +177,20 @@ func (s *Server) dispatch(parent context.Context, index int, raw []byte) m.Reply
 	}
 	return reply
 }
-func (s *Server) call(ctx context.Context, index int, r m.Request) (any, error) {
+func (s *Server) call(ctx context.Context, index int, r m.Request, token string) (any, error) {
 	empty := func() error { var body struct{}; return m.Decode(r.Body, &body) }
 	switch r.Op {
+	case "capacity_workset_query":
+		if e := empty(); e != nil {
+			return nil, e
+		}
+		return s.Store.CapacityWorkset(ctx, token, "query", nil)
+	case "capacity_workset_prepare", "capacity_workset_confirm", "capacity_workset_settle":
+		var b m.CapacityWorkset
+		if e := m.Decode(r.Body, &b); e != nil {
+			return nil, e
+		}
+		return s.Store.CapacityWorkset(ctx, token, strings.TrimPrefix(r.Op, "capacity_workset_"), &b)
 	case "recovery_query":
 		var b m.RecoveryQuery
 		if e := m.Decode(r.Body, &b); e != nil {

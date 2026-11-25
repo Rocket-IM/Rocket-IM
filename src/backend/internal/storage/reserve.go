@@ -12,6 +12,20 @@ import (
 func (s *Store) knownReserve(ctx context.Context, tx pgx.Tx) (int64, int64, error) {
 	var controls, growth int64
 	e := tx.QueryRow(ctx, s.queries["capacity_known_controls"]).Scan(&controls, &growth)
+	if e != nil {
+		return 0, 0, e
+	}
+	var count, version int
+	if e = tx.QueryRow(ctx, s.queries["schema_version"]).Scan(&count, &version); e != nil {
+		return 0, 0, e
+	}
+	if version == 7 {
+		additional, err := s.worksetGrowth(ctx, tx)
+		if err != nil {
+			return 0, 0, err
+		}
+		growth += additional
+	}
 	return controls, growth, e
 }
 func (s *Store) checkKnownReserve(ctx context.Context, tx pgx.Tx) error {
@@ -19,7 +33,7 @@ func (s *Store) checkKnownReserve(ctx context.Context, tx pgx.Tx) error {
 	if e := tx.QueryRow(ctx, s.queries["schema_version"]).Scan(&count, &version); e != nil {
 		return e
 	}
-	if version != 6 {
+	if version != 6 && version != 7 {
 		return nil
 	}
 	if count != 1 || !s.evidenced {
@@ -40,7 +54,7 @@ func (s *Store) checkKnownReserve(ctx context.Context, tx pgx.Tx) error {
 }
 func (s *Store) capacityReservation(ctx context.Context, tx pgx.Tx, out *m.Capacity) error {
 	out.Reserve = m.CapacityReserve{State: "not_enabled", Resources: []m.CapacityReservedResource{}, Work: []m.CapacityReservedWork{}}
-	if out.Schema != "6" {
+	if out.Schema != "6" && out.Schema != "7" {
 		return nil
 	}
 	controls, growth, e := s.knownReserve(ctx, tx)
@@ -62,6 +76,12 @@ func (s *Store) capacityReservation(ctx context.Context, tx pgx.Tx, out *m.Capac
 
 // 必须先封存并已启用原外部对账；升级也沿原候选证据/未知提交门禁，旧包拒载schema6。
 func (s *Store) enableCapacityReserve(ctx context.Context) error {
+	return s.enableCapacityVersion(ctx, 6, "006_known_capacity.sql")
+}
+func (s *Store) enableCapacityWorkset(ctx context.Context) error {
+	return s.enableCapacityVersion(ctx, 7, "007_common_workset.sql")
+}
+func (s *Store) enableCapacityVersion(ctx context.Context, want int, migration string) error {
 	g := s.maintenance
 	if _, e := s.verifySealed(ctx); e != nil {
 		return e
@@ -91,13 +111,13 @@ func (s *Store) enableCapacityReserve(ctx context.Context) error {
 	if count != 1 {
 		return m.Fail("schema_version_unsupported")
 	}
-	if version == 6 {
+	if version >= want && version <= 7 {
 		return nil
 	}
-	if version != 5 {
+	if version != want-1 {
 		return m.Fail("schema_version_unsupported")
 	}
-	if e = applyMigration(ctx, tx, "006_known_capacity.sql"); e != nil {
+	if e = applyMigration(ctx, tx, migration); e != nil {
 		return e
 	}
 	// 只有本次受控升级的局部Store设定，运行态的evidenced仍在Open时固定。

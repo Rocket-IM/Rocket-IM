@@ -7,7 +7,7 @@ import uuid
 import persistent_release as release
 from persistent_signing_packages import LabIdentity, sign, verified_copy, write_json
 
-def build(run, upgrade=False, capacity=False, reserve=False):
+def build(run, upgrade=False, capacity=False, reserve=False, workset=False):
     signer = None
     report = {'status': 'RUNNING'}
     record = Path(run).parent / (Path(run).name + '-signer.json')
@@ -30,6 +30,11 @@ def build(run, upgrade=False, capacity=False, reserve=False):
             target=Path(run).parent/(Path(run).name+'-dev11')
             old=verified_copy(source,target,signer,'fbedacca80737e29d379f7760c8e18101ac9b6b27ed32363b7ca79558e166feb')
             report['dev11']={'release':str(target),'archive_sha256':old['archive_sha256']}
+        if workset:
+            source=release.OUTPUT/'runs/a113058b-4419-47df-aacb-21f94837b5b4/dev12-r02'
+            target=Path(run).parent/(Path(run).name+'-dev12')
+            old=verified_copy(source,target,signer,'777c34f9b6293533c4ef47929446e630e0be0d540f9bcebc870cf8f68da66076')
+            report['dev12']={'release':str(target),'archive_sha256':old['archive_sha256']}
         result = release.main(Path(run),signer=lambda binary:sign(binary,signer))
         report['status'] = 'PASS_SCOPED' if result == 0 else 'FAIL'
         return result
@@ -39,5 +44,5 @@ def build(run, upgrade=False, capacity=False, reserve=False):
         write_json(record, report)
 
 if __name__=='__main__':
-    if len(sys.argv)!=3 or sys.argv[1] not in ('build','build-upgrade','build-capacity','build-reserve'): raise SystemExit('usage: persistent_network.py build|build-upgrade|build-capacity|build-reserve ABSOLUTE_RUN_DIRECTORY')
-    sys.exit(build(sys.argv[2], upgrade=sys.argv[1]=='build-upgrade',capacity=sys.argv[1]=='build-capacity',reserve=sys.argv[1]=='build-reserve'))
+    if len(sys.argv)!=3 or sys.argv[1] not in ('build','build-upgrade','build-capacity','build-reserve','build-workset'): raise SystemExit('usage: persistent_network.py build|build-upgrade|build-capacity|build-reserve|build-workset ABSOLUTE_RUN_DIRECTORY')
+    sys.exit(build(sys.argv[2], upgrade=sys.argv[1]=='build-upgrade',capacity=sys.argv[1]=='build-capacity',reserve=sys.argv[1]=='build-reserve',workset=sys.argv[1]=='build-workset'))

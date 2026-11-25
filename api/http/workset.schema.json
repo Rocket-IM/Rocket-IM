@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rocket-im.invalid/http/workset.schema.json",
+  "description": "固定原件闭区间1<=first<=last<=512。SDK/Service核对原件和原身份；原件及工作集摘要规则见端侧存储35节。没有TTL或解除。Service confirmed是持久收到SDK确认，SDK active是持久收到Service确认；不是跨库原子快照。",
+  "oneOf": [
+    {
+      "type": "null"
+    },
+    {
+      "$ref": "#/$defs/ServiceState"
+    }
+  ],
+  "$defs": {
+    "Workset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "owner",
+        "sdk_instance",
+        "conversation",
+        "context",
+        "first",
+        "last",
+        "originals_hash"
+      ],
+      "properties": {
+        "version": {
+          "const": "control-workset-v1"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "owner": {
+          "$ref": "../realtime/alpha.schema.json#/$defs/Identity"
+        },
+        "sdk_instance": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "conversation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "context": {
+          "type": "string",
+          "pattern": "^(initial|[0-9a-f]{64})$"
+        },
+        "first": {
+          "type": "string",
+          "pattern": "^([1-9]|[1-9][0-9]|[1-4][0-9]{2}|50[0-9]|51[0-2])$"
+        },
+        "last": {
+          "type": "string",
+          "pattern": "^([1-9]|[1-9][0-9]|[1-4][0-9]{2}|50[0-9]|51[0-2])$"
+        },
+        "originals_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "ServiceState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workset",
+        "phase"
+      ],
+      "properties": {
+        "workset": {
+          "$ref": "#/$defs/Workset"
+        },
+        "phase": {
+          "enum": [
+            "prepared",
+            "confirmed",
+            "settled"
+          ]
+        }
+      }
+    },
+    "SDKState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workset",
+        "phase"
+      ],
+      "properties": {
+        "workset": {
+          "$ref": "#/$defs/Workset"
+        },
+        "phase": {
+          "enum": [
+            "prepared",
+            "confirmed",
+            "active",
+            "settled"
+          ]
+        }
+      }
+    }
+  }
+}

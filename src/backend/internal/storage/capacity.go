@@ -48,7 +48,7 @@ func (s *Store) CapacityDevice(ctx context.Context, token string) (m.Capacity, e
 	}
 	// 设备观察不得通过全局余量反推出业务主体账本；只给本设备已知控制数量。
 	out.Reserve.Resources = []m.CapacityReservedResource{}
-	if out.Schema == "6" {
+	if out.Schema == "6" || out.Schema == "7" {
 		var controls int64
 		e = tx.QueryRow(ctx, `SELECT count(*) FROM alpha_mailbox m JOIN alpha_devices d USING(device_index) WHERE d.device_index=$1 AND m.sequence>d.processed AND m.sequence < COALESCE((SELECT min(x.sequence) FROM alpha_mailbox x WHERE x.device_index=$1 AND x.sequence>d.processed AND x.event->>'kind' NOT IN ('delivered','unavailable')),d.tail+1)`, index).Scan(&controls)
 		if e != nil {
@@ -155,7 +155,7 @@ func (s *Store) capacityBase(ctx context.Context, tx pgx.Tx) (m.Capacity, error)
 	if e = tx.QueryRow(ctx, s.queries["schema_version"]).Scan(&count, &version); e != nil {
 		return out, e
 	}
-	if count != 1 || (version != 4 && version != 5 && version != 6) {
+	if count != 1 || version < 4 || version > 7 {
 		return out, m.Fail("schema_version_unsupported")
 	}
 	out.Schema = strconv.Itoa(version)

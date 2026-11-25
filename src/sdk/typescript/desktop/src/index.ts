@@ -3,6 +3,9 @@ import * as v from './validation.js';
 import type * as T from './types.js';
 import { capacity } from './capacity.js';
 import type { Capacity } from './capacity.js';
+import { worksetState } from './workset.js';
+import type { CapacityWorksetState } from './workset.js';
+export type { CapacityWorkset, CapacityWorksetState } from './workset.js';
 export type { Capacity, CapacityBudget, CapacityOperation, CapacityBlocker } from './capacity.js';
 import { AuthenticationBridge } from './authentication.js';
 export { SdkError, VERSION };
@@ -190,6 +193,26 @@ export class PersistentDevice {
     return this.#call({ op: 'reserve_capacity' }, data => {
       const result = capacity(data);
       if (!v.sameScope(result.scope, this.#scope)) throw new SdkError('scope_mismatch', true);
+      return result;
+    }, options);
+  }
+  /** 固定已下载控制原件，启用原进度保护并升级v7。Prepared仅为本地；取消不解除承诺。 */
+  async prepareCapacityWorkset(options?: T.CallOptions): Promise<CapacityWorksetState> {
+    const result = await this.#workset('prepare_capacity_workset', options);
+    if (result === null) throw new SdkError('ipc_protocol_error', true);
+    return result;
+  }
+  /** 本机持久观察；active才包含Service确认。null表示本机尚未准备，不能推断远端。 */
+  capacityWorkset(options?: T.CallOptions): Promise<CapacityWorksetState | null> {
+    return this.#workset('capacity_workset', options);
+  }
+  #workset(op: string, options?: T.CallOptions): Promise<CapacityWorksetState | null> {
+    if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options) ||
+        Object.keys(options).some(key => key !== 'signal') ||
+        (options.signal !== undefined && !(options.signal instanceof AbortSignal)))) return Promise.reject(new SdkError('invalid_options'));
+    return this.#call({op}, data => {
+      const result = worksetState(data);
+      if (result !== null && !v.sameScope(result.workset.owner.scope, this.#scope)) throw new SdkError('scope_mismatch', true);
       return result;
     }, options);
   }

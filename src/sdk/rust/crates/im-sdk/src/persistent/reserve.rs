@@ -19,6 +19,7 @@ pub(super) struct Proof {
 impl Proof {
     fn include(&mut self, s: &Saved) -> Result<()> {
         let mut stage = s.clone();
+        super::network::project_workset_phase(&mut stage);
         // 字段在原Meta中实际编码为82字节；已启用时不能重复加额。
         if stage.meta.backup_guard.is_none() {
             stage.meta.backup_guard = Some("0".repeat(64));
@@ -105,6 +106,7 @@ pub(super) fn prove(s: &Saved) -> Result<Proof> {
         proof.include(&next)?;
     }
     // 保留原授权/未知门禁。只保证这里列出的本地字节，不能推导连接或远端完成。
+    super::network::project_workset_phase(&mut next);
     let work = super::network::project_known(&mut next)?;
     proof.sends = work.0;
     proof.controls = work.1;

@@ -1,7 +1,7 @@
 export interface Scope { readonly service: string; readonly account: string; readonly device: string }
 /** 端侧快照完成回执，不表示Service同步或送达完成；不含系统秘密。 */
 export interface BackupInfo {
-  readonly format: 1 | 2; readonly backup_id: string; readonly scope: Scope;
+  readonly format: 1 | 2 | 3; readonly backup_id: string; readonly scope: Scope;
   readonly revision: string; readonly snapshot: string;
 }
 /** 公钥和协议材料均为小写十六进制字符串。Identity 必须经测试接入方独立核验。 */

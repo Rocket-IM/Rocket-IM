@@ -584,6 +584,91 @@
             "op",
             "body"
           ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "op",
+            "body"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "capacity_workset_prepare"
+            },
+            "body": {
+              "$ref": "../http/workset.schema.json#/$defs/Workset"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "op",
+            "body"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "capacity_workset_confirm"
+            },
+            "body": {
+              "$ref": "../http/workset.schema.json#/$defs/Workset"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "op",
+            "body"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "capacity_workset_settle"
+            },
+            "body": {
+              "$ref": "../http/workset.schema.json#/$defs/Workset"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "op",
+            "body"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "capacity_workset_query"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
         }
       ]
     },

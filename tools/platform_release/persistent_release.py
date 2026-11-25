@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / 'dist/platform-release/persistent'
 PACKAGE = ROOT / 'src/sdk/typescript/desktop'
 CONSUMER = ROOT / 'tests/consumers/node-persistent'
-VERSION = '0.2.0-dev.12'
+VERSION = '0.2.0-dev.13'
 NAME = '@rocket-im/desktop-dev'
 
 def sources():
@@ -93,6 +93,7 @@ def main(run=None, signer=None):
         shutil.copytree(package/'dist',stage/'dist')
         for name in ('transport.mjs','transport.d.mts','artifact.mjs'): shutil.copy2(package/'src'/name,stage/'dist'/name)
         cmd([node_binary(),frozen/'tools/platform_release/persistent_capacity.mjs',stage],stage,'capacity-validation.log')
+        cmd([node_binary(),frozen/'tools/platform_release/persistent_workset.mjs',stage],stage,'workset-validation.log')
         binary=stage/'bin/darwin-arm64/rocket-im-desktop-runtime';binary.parent.mkdir(parents=True)
         executable=next(Path(row['executable']) for row in artifacts if row.get('executable') and row['target']['name']=='rocket-im-desktop-runtime')
         assert executable.parent==OUTPUT/'target-protected/release'

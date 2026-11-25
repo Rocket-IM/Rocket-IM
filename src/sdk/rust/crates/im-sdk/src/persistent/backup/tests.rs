@@ -70,7 +70,7 @@ fn encrypted_backup_roundtrip_and_exact_file_extent() {
     tx.commit().unwrap();
     assert!(restore::read_current(&current.0, &key, &scope).is_ok());
     let tx = connection.transaction().unwrap();
-    tx.execute_batch("PRAGMA user_version=7;").unwrap();
+    tx.execute_batch("PRAGMA user_version=8;").unwrap();
     tx.commit().unwrap();
     assert_eq!(
         restore::read_current(&current.0, &key, &scope)

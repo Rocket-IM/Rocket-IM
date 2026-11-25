@@ -86,7 +86,7 @@ func capacityFields(raw json.RawMessage) bool {
 	return true
 }
 func (c Capacity) valid(service string) bool {
-	if c.Version != "service-capacity-alpha2" || c.Owner != "service" || c.Consistency != "single_pg_read" || c.Scope.Service != service || c.Scope.Access != "service" || c.Scope.Account != nil || c.Scope.Device != nil || c.Scope.Principal == nil || *c.Scope.Principal == "" || c.Scope.Conversation == "" || c.Cursors != nil || (c.Schema != "4" && c.Schema != "5" && c.Schema != "6") {
+	if c.Version != "service-capacity-alpha2" || c.Owner != "service" || c.Consistency != "single_pg_read" || c.Scope.Service != service || c.Scope.Access != "service" || c.Scope.Account != nil || c.Scope.Device != nil || c.Scope.Principal == nil || *c.Scope.Principal == "" || c.Scope.Conversation == "" || c.Cursors != nil || (c.Schema != "4" && c.Schema != "5" && c.Schema != "6" && c.Schema != "7") {
 		return false
 	}
 	if len(c.ObservationID) != 64 {
@@ -185,9 +185,9 @@ func (c Capacity) validReserve() bool {
 		return false
 	}
 	if c.Reserve.State == "not_enabled" {
-		return c.Schema != "6" && len(c.Reserve.Resources) == 0 && len(c.Reserve.Work) == 0
+		return c.Schema != "6" && c.Schema != "7" && len(c.Reserve.Resources) == 0 && len(c.Reserve.Work) == 0
 	}
-	if c.Schema != "6" || len(c.Reserve.Resources) != 1 || len(c.Reserve.Work) != 1 {
+	if (c.Schema != "6" && c.Schema != "7") || len(c.Reserve.Resources) != 1 || len(c.Reserve.Work) != 1 {
 		return false
 	}
 	r, w := c.Reserve.Resources[0], c.Reserve.Work[0]

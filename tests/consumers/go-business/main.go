@@ -53,6 +53,8 @@ func main() {
 		}
 		var out any
 		switch r.Op {
+		case "worksets":
+			out, e = client.CapacityWorksets(ctx)
 		case "capacity":
 			out, e = client.Capacity(ctx)
 		case "users":

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://rocket-im.invalid/http/capacity.schema.json",
-  "description": "同一受控读事务的容量观察；schema6显式保护已知控制报告的256MiB对账行JSON余量。设备只读自身工作数，不暴露全主体余量；capacity_read主体可读全局。逻辑余量不是权限、远端或物理保证，64MiB导出没有预留。",
+  "description": "同一受控读事务的容量观察；schema6/7显式保护已知控制报告（schema7同时包含固定工作集阶段）的256MiB对账行JSON余量。设备只读自身工作数，不暴露全主体余量；capacity_read主体可读全局。逻辑余量不是权限、远端或物理保证，64MiB导出没有预留。",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -46,7 +46,8 @@
       "enum": [
         "4",
         "5",
-        "6"
+        "6",
+        "7"
       ]
     },
     "budgets": {

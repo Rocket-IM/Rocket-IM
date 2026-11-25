@@ -18,11 +18,15 @@ def verify(task, release, label, suite):
     root=Path('/private/tmp')/('Rocket IM Capacity '+uuid.uuid4().hex[:12]); lab=None
     try:
         prepare(root)
-        if suite.startswith(('diagnostics','reserve')):
+        if suite.startswith(('diagnostics','reserve','workset')):
             from diagnostics_harness import DiagnosticsLab
             lab=DiagnosticsLab(release,root/'environment.json',run)
         else:lab=CapacityLab(release,root/'environment.json',run)
         new_client=lab.release
+        if suite in ('workset-upgrade','workset-upgrade-legacy','workset-upgrade-full'):
+            from diagnostics_harness import old_client
+            lab.release=old_client(task,new_client,'dev12')
+            lab.old_service='workset';lab.operator=False
         if suite in ('reserve-upgrade','reserve-upgrade-full'):
             from diagnostics_harness import old_client
             lab.release=old_client(task,new_client,'dev11')
@@ -35,7 +39,22 @@ def verify(task, release, label, suite):
             from rejection_upgrade import baseline
             lab.release=baseline(task,new_client)
         lab.build(proxy=True)
-        if suite=='reserve':
+        if suite=='workset':
+            from workset_cases import run as workset_run
+            workset_run(lab)
+        elif suite=='workset-lifecycle':
+            from workset_lifecycle import run as workset_lifecycle
+            workset_lifecycle(lab)
+        elif suite=='workset-full':
+            from workset_cases import full as workset_full
+            workset_full(lab)
+        elif suite=='workset-upgrade-full':
+            from workset_upgrade_full import run as workset_upgrade_full
+            workset_upgrade_full(lab,new_client)
+        elif suite in ('workset-upgrade','workset-upgrade-legacy'):
+            from workset_upgrade import run as workset_upgrade
+            workset_upgrade(lab,new_client,legacy=suite=='workset-upgrade-legacy')
+        elif suite=='reserve':
             from reserve_cases import run as reserve_run
             reserve_run(lab)
         elif suite=='reserve-full':
@@ -118,5 +137,5 @@ def verify(task, release, label, suite):
 
 if __name__=='__main__':
     if len(sys.argv)!=6 or sys.argv[1]!='verify':
-        raise SystemExit('verify <task-root> <frozen-service-release> <new-label> reserve|reserve-full|reserve-upgrade|reserve-upgrade-full|diagnostics|diagnostics-upgrade|diagnostics-full|startup|baseline|overflow|rejection|rejection-multiple|rejection-faults|rejection-upgrade|rejection-upgrade-guarded|large-local|recovery|renewal|lifecycle|successor|unknown')
+        raise SystemExit('verify <task-root> <frozen-service-release> <new-label> workset|workset-full|workset-lifecycle|workset-upgrade|workset-upgrade-legacy|workset-upgrade-full|reserve|reserve-full|reserve-upgrade|reserve-upgrade-full|diagnostics|diagnostics-upgrade|diagnostics-full|startup|baseline|overflow|rejection|rejection-multiple|rejection-faults|rejection-upgrade|rejection-upgrade-guarded|large-local|recovery|renewal|lifecycle|successor|unknown')
     sys.exit(verify(*sys.argv[2:]))

@@ -14,6 +14,7 @@ impl NetworkData {
         }
     }
     pub(in crate::persistent) fn validate(&self, data: &Data) -> Result<()> {
+        super::workset::validate(data, self)?;
         let bad = || Error::paused("network_store_invalid");
         let b = self.binding.as_ref().ok_or_else(bad)?;
         b.peer.validate().map_err(|_| bad())?;

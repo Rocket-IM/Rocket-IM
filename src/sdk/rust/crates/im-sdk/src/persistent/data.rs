@@ -49,6 +49,9 @@ pub(super) struct Saved {
     pub meta: super::recovery_types::Meta,
 }
 impl Data {
+    pub fn has_workset(&self) -> bool {
+        self.network.as_ref().is_some_and(|n| n.workset.is_some())
+    }
     pub fn empty(scope: Scope) -> Self {
         Self {
             state: State {

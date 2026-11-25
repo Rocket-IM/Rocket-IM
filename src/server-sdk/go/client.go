@@ -194,7 +194,7 @@ func (c *Client) callHTTP(ctx context.Context, method, op string, body []byte, o
 }
 func knownCode(s string) bool {
 	switch s {
-	case "unauthorized", "forbidden", "scope_mismatch", "invalid_request", "idempotency_conflict", "device_conflict", "device_limit", "device_not_bound", "request_limit", "credential_expired", "credential_revoked", "invalid_expiry", "storage_unavailable", "service_reconciliation_required", "service_reconciliation_mismatch":
+	case "unauthorized", "forbidden", "scope_mismatch", "invalid_request", "idempotency_conflict", "device_conflict", "device_limit", "device_not_bound", "request_limit", "credential_expired", "credential_revoked", "invalid_expiry", "storage_unavailable", "service_reconciliation_required", "service_reconciliation_mismatch", "workset_not_enabled", "workset_invalid", "workset_original_mismatch", "workset_not_complete":
 		return true
 	}
 	return false

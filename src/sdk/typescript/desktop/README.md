@@ -1,6 +1,6 @@
 # Rocket-IM macOS 持久 SDK 开发包
 
-`@rocket-im/desktop-dev@0.2.0-dev.12`：仅 macOS arm64 + Node >=22，固定两个成员设备、测试身份、每端一个 SQLite 数据库。预编译 Rust 程序随包提供；消费方无需 Rust、Cargo 或生成器。
+`@rocket-im/desktop-dev@0.2.0-dev.13`：仅 macOS arm64 + Node >=22，固定两个成员设备、测试身份、每端一个 SQLite 数据库。预编译 Rust 程序随包提供；消费方无需 Rust、Cargo 或生成器。
 
 本版联网后继恢复通过 `networkRecovery` 明确授权，Rust 自动交换材料。原请求无完整候选且返回 `successor_required` 时，发起端调用 `{kind:'begin', request_id, action}`；对端从 `networkState().recovery` 取得已核验的 `round_id`，调用 `{kind:'approve', round_id}` 或 `{kind:'reject', round_id}`。不把登录成功、Service 目录或通知当作批准。双方安装证明齐备后 `phase==='complete'` 才能继续新发送，新消息必须用新请求/消息 ID。
 
@@ -10,7 +10,7 @@
 
 联网材料协议为 `successor-alpha1`，与既有离线签名材料及设备访问凭证分离；最多16轮。新预约及对端首次批准的窗口为15分钟；已经持久授权的传输不因窗口结束被撤销，Ready 后没有自动关闭。若Service确认首次预约已过期且从未接受，SDK结束这次未产生密码材料的意图并报告 `recovery_deadline`，原未决请求仍保留，重新发起需要显式Begin。已经预约的同ID重传优先返回原记录，不会被当作未预约超时清除。进入联网恢复管理后，原离线材料变更入口明确拒绝 `network_recovery_managed`，状态/已归档材料只读查询仍可用。实际验收见仓库端侧存储文档第27节，完整阶段0/生产/分发未获批准。
 
-安装本地真实 TGZ：`npm install --ignore-scripts /absolute/path/rocket-im-desktop-dev-0.2.0-dev.12.tgz`。导入 `PersistentDevice`，使用规范绝对路径、`{service, account, device}` 和显式 `keychain` 文件路径打开实例。新库须显式 `create: true`；已存在库使用 `false`，不自动新建/重置/迁移旧 POC 库。
+安装本地真实 TGZ：`npm install --ignore-scripts /absolute/path/rocket-im-desktop-dev-0.2.0-dev.13.tgz`。导入 `PersistentDevice`，使用规范绝对路径、`{service, account, device}` 和显式 `keychain` 文件路径打开实例。新库须显式 `create: true`；已存在库使用 `false`，不自动新建/重置/迁移旧 POC 库。
 
 公开方法：`connect`、`disconnect`、`networkState`、`networkRecovery`、`networkUnavailable`、`initialize`、`joiningMaterial`、`createGroup`、`joinGroup`、`send`、`receive`、`message`、`history`、`request`、`state`、`capacity`、`subscribe`、`recoverRequest`、`recovery`、`close`、`logout`。身份和协议材料采用小写十六进制；所有计数为十进制字符串。每端仅支持一个群，公钥必须由接入方核验/固定，不能因登录或收到 KeyPackage 自动信任。完整可执行接入示例随仓库外独立消费工程提供。
 
@@ -172,3 +172,17 @@ dev.9的有效加密v3/v4库可由dev.10原身份原路径打开；首次拒绝�
 `reserve.work`列出：完整普通候选精确安装、已有发送原ID的ACK/认证永久拒绝、已经下载且位于未知解密之前的连续控制事件及报告，以及target已有Ready候选并已保存同轮commit后的本地Finish。首次backup_guard的实际82字节也计入Meta；这不保证64MiB备份文件或磁盘。候选密码字节数组和archives按真实JSON计入，已占用部分不再次预约。预留算法从原账本恢复，失败回滚不消耗、精确重试不重复扣额、关闭/未知结果不释放；原终态结清后R转入U。
 
 仅资源检查通过且原门禁无阻断时，相应操作可显示`bounded_ready`。这不授予权限、不强制网络完成，也不保证对端或Service一起完成。新密码步骤、未知Executing/legacy、新后继、未下载/未来消息及控制、peer安装、凭证续期和任意磁盘故障均不承诺。授权、撤销、钥匙串锁定、退休上下文、外部进度和提交未知继续原安全规则。实际验证与未决项见[第34节](../../../../docs/端侧存储与附件管理.md#capacity-known-reserve-20261125)。
+
+
+## 同一有限控制工作集（dev.13）
+
+先启用`reserveCapacity()`，在已有联网绑定且下载了连续控制原件后调用`prepareCapacityWorkset()`。Rust从`reported+1`开始选取已下载的非空`delivered/unavailable`前缀，停止于首个message；宿主不能传工作集、范围或容量标签。首次准备自动启用原系统进度保护，再在原写事务保存固定原件摘要并升级v7；没有合格原件返回`workset_empty`，未知候选/活动恢复返回`workset_source_unavailable`。每个设备仅一个不可替换工作集，重复调用返回原记录，包括结清后；其他新工作集不在本实验范围。
+
+`capacityWorkset()`返回`null`或`{workset,phase}`，所有序号均为十进制字符串。`prepared`是本地承诺；`confirmed`表示本地已持久保存Service准备回复；联网同步继续将本地确认提交给Service，保存其确认回复后变为`active`。只有`active/settled`包含SDK已持久收到的共同确认，`capacity().reserve.bounded_ready`仍只是本地保证。Service有独立的prepared/confirmed/settled状态，不能把两个不同时间的查询当作跨库原子快照。
+
+active后沿原控制处理和received报告。SDK本地reported达到固定终点后请求结清；Service独立验证相同原件、全部received及自身游标，保存settled；SDK保存该回复才变为settled。未知提交、丢回复、关闭、重启、取消、超时均保留已有承诺，不自动解除或按期限回收。恢复只重试原范围，不重做密码输入；撤销、锁定和维护门禁仍可能阻止继续。凭证续期、新消息/后继、密码步骤、磁盘或网络可用性不在共同承诺中。
+
+新记录与阶段增长纳入原Data/Meta和候选峰值，普通写无法侵占。v7及备份格式3由旧dev.12明确拒载；未准备的旧库仍按v3—v6打开。完整备份仍只支持原scope/规范路径/系统秘密/外部最新进度，旧备份不能抹掉承诺。格式3恢复保留所有原件与阶段；没有生产分发、Windows或其他语言持久端验收。
+
+
+取消或关闭不等于未提交；工作集写入若返回`workset_commit_unknown`，重开后查询同一原记录，不创建替代ID。初次Service准备要求原上下文仍活动；已在Service持久准备的记录可以在双方明确授权的后继后继续核对并结清，但不会复活旧密码上下文。若外部进度有候选而数据库缺少对应完整状态，Service继续维护阻断，不自动回收。本机范围不承诺未来密码操作/认证/网络可用；协议与状态顺序见仓库《端侧存储与附件管理》第35节。

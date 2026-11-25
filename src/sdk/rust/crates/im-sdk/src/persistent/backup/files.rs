@@ -81,16 +81,18 @@ pub(super) fn write_backup(
         [encode(manifest)?],
     )?;
     store::write(&tx, saved)?;
-    if saved.meta.reserve_version.is_some() {
+    if saved.data.has_workset() {
+        tx.execute_batch("PRAGMA user_version=3;")?;
+    } else if saved.meta.reserve_version.is_some() {
         tx.execute_batch("PRAGMA user_version=2;")?;
     }
     #[cfg(feature = "persistent-test-hooks")]
     if std::env::var("ROCKET_IM_TEST_BACKUP_VERSION")
         .ok()
         .as_deref()
-        == Some("3")
+        == Some("4")
     {
-        tx.execute_batch("PRAGMA user_version=3;")?;
+        tx.execute_batch("PRAGMA user_version=4;")?;
     }
     tx.commit()?;
     drop(connection);
@@ -119,7 +121,7 @@ pub(super) fn read(
         let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         let app: i64 = tx.query_row("PRAGMA application_id", [], |r| r.get(0))?;
         let version: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if app != BACKUP_APP || !matches!(version, 1 | 2) {
+        if app != BACKUP_APP || !matches!(version, 1..=3) {
             return Err(Error::paused("backup_format_unsupported"));
         }
         let pages: i64 = tx.query_row("PRAGMA page_count", [], |r| r.get(0))?;
@@ -162,7 +164,8 @@ pub(super) fn read(
             return Err(Error::paused("backup_binding_mismatch"));
         }
         let saved = store::load(&tx, scope)?;
-        if (version == 2) != saved.meta.reserve_version.is_some()
+        if (version >= 2) != saved.meta.reserve_version.is_some()
+            || (version == 3) != saved.data.has_workset()
             || manifest.info.backup_id.len() != 64
             || manifest.info.snapshot != store::digest(&saved)?
             || manifest.info.revision != saved.data.state.revision

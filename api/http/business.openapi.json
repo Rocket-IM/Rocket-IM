@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Rocket-IM business-alpha1",
-    "version": "0.1.0-alpha.7",
+    "version": "0.1.0-alpha.8",
     "description": "固定双设备/单会话的业务身份接入；不接管业务密码，不提供密码成员撤销，目录关联不构成独立信任。 Service 0.1.0-alpha.6增加service-capacity-alpha1只读容量查询，不改既有准入/持久格式。"
   },
   "paths": {
@@ -417,6 +417,53 @@
             "description": "存储/外部对账未确认"
           }
         }
+      }
+    },
+    "/v1/business/capacity-worksets": {
+      "get": {
+        "operationId": "serviceCapacity",
+        "security": [
+          {
+            "businessBearer": []
+          }
+        ],
+        "description": "仅配置显式capacity_read=true且有效的业务主体可读全Service计量；默认false，不授予其他业务数据访问。修改已登记实例配置仍受维护摘要门禁。 无query/body/request_id。完整读事务结束后返回；权限、过期/撤销、维护未知继续拒绝。响应Cache-Control:no-store。",
+        "responses": {
+          "200": {
+            "description": "完整范围的只读观察，unavailable不是0。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "$ref": "workset.schema.json"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "不支持的输入"
+          },
+          "401": {
+            "description": "无效或过期凭证"
+          },
+          "403": {
+            "description": "缺少全局诊断权限"
+          },
+          "409": {
+            "description": "设备凭证过期或撤销"
+          },
+          "429": {
+            "description": "并发请求限额"
+          },
+          "503": {
+            "description": "存储/外部对账未确认"
+          }
+        },
+        "summary": "读取固定双设备的共同工作集持久阶段（capacity_read权限）"
       }
     }
   },

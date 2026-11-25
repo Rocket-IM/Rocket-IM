@@ -62,7 +62,7 @@ void authenticationTypes;
 async function backupTypes(device: PersistentDevice) {
   await device.disconnect();
   const info = await device.createBackup('/private/tmp/example.rimbackup');
-  const version: 1 | 2 = info.format; const digest: string = info.snapshot;
+  const version: 1 | 2 | 3 = info.format; const digest: string = info.snapshot;
   await device.close();
   await PersistentDevice.restoreBackup({path: '/private/tmp/original.db', scope: info.scope, keychain: '/private/tmp/dedicated.keychain-db'}, '/private/tmp/example.rimbackup');
   // @ts-expect-error 宿主不能注入数据库对象或导出密钥。
@@ -89,3 +89,13 @@ async function reserveTypes(device: PersistentDevice) {
   return available;
 }
 void reserveTypes;
+
+async function worksetTypes(device: PersistentDevice) {
+  const prepared: import('@rocket-im/desktop-dev').CapacityWorksetState = await device.prepareCapacityWorkset();
+  const sequence: string = prepared.workset.last;
+  const observation: import('@rocket-im/desktop-dev').CapacityWorksetState | null = await device.capacityWorkset();
+  // @ts-expect-error 工作集由Rust派生，宿主不能传范围或额度标签。
+  await device.prepareCapacityWorkset({first:'1',reserved:true});
+  return {sequence,observation};
+}
+void worksetTypes;

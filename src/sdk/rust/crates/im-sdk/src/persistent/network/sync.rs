@@ -39,6 +39,9 @@ impl NetworkSession {
             .network
             .as_ref()
             .ok_or_else(|| Error::paused("network_store_invalid"))?;
+        if self.workset_step(device, &saved)? {
+            return Ok(true);
+        }
         if number(&network.reported)? < number(&network.processed)? {
             let sequence = (number(&network.reported)? + 1).to_string();
             let disposition = if network.retired_events.contains(&sequence) {

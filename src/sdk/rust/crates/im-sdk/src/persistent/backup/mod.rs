@@ -53,7 +53,7 @@ impl PersistentDevice {
     }
 }
 impl Store {
-    fn enable_backup(&mut self) -> Result<Saved> {
+    pub(in crate::persistent) fn enable_backup(&mut self) -> Result<Saved> {
         let p = self
             .protection
             .as_ref()
@@ -89,7 +89,9 @@ impl Store {
         let key = p.encryption_key()?;
         let manifest = Manifest {
             info: BackupInfo {
-                format: if saved.meta.reserve_version.is_some() {
+                format: if saved.data.has_workset() {
+                    3
+                } else if saved.meta.reserve_version.is_some() {
                     2
                 } else {
                     1
