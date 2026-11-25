@@ -19,11 +19,42 @@ mod identity_init_tests;
 mod identity_preflight;
 mod identity_records;
 mod identity_session;
+mod identity_source;
+mod identity_source_state;
 mod identity_state;
 #[cfg(test)]
 mod identity_test_support;
 #[cfg(test)]
 mod identity_tests;
+mod join_recovery;
+mod join_recovery_apply;
+mod join_recovery_capacity;
+mod join_recovery_consistency;
+mod join_recovery_evidence;
+mod join_recovery_mls;
+mod join_recovery_preflight;
+mod join_recovery_public;
+mod join_recovery_request;
+mod join_recovery_state;
+mod join_recovery_witness;
+mod join_recovery_witness_apply;
+mod join_recovery_witness_config;
+mod join_recovery_witness_evidence;
+#[cfg(feature = "key-package-probe")]
+mod join_recovery_witness_probe;
+mod join_recovery_witness_response;
+mod join_recovery_witness_state;
+mod key_package_directory;
+mod key_package_join;
+mod key_package_preflight;
+#[cfg(feature = "key-package-probe")]
+mod key_package_probe;
+mod key_package_state;
+mod key_packages;
+#[cfg(feature = "key-package-probe")]
+pub mod recovery_bundle_probe;
+#[cfg(feature = "key-package-probe")]
+pub mod recovery_capacity_probe;
 pub use identity_session::Session;
 mod messaging;
 mod operation;
@@ -31,6 +62,7 @@ mod permission_admission;
 mod permission_apply;
 mod permission_commit;
 mod permission_join;
+mod permission_prepare;
 mod permission_recovery;
 mod permission_state;
 #[cfg(test)]
@@ -49,6 +81,7 @@ mod state;
 mod store;
 #[cfg(test)]
 mod stream_source_test_support;
+mod trusted_startup;
 mod wire;
 mod wire_accept;
 mod wire_acceptance;
@@ -200,6 +233,8 @@ enum CrashPoint {
     BeforeSave,
     BeforeRename,
     AfterSave,
+    AfterWelcomeKeys,
+    AfterWelcomeValidation,
 }
 
 #[derive(Deserialize)]
@@ -223,6 +258,7 @@ pub fn execute(input: &str) -> Result<Value, LabError> {
 fn execute_session(input: &str, session: &mut Session) -> Result<Value, LabError> {
     ensure(input.len() <= 1024 * 1024, "input_limit", "请求超过 1 MiB")?;
     let request: Request = checked("invalid_request", serde_json::from_str(input))?;
+    crate::join_recovery::witness::validate_lab_envelopes(input)?;
     let context = Context {
         service: request.service.clone(),
         account: request.account.clone(),
@@ -253,6 +289,7 @@ fn execute_session(input: &str, session: &mut Session) -> Result<Value, LabError
     }
     session.activate(request.directory.clone(), context.clone())?;
     let locked = LockedDevice::open(&request.directory)?;
+    trusted_startup::check(&locked, &request, &context)?;
     if let Some(path) = std::env::var_os("RIM_ROLLBACK_ANCHOR_CONFIG") {
         return rollback::execute(&PathBuf::from(path), &locked, request, context, session);
     }
@@ -321,6 +358,9 @@ fn execute_state(
     permissions::guard(&state, &request.operation)?;
     identity_records::preflight(&state, session, &request.operation)?;
     identity_gate::check(&state, &request.operation)?;
+    identity_source::preflight(&state, &request.operation)?;
+    key_package_preflight::check(&state, &request.operation)?;
+    join_recovery::preflight(&state, &request.operation)?;
     let request_digest = digest(&checked(
         "request_encoding",
         serde_json::to_vec(&request.operation),
@@ -337,6 +377,16 @@ fn execute_state(
         )?;
         return Ok(json!({"ok":true,"result":cached.result}));
     }
+    let is_permission_join = matches!(
+        request.operation,
+        Operation::PermissionJoin { .. } | Operation::JoinRecovery { .. }
+    );
+    let is_lifecycle = matches!(
+        request.operation,
+        Operation::KeyPackageResponse { .. }
+            | Operation::KeyPackageRequest { .. }
+            | Operation::KeyPackageGenerate { .. }
+    );
     let is_wire_read = matches!(request.operation, Operation::WireRead { .. });
     let is_wire_reclaim = matches!(request.operation, Operation::WireReclaim { .. });
     let is_reclaim_prepare = matches!(request.operation, Operation::WireReclaimRequest { .. });
@@ -346,7 +396,16 @@ fn execute_state(
     );
     let should_save = !matches!(
         request.operation,
-        Operation::Inspect
+        Operation::IdentitySource {
+            command: identity_source::Command::Inspect
+                | identity_source::Command::ExportHead { .. }
+                | identity_source::Command::Approve { .. }
+        } | Operation::Inspect
+            | Operation::JoinRecovery {
+                command: join_recovery_state::Command::Inspect
+                    | join_recovery_state::Command::WitnessInspect
+            }
+            | Operation::KeyPackageInspect
             | Operation::IdentityTrustPrepare { .. }
             | Operation::IdentityTrustInspect { .. }
             | Operation::DeviceRegistrationProve { .. }
@@ -364,6 +423,12 @@ fn execute_state(
             | Operation::ConsistencyExchangeInspect
             | Operation::SignAuthorization { .. }
     );
+    #[cfg(feature = "key-package-probe")]
+    let should_save = should_save
+        && !matches!(
+            request.operation,
+            Operation::JoinRecoveryWitnessSignProbe { .. }
+        );
     // 准备只保存固定公开请求，沿原诊断的Q02守卫；不附带MLS读取或迁移索引写入。
     // 这使锚预约前的纯元数据候选与实际保存有相同预算，不以额外索引字节制造未决预约。
     if should_save && !is_reclaim_prepare && !identity_metadata {
@@ -375,7 +440,7 @@ fn execute_state(
             | Operation::ConsistencyObserveFork { .. }
             | Operation::ConsistencyResume { .. }
     );
-    let mut result = perform(&mut state, request.operation, session)?;
+    let mut result = perform(&mut state, request.operation, session, request.failpoint)?;
     if should_save && !is_reclaim_prepare && !identity_metadata {
         consistency_state::record_current(&mut state)?;
     }
@@ -400,6 +465,7 @@ fn execute_state(
     }
     // 迟到的原终态重复只返回已存事实；不能重写快照或倒退当前尾。
     if should_save
+        && !((is_permission_join || is_lifecycle) && result["duplicate"] == true)
         && !(is_wire_terminal && result["duplicate"] == true)
         && !(is_wire_read && result["marked_count"] == 0)
         && !(is_wire_reclaim && result["duplicate"] == true)
@@ -415,8 +481,76 @@ fn perform(
     state: &mut DeviceState,
     operation: Operation,
     session: &mut Session,
+    failpoint: CrashPoint,
 ) -> Result<Value, LabError> {
     match operation {
+        Operation::IdentitySource { command } => identity_source::apply(state, command),
+        #[cfg(feature = "key-package-probe")]
+        Operation::KeyPackageProbe {
+            mode,
+            request_id,
+            original,
+        } => key_package_probe::execute(state, mode, request_id, original),
+        Operation::KeyPackageGenerate {
+            request_id,
+            count,
+            not_before,
+            not_after,
+            source_key,
+        } => key_packages::generate(state, request_id, count, not_before, not_after, source_key),
+        Operation::KeyPackageRequest {
+            request_id,
+            action,
+            source_key,
+        } => key_packages::request(state, request_id, action, source_key),
+        Operation::KeyPackageResponse {
+            request_id,
+            receipt,
+        } => key_packages::response(state, request_id, receipt),
+        Operation::KeyPackageInspect => Ok(key_packages::inspect(state)),
+        Operation::JoinRecovery { command } => join_recovery::execute(state, command, failpoint),
+        #[cfg(feature = "key-package-probe")]
+        Operation::JoinRecoverySignProbe { request } => Ok(
+            json!({"proof":crate::join_recovery::sign(&request,request.domain()?,&state.signer()?)?}),
+        ),
+        #[cfg(feature = "key-package-probe")]
+        Operation::JoinRecoveryWitnessSignProbe {
+            kind,
+            statement_bytes,
+        } => {
+            use openmls_traits::signatures::Signer;
+            let domain = match kind.as_str() {
+                "request" => crate::join_recovery::witness::REQUEST_DOMAIN,
+                "response" => crate::join_recovery::witness::RESPONSE_DOMAIN,
+                _ => return Err(LabError::new("invalid_request", "仅限 W1 两个公开签名域")),
+            };
+            let raw = codec::decode(&statement_bytes)?;
+            ensure(raw.len() <= 32768, "input_limit", "测试签名原件超限")?;
+            let mut payload = domain.to_vec();
+            payload.extend(&raw);
+            let signature = state
+                .signer()?
+                .sign(&payload)
+                .map_err(|_| LabError::new("signing", "公开测试原件签名失败"))?;
+            Ok(
+                json!({"proof":crate::permission::receipts::SignedRecord {statement_bytes,signature_bytes:codec::encode(&signature)}}),
+            )
+        }
+        #[cfg(feature = "key-package-probe")]
+        Operation::JoinRecoveryChangeProbe {
+            statement,
+            commit_bytes,
+        } => {
+            let signed =
+                crate::join_recovery::sign(&statement, statement.domain()?, &state.signer()?)?;
+            Ok(
+                json!({"change":crate::permission::Proof {statement_bytes:signed.statement_bytes,signature_bytes:signed.signature_bytes,commit_bytes}}),
+            )
+        }
+        Operation::PermissionPrepareClaim {
+            request_id,
+            validity_secs,
+        } => key_package_join::prepare(state, request_id, validity_secs),
         Operation::AnchorInspect
         | Operation::AnchorResume
         | Operation::AnchorRebuild { .. }
@@ -587,7 +721,9 @@ fn perform(
             permission_admission::JoinMode::Device,
         ),
         Operation::PermissionJoinAdvance { record } => permission_join::advance(state, record),
-        Operation::PermissionJoin { record, join } => permission_join::join(state, record, join),
+        Operation::PermissionJoin { record, join } => {
+            permission_join::join(state, record, join, failpoint)
+        }
         Operation::PermissionCloseRequest => permission_recovery::close_request(state),
         Operation::PermissionRecover { record } => permission_recovery::recover(state, record),
         Operation::WireConfigure {

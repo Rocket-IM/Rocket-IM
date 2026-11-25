@@ -191,3 +191,5 @@ fn acceptance_optional_fields_reject_explicit_null_before_dedupe_or_download() {
 
 #[path = "history_boundary_tests.rs"]
 mod boundary;
+#[path = "history_preflight_tests.rs"]
+mod preflight;

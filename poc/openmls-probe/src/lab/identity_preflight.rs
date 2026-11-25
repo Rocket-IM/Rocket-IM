@@ -23,7 +23,16 @@ pub(super) fn check(
 ) -> Result<(), LabError> {
     if !matches!(
         request.operation,
-        Operation::IdentityTrustObserve { .. }
+        Operation::IdentitySource { .. }
+            | Operation::JoinRecovery { .. }
+            | Operation::ConsistencyChallenge
+            | Operation::ConsistencyObserveHead { .. }
+            | Operation::ConsistencyObserveFork { .. }
+            | Operation::ConsistencyResume { .. }
+            | Operation::KeyPackageGenerate { .. }
+            | Operation::KeyPackageRequest { .. }
+            | Operation::PermissionPrepareClaim { .. }
+            | Operation::IdentityTrustObserve { .. }
             | Operation::IdentityTrustPrepare { .. }
             | Operation::IdentityTrustConfirm { .. }
             | Operation::IdentityTrustReset { .. }
@@ -35,6 +44,7 @@ pub(super) fn check(
             | Operation::Send { .. }
             | Operation::Remove { .. }
             | Operation::WireSend { .. }
+            | Operation::WireReceive { .. }
             | Operation::PermissionPrepare { .. }
             | Operation::PermissionPrepareAdd { .. }
             | Operation::PermissionPrepareDevice { .. }
@@ -43,21 +53,36 @@ pub(super) fn check(
         return Ok(());
     }
     let head = super::rollback_io::state_hash(&request.directory)?;
-    let metadata = locked
+    let mut metadata = locked
         .metadata_committed(
             context,
             &checked("anchor_head", crate::rollback_anchor::decode_hex(&head))?,
         )?
         .ok_or_else(|| LabError::new("not_initialized", "设备尚未初始化"))?;
-    super::rebuild_state::guard(&metadata, &request.operation)?;
-    super::wire_send_order::preflight(&metadata, &request.operation)?;
-    super::wire_stream_source::preflight(&metadata, &request.operation)?;
-    super::consistency_state::guard(&metadata, &request.operation)?;
-    super::permissions::guard(&metadata, &request.operation)?;
-    super::wire_send_order::preflight_send(&metadata, &request.operation)?;
-    super::identity_records::preflight(&metadata, session, &request.operation)?;
+    check_loaded(&mut metadata, request, session)
+}
+
+/// 同一已认证元数据上的纯门禁；不授予 provider 执行或持久化许可。
+pub(super) fn check_loaded(
+    metadata: &mut DeviceState,
+    request: &Request,
+    session: &Session,
+) -> Result<(), LabError> {
+    super::rebuild_state::guard(metadata, &request.operation)?;
+    super::wire_send_order::preflight(metadata, &request.operation)?;
+    super::wire_stream_source::preflight(metadata, &request.operation)?;
+    super::join_recovery_consistency::refresh(metadata)?;
+    super::consistency_state::guard(metadata, &request.operation)?;
+    super::permissions::guard(metadata, &request.operation)?;
+    super::wire_send_order::preflight_send(metadata, &request.operation)?;
+    super::identity_records::preflight(metadata, session, &request.operation)?;
     if let Operation::DeviceRegistrationProve { challenge_bytes } = &request.operation {
-        registration(&metadata, challenge_bytes)?;
+        registration(metadata, challenge_bytes)?;
     }
-    super::identity_gate::check(&metadata, &request.operation)
+    super::identity_source::preflight(metadata, &request.operation)?;
+    super::key_package_preflight::check(metadata, &request.operation)?;
+    super::join_recovery::preflight(metadata, &request.operation)?;
+    super::consistency::preflight(metadata, &request.operation)?;
+    super::wire_receive::preflight(metadata, &request.operation)?;
+    super::identity_gate::check(metadata, &request.operation)
 }

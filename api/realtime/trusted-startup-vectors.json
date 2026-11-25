@@ -1,0 +1,43 @@
+{
+  "protocol_version": "rim-startup-vectors-1",
+  "approval_key": "F8t5+ytBIPKx7GXkGY1uCLKOgT/rAeSkAIObheGAgM4=",
+  "approval": {
+    "protocol_version": "rim-startup-approval-1",
+    "slot": "vector-install",
+    "previous_generation": "0",
+    "previous_sha256": "absent",
+    "action": "install",
+    "manifest": {
+      "protocol_version": "rim-startup-manifest-1",
+      "slot": "vector-install",
+      "generation": "1",
+      "roots": {
+        "service_id": "vector-service",
+        "issuer": "vector-issuer",
+        "audience": "vector-audience",
+        "business_key": "0EqyMnQrtKs6E2i9RhXk5tAiSrcaAWuvhSCjMsl3hzc=",
+        "receipt_key": "oJql9HpnWYAv+VX43C0qFKXJnSO+l/hkEn/5ODRVpPA="
+      },
+      "scope": {
+        "service": "vector-service",
+        "account": "alice",
+        "device": "vector-device",
+        "identity_key": "abababababababababababababababababababababababababababababababab",
+        "store_id": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+      },
+      "anchor_public_key": "c6822637c7d310ec57627be00ba259d253749f4aaf644470cffbe53a35f73242",
+      "anchor_config_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"
+    }
+  },
+  "proof": {
+    "signature_bytes": "ebx7DT9TB9QX43jTIm7V7Zj/zADLTKMYp9jjzUSC+01F7f8ZtTqxOtC4lKMn/59dPaNS2PvzPRF/hY3glFt7Cg==",
+    "statement_bytes": "eyJwcm90b2NvbF92ZXJzaW9uIjoicmltLXN0YXJ0dXAtYXBwcm92YWwtMSIsInNsb3QiOiJ2ZWN0b3ItaW5zdGFsbCIsInByZXZpb3VzX2dlbmVyYXRpb24iOiIwIiwicHJldmlvdXNfc2hhMjU2IjoiYWJzZW50IiwiYWN0aW9uIjoiaW5zdGFsbCIsIm1hbmlmZXN0Ijp7InByb3RvY29sX3ZlcnNpb24iOiJyaW0tc3RhcnR1cC1tYW5pZmVzdC0xIiwic2xvdCI6InZlY3Rvci1pbnN0YWxsIiwiZ2VuZXJhdGlvbiI6IjEiLCJyb290cyI6eyJzZXJ2aWNlX2lkIjoidmVjdG9yLXNlcnZpY2UiLCJpc3N1ZXIiOiJ2ZWN0b3ItaXNzdWVyIiwiYXVkaWVuY2UiOiJ2ZWN0b3ItYXVkaWVuY2UiLCJidXNpbmVzc19rZXkiOiIwRXF5TW5RcnRLczZFMmk5UmhYazV0QWlTcmNhQVd1dmhTQ2pNc2wzaHpjPSIsInJlY2VpcHRfa2V5Ijoib0pxbDlIcG5XWUF2K1ZYNDNDMHFGS1hKblNPK2wvaGtFbi81T0RSVnBQQT0ifSwic2NvcGUiOnsic2VydmljZSI6InZlY3Rvci1zZXJ2aWNlIiwiYWNjb3VudCI6ImFsaWNlIiwiZGV2aWNlIjoidmVjdG9yLWRldmljZSIsImlkZW50aXR5X2tleSI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJzdG9yZV9pZCI6ImNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2QifSwiYW5jaG9yX3B1YmxpY19rZXkiOiJjNjgyMjYzN2M3ZDMxMGVjNTc2MjdiZTAwYmEyNTlkMjUzNzQ5ZjRhYWY2NDQ0NzBjZmZiZTUzYTM1ZjczMjQyIiwiYW5jaG9yX2NvbmZpZ19zaGEyNTYiOiJlZmVmZWZlZmVmZWZlZmVmZWZlZmVmZWZlZmVmZWZlZmVmZWZlZmVmZWZlZmVmZWZlZmVmZWZlZmVmZWZlZmVmIn19"
+  },
+  "negative_mutations": [
+    "wrong_signature_key",
+    "response_domain",
+    "changed_slot",
+    "changed_generation",
+    "unknown_field"
+  ]
+}

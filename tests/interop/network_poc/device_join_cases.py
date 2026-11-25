@@ -46,6 +46,8 @@ def future_device_flow(lab):
     setup(lab)
     original_rosters = {d: lab.rust(d, "inspect")["roster_version"] for d in (*ACCOUNTS, "b2")}
     old = publish(lab, "before_device_join", "b1")
+    lab.rust("b1", "wire_accept", logical_message_id="before_device_join", attempt_id="P1",
+             acceptance_receipt=old[1]["acceptance_receipt"])
     old_page = lab.pull("b1")
     candidate = prepare_device(lab, "bob_device_join")
     lab.public_fixture_directory.mkdir(parents=True, exist_ok=True)

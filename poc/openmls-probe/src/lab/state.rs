@@ -32,6 +32,8 @@ pub(super) struct ControlRecord {
 #[serde(deny_unknown_fields)]
 pub(super) struct DeviceState {
     pub version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_source: Option<super::identity_source::State>,
     pub context: Context,
     // 新 Init 显式标记严格账本；None 只兼容真实旧快照，绝不授予默认核验。
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -40,6 +42,12 @@ pub(super) struct DeviceState {
     pub own_signature_key: [u8; 32],
     pub signature_id: StorageId,
     pub key_package: Vec<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_packages: Option<super::key_package_state::State>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub join_recovery: Option<super::join_recovery_state::State>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub witness_state: Option<super::join_recovery_witness_state::State>,
     pub group_id: Option<Vec<u8>>,
     pub roster: TrustedRoster,
     pub peer_pins: Vec<Pin>,
@@ -72,6 +80,10 @@ pub(super) struct DeviceState {
     pub rebuild_stream: super::rebuild_stream::State,
     #[serde(skip)]
     pub provider: OpenMlsRustCrypto,
+    #[serde(skip)]
+    pub recovery_deadline: Option<(u64, u64)>,
+    #[serde(skip)]
+    pub witness_deadline: Option<u64>,
 }
 
 impl DeviceState {
@@ -122,6 +134,10 @@ impl DeviceState {
             own_signature_key: public,
             signature_id: signer.id(),
             key_package,
+            key_packages: None,
+            identity_source: None,
+            join_recovery: None,
+            witness_state: None,
             group_id: None,
             roster,
             peer_pins: Vec::new(),
@@ -140,6 +156,8 @@ impl DeviceState {
             rebuild: None,
             rebuild_stream: Default::default(),
             provider,
+            recovery_deadline: None,
+            witness_deadline: None,
         })
     }
 

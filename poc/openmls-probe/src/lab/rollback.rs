@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::Path;
 
+mod witness_retry;
+
 const GATE: &str = "anchor-gate.enc";
 const JOURNAL: &str = "anchor-journal.enc";
 const GATE_DOMAIN: &str = "Rocket-IM/POC/anchor-gate/v1";
@@ -68,6 +70,10 @@ pub(super) fn execute(
     // 成功预检不授予执行许可；下面仍须独立锚Reserve并重新核对完整快照。
     super::identity_preflight::check(locked, &request, &context, session)?;
     super::rebuild_stream_sync::preflight(locked, &request, &context)?;
+    // 唯一例外是已经持久的 W1 精确结果；只读失败也不创建锚门禁记录。
+    if let Some(result) = witness_retry::try_result(&config, locked, &request, &context, session)? {
+        return Ok(result);
+    }
     let result = (|| {
         ensure(
             config.scope.service == context.service

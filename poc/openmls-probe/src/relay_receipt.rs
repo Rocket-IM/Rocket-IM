@@ -1,4 +1,4 @@
-//! 仅操作 Service 自有的回执签名钥；不接受用户设备目录或 E2EE 材料。
+//! 仅操作显式配置的回执/业务签发钥；协议白名单限制公开对象，不读取用户解密私钥。
 use crate::permission::{receipts::SignedRecord, PermissionError};
 mod statement;
 use base64::{engine::general_purpose::STANDARD, Engine};

@@ -22,7 +22,14 @@ pub(super) fn check_prepare(
     )?;
     if let Some(intent) = &state.permissions.recovery.intent {
         ensure(
-            action.same_intent(&intent.action),
+            action.same_intent(&intent.action)
+                || super::key_package_join::renewed_intent(
+                    state,
+                    &intent.origin_change_id,
+                    id,
+                    &intent.action,
+                    action,
+                )?,
             "intent_mismatch",
             "新候选必须保留原权限变更意图",
         )?;
@@ -235,7 +242,14 @@ pub(super) fn recover(state: &mut DeviceState, record: RecoveryRecord) -> Result
                         }
                         Action::RevokeDevice { .. } => statement.action == original.action,
                         Action::AddMember { member, .. } | Action::AddDevice { member, .. } => {
-                            original.action.same_intent(&statement.action)
+                            (original.action.same_intent(&statement.action)
+                                || super::key_package_join::renewed_intent(
+                                    state,
+                                    &original.origin_change_id,
+                                    &statement.change_id,
+                                    &original.action,
+                                    &statement.action,
+                                )?)
                                 && next.members.contains(member)
                         }
                     };

@@ -1,0 +1,13 @@
+{
+  "listen": "127.0.0.1:8443",
+  "database_url": "REPLACE_WITH_EXPLICIT_TEST_DATABASE_DSN",
+  "recovery_state": "/absolute/private-maintenance/service-state.json",
+  "tls_cert": "/absolute/path/server.pem",
+  "tls_key": "/absolute/path/server.key",
+  "service": "test-service",
+  "conversation": "test-chat",
+  "devices": [
+    {"account":"alice","device":"alice-1","identity_key":"REPLACE_WITH_INDEPENDENTLY_VERIFIED_PUBLIC_KEY_HEX","token_sha256":"REPLACE_WITH_RANDOM_CREDENTIAL_SHA256"},
+    {"account":"bob","device":"bob-1","identity_key":"REPLACE_WITH_INDEPENDENTLY_VERIFIED_PUBLIC_KEY_HEX","token_sha256":"REPLACE_WITH_RANDOM_CREDENTIAL_SHA256"}
+  ]
+}

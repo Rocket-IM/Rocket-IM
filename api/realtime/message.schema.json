@@ -1235,7 +1235,10 @@
       "type": "object",
       "properties": {
         "protocol_version": {
-          "const": "rim-permission-1"
+          "enum": [
+            "rim-permission-1",
+            "rim-permission-2"
+          ]
         },
         "change_id": {
           "$ref": "#/$defs/Identifier"
@@ -1275,6 +1278,9 @@
         },
         "expires_at_unix_secs": {
           "$ref": "#/$defs/U64"
+        },
+        "allocation_sha256": {
+          "$ref": "#/$defs/StateRef"
         }
       },
       "required": [
@@ -1294,7 +1300,42 @@
         "expires_at_unix_secs"
       ],
       "additionalProperties": false,
-      "description": "不可变原始UTF-8 JSON签名声明。版本恰为前驱+1；有效期跨度1..300秒，首次Service接受要求issued<=当前秒<expires。实验单会话nonce唯一，已接受原证据重试不受当前过期影响。"
+      "description": "不可变原始UTF-8 JSON签名声明。版本恰为前驱+1；有效期跨度1..300秒，首次Service接受要求issued<=当前秒<expires。实验单会话nonce唯一，已接受原证据重试不受当前过期影响。",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "protocol_version": {
+                "const": "rim-permission-2"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "allocation_sha256"
+            ],
+            "properties": {
+              "action": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "add_member",
+                      "add_device"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "allocation_sha256"
+              ]
+            }
+          }
+        }
+      ]
     },
     "PermissionProof": {
       "type": "object",
@@ -1627,7 +1668,23 @@
         "records": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/PermissionRecord"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/PermissionRecord"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "recovery": {
+                    "$ref": "#/$defs/RecoveryPublicRecord"
+                  }
+                },
+                "required": [
+                  "recovery"
+                ],
+                "additionalProperties": false
+              }
+            ]
           },
           "minItems": 0,
           "maxItems": 32
@@ -1640,7 +1697,7 @@
         "has_more"
       ],
       "additionalProperties": false,
-      "description": "当前有效成员分页取得有序accepted {change,receipt}记录，不使用平行数组。关闭记录通过close返回；分页边界与原权限链一致，完整JSON<=900KiB，不跳游标。"
+      "description": "当前有效成员分页取得有序accepted {change,receipt}记录，不使用平行数组。关闭记录通过close返回；分页边界与原权限链一致，完整JSON<=900KiB，不跳游标。 v3 使用 recovery 分支，包含目标意图、claim、分配及唯一 accepted，不包含目标 Welcome 或私有 bundle。"
     },
     "PermissionRecordsResultResponse": {
       "type": "object",
@@ -1721,6 +1778,9 @@
         },
         "welcome": {
           "$ref": "#/$defs/PayloadBytes"
+        },
+        "allocation": {
+          "$ref": "#/$defs/KeyPackageAllocation"
         }
       },
       "required": [
@@ -1728,7 +1788,7 @@
         "welcome"
       ],
       "additionalProperties": false,
-      "description": "原始KeyPackage和Welcome的规范Base64，两份SHA256由对应动作的授权设备签名绑定：add_member由群主当前设备邀请新账号，add_device由目标同账号当前有效旧设备授权。两者均仅from_join。每段最大512KiB，首次提交会验证真实KeyPackage签名、身份及密码套件；完整请求不超过1MiB，完整材料响应不超过900KiB。Welcome仅精确目标当前有效设备可领；Service不能解密Welcome，接收端独立验证实际MLS加入。"
+      "description": "原始KeyPackage和Welcome的规范Base64，两份SHA256由对应动作的授权设备签名绑定：add_member由群主当前设备邀请新账号，add_device由目标同账号当前有效旧设备授权。两者均仅from_join。每段最大512KiB，首次提交会验证真实KeyPackage签名、身份及密码套件；完整请求不超过1MiB，完整材料响应不超过900KiB。Welcome仅精确目标当前有效设备可领；Service不能解密Welcome，接收端独立验证实际MLS加入。 rim-permission-2必有allocation，actor签入准确领取回执摘要；池内材料禁止走v1裸包路径。"
     },
     "JoinMaterialRequest": {
       "type": "object",
@@ -3930,6 +3990,2015 @@
         "result"
       ],
       "additionalProperties": false
+    },
+    "KeyPackageSigned": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 65536,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false
+    },
+    "KeyPackageAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "directory"
+            },
+            "account_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "challenge": {
+              "$ref": "#/$defs/StateRef"
+            }
+          },
+          "required": [
+            "kind",
+            "account_id",
+            "challenge"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "publish"
+            },
+            "packages": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 10924,
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "required": [
+            "kind",
+            "packages"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "claim"
+            },
+            "target": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "conversation_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "join_kind": {
+              "enum": [
+                "add_member",
+                "add_device"
+              ]
+            },
+            "change_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "directory_version": {
+              "$ref": "#/$defs/U64"
+            },
+            "directory_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "authorization_version": {
+              "$ref": "#/$defs/U64"
+            },
+            "crypto_state_ref": {
+              "$ref": "#/$defs/StateRef"
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "conversation_id",
+            "join_kind",
+            "change_id",
+            "directory_version",
+            "directory_sha256",
+            "authorization_version",
+            "crypto_state_ref"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "retire"
+            },
+            "key_package_sha256": {
+              "$ref": "#/$defs/StateRef"
+            }
+          },
+          "required": [
+            "kind",
+            "key_package_sha256"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "KeyPackageRequestStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-key-package-request-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "actor": {
+          "$ref": "#/$defs/PermissionMember"
+        },
+        "action": {
+          "$ref": "#/$defs/KeyPackageAction"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "request_id",
+        "actor",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "KeyPackageResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "directory"
+            },
+            "challenge": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "snapshots": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 21848,
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              },
+              "minItems": 1,
+              "maxItems": 16
+            }
+          },
+          "required": [
+            "kind",
+            "challenge",
+            "snapshots"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "published"
+            },
+            "hashes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/StateRef"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            },
+            "inventory_version": {
+              "$ref": "#/$defs/U64"
+            }
+          },
+          "required": [
+            "kind",
+            "hashes",
+            "inventory_version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "allocated"
+            },
+            "key_package": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 10924,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            },
+            "key_package_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "inventory_version": {
+              "$ref": "#/$defs/U64"
+            },
+            "allocated_at_ms": {
+              "$ref": "#/$defs/U64"
+            }
+          },
+          "required": [
+            "kind",
+            "key_package",
+            "key_package_sha256",
+            "inventory_version",
+            "allocated_at_ms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "unavailable"
+            },
+            "inventory_version": {
+              "$ref": "#/$defs/U64"
+            }
+          },
+          "required": [
+            "kind",
+            "inventory_version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "retired"
+            },
+            "key_package_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "inventory_version": {
+              "$ref": "#/$defs/U64"
+            }
+          },
+          "required": [
+            "kind",
+            "key_package_sha256",
+            "inventory_version"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "KeyPackageReceiptStatement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-key-package-receipt-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "result": {
+          "$ref": "#/$defs/KeyPackageResult"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "request_sha256",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "DeviceDirectorySnapshot": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-device-directory-1"
+        },
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/U64"
+        },
+        "previous_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "authorization_source": {
+          "const": "synthetic-registration-poc"
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "enum": [
+                  "active",
+                  "revoked"
+                ]
+              },
+              "registration": {
+                "$ref": "#/$defs/SignedDeviceRegistration"
+              }
+            },
+            "required": [
+              "status",
+              "registration"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 8
+        }
+      },
+      "required": [
+        "protocol_version",
+        "service_id",
+        "account_id",
+        "version",
+        "previous_sha256",
+        "authorization_source",
+        "devices"
+      ],
+      "additionalProperties": false
+    },
+    "KeyPackageLifecycleRequest": {
+      "type": "object",
+      "properties": {
+        "proof": {
+          "$ref": "#/$defs/KeyPackageSigned"
+        }
+      },
+      "required": [
+        "proof"
+      ],
+      "additionalProperties": false
+    },
+    "KeyPackageLifecycleResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "receipt": {
+              "$ref": "#/$defs/KeyPackageSigned"
+            }
+          },
+          "required": [
+            "receipt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "KeyPackageAllocation": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/KeyPackageSigned"
+        },
+        "receipt": {
+          "$ref": "#/$defs/KeyPackageSigned"
+        }
+      },
+      "required": [
+        "request",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "RecoverySigned": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/HeaderBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/PermissionSignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryScope": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "group_id": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "minLength": 4,
+          "maxLength": 344
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "group_id"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryAdmissionRef": {
+      "type": "object",
+      "properties": {
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "record_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "change_id",
+        "record_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryFloor": {
+      "type": "object",
+      "properties": {
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "authorization_version",
+        "crypto_state_ref"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryDirectoryRef": {
+      "type": "object",
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/U64"
+        },
+        "sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "account_id",
+        "version",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryIntent": {
+      "description": "按原件版本验证 legacy 或 E10C-W1；跨对象版本、策略和签名绑定由运行验证器强制。",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "protocol_version": {
+              "const": "rim-recovery-request-1"
+            },
+            "scope": {
+              "$ref": "#/$defs/RecoveryScope"
+            },
+            "request_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "signer": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "nonce": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "kind": {
+              "const": "intent"
+            },
+            "change_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "root_admission": {
+              "$ref": "#/$defs/RecoveryAdmissionRef"
+            },
+            "current_admission": {
+              "$ref": "#/$defs/RecoveryAdmissionRef"
+            },
+            "actor": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "predecessor": {
+              "$ref": "#/$defs/RecoveryFloor"
+            },
+            "known_floor": {
+              "$ref": "#/$defs/RecoveryFloor"
+            },
+            "directory_refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RecoveryDirectoryRef"
+              },
+              "minItems": 1,
+              "maxItems": 2
+            },
+            "key_package_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "history_policy": {
+              "const": "from_recovery"
+            },
+            "issued_at_unix_secs": {
+              "$ref": "#/$defs/U64"
+            },
+            "expires_at_unix_secs": {
+              "$ref": "#/$defs/U64"
+            }
+          },
+          "required": [
+            "protocol_version",
+            "scope",
+            "request_id",
+            "signer",
+            "nonce",
+            "kind",
+            "change_id",
+            "root_admission",
+            "current_admission",
+            "actor",
+            "predecessor",
+            "known_floor",
+            "directory_refs",
+            "key_package_sha256",
+            "history_policy",
+            "issued_at_unix_secs",
+            "expires_at_unix_secs"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "join-recovery-witness.schema.json#/$defs/Intent"
+        }
+      ]
+    },
+    "RecoveryControl": {
+      "description": "按原件版本验证 legacy 或 E10C-W1；跨对象版本、策略和签名绑定由运行验证器强制。",
+      "oneOf": [
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "protocol_version": {
+                  "const": "rim-recovery-request-1"
+                },
+                "scope": {
+                  "$ref": "#/$defs/RecoveryScope"
+                },
+                "request_id": {
+                  "$ref": "#/$defs/Identifier"
+                },
+                "signer": {
+                  "$ref": "#/$defs/PermissionMember"
+                },
+                "nonce": {
+                  "$ref": "#/$defs/StateRef"
+                },
+                "recovery_id": {
+                  "$ref": "#/$defs/Identifier"
+                },
+                "change_id": {
+                  "$ref": "#/$defs/Identifier"
+                },
+                "intent_sha256": {
+                  "$ref": "#/$defs/StateRef"
+                },
+                "kind": {
+                  "const": "claim"
+                },
+                "reason": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "protocol_version",
+                "scope",
+                "request_id",
+                "signer",
+                "nonce",
+                "recovery_id",
+                "change_id",
+                "intent_sha256",
+                "kind",
+                "reason"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "protocol_version": {
+                  "const": "rim-recovery-request-1"
+                },
+                "scope": {
+                  "$ref": "#/$defs/RecoveryScope"
+                },
+                "request_id": {
+                  "$ref": "#/$defs/Identifier"
+                },
+                "signer": {
+                  "$ref": "#/$defs/PermissionMember"
+                },
+                "nonce": {
+                  "$ref": "#/$defs/StateRef"
+                },
+                "recovery_id": {
+                  "$ref": "#/$defs/Identifier"
+                },
+                "change_id": {
+                  "$ref": "#/$defs/Identifier"
+                },
+                "intent_sha256": {
+                  "$ref": "#/$defs/StateRef"
+                },
+                "kind": {
+                  "const": "close"
+                },
+                "reason": {
+                  "enum": [
+                    "cancelled",
+                    "predecessor_changed",
+                    "expired",
+                    "preparation_failed"
+                  ]
+                }
+              },
+              "required": [
+                "protocol_version",
+                "scope",
+                "request_id",
+                "signer",
+                "nonce",
+                "recovery_id",
+                "change_id",
+                "intent_sha256",
+                "kind",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        {
+          "$ref": "join-recovery-witness.schema.json#/$defs/Control"
+        }
+      ]
+    },
+    "RecoveryRequestStatement": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/RecoveryIntent"
+        },
+        {
+          "$ref": "#/$defs/RecoveryControl"
+        }
+      ]
+    },
+    "RecoveryAction": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "recover_join"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/RecoveryAdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/RecoveryAdmissionRef"
+        },
+        "target": {
+          "$ref": "#/$defs/PermissionMember"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "allocation_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "key_package_ref": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "minLength": 44,
+          "maxLength": 44
+        },
+        "welcome_sha256": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "history_policy": {
+          "const": "from_recovery"
+        },
+        "previous_epoch": {
+          "$ref": "#/$defs/U64"
+        },
+        "old_leaf_index": {
+          "$ref": "#/$defs/U64"
+        },
+        "old_leaf_sha256": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "kind",
+        "recovery_id",
+        "root_admission",
+        "current_admission",
+        "target",
+        "intent_sha256",
+        "allocation_sha256",
+        "key_package_sha256",
+        "key_package_ref",
+        "welcome_sha256",
+        "history_policy",
+        "previous_epoch",
+        "old_leaf_index",
+        "old_leaf_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryStatement": {
+      "description": "按原件版本验证 legacy 或 E10C-W1；跨对象版本、策略和签名绑定由运行验证器强制。",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "protocol_version": {
+              "const": "rim-permission-3"
+            },
+            "scope": {
+              "$ref": "#/$defs/RecoveryScope"
+            },
+            "change_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "actor": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "previous_authorization_version": {
+              "$ref": "#/$defs/U64"
+            },
+            "authorization_version": {
+              "$ref": "#/$defs/U64"
+            },
+            "from_state_ref": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "to_state_ref": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "action": {
+              "$ref": "#/$defs/RecoveryAction"
+            },
+            "commit_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "nonce": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "issued_at_unix_secs": {
+              "$ref": "#/$defs/U64"
+            },
+            "expires_at_unix_secs": {
+              "$ref": "#/$defs/U64"
+            }
+          },
+          "required": [
+            "protocol_version",
+            "scope",
+            "change_id",
+            "actor",
+            "previous_authorization_version",
+            "authorization_version",
+            "from_state_ref",
+            "to_state_ref",
+            "action",
+            "commit_sha256",
+            "nonce",
+            "issued_at_unix_secs",
+            "expires_at_unix_secs"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "join-recovery-witness.schema.json#/$defs/Statement"
+        }
+      ]
+    },
+    "RecoveryReceiptStatement": {
+      "description": "按原件版本验证 legacy 或 E10C-W1；跨对象版本、策略和签名绑定由运行验证器强制。",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "protocol_version": {
+              "const": "rim-recovery-receipt-1"
+            },
+            "scope": {
+              "$ref": "#/$defs/RecoveryScope"
+            },
+            "recovery_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "change_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "root_admission": {
+              "$ref": "#/$defs/RecoveryAdmissionRef"
+            },
+            "current_admission": {
+              "$ref": "#/$defs/RecoveryAdmissionRef"
+            },
+            "target": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "actor": {
+              "$ref": "#/$defs/PermissionMember"
+            },
+            "intent_sha256": {
+              "$ref": "#/$defs/StateRef"
+            },
+            "result": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "allocated"
+                    },
+                    "claim_sha256": {
+                      "$ref": "#/$defs/StateRef"
+                    },
+                    "key_package_sha256": {
+                      "$ref": "#/$defs/StateRef"
+                    },
+                    "key_package_ref": {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "minLength": 44,
+                      "maxLength": 44
+                    },
+                    "predecessor": {
+                      "$ref": "#/$defs/RecoveryFloor"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "claim_sha256",
+                    "key_package_sha256",
+                    "key_package_ref",
+                    "predecessor"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "accepted"
+                    },
+                    "allocation_sha256": {
+                      "$ref": "#/$defs/StateRef"
+                    },
+                    "candidate_sha256": {
+                      "$ref": "#/$defs/StateRef"
+                    },
+                    "checkpoint": {
+                      "$ref": "#/$defs/PermissionCheckpoint"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "allocation_sha256",
+                    "candidate_sha256",
+                    "checkpoint"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "closed"
+                    },
+                    "close_sha256": {
+                      "$ref": "#/$defs/StateRef"
+                    },
+                    "reason": {
+                      "enum": [
+                        "cancelled",
+                        "predecessor_changed",
+                        "expired",
+                        "preparation_failed"
+                      ]
+                    },
+                    "checkpoint": {
+                      "$ref": "#/$defs/PermissionCheckpoint"
+                    },
+                    "allocation_sha256": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/$defs/StateRef"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "close_sha256",
+                    "reason",
+                    "checkpoint",
+                    "allocation_sha256"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": [
+            "protocol_version",
+            "scope",
+            "recovery_id",
+            "change_id",
+            "root_admission",
+            "current_admission",
+            "target",
+            "actor",
+            "intent_sha256",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "join-recovery-witness.schema.json#/$defs/Receipt"
+        }
+      ]
+    },
+    "RecoveryPublicBundle": {
+      "type": "object",
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/RecoverySigned"
+        },
+        "claim": {
+          "$ref": "#/$defs/RecoverySigned"
+        },
+        "allocation": {
+          "$ref": "#/$defs/RecoverySigned"
+        },
+        "change": {
+          "$ref": "#/$defs/PermissionProof"
+        }
+      },
+      "required": [
+        "intent",
+        "claim",
+        "allocation",
+        "change"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryBundle": {
+      "type": "object",
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/RecoverySigned"
+        },
+        "claim": {
+          "$ref": "#/$defs/RecoverySigned"
+        },
+        "allocation": {
+          "$ref": "#/$defs/RecoverySigned"
+        },
+        "change": {
+          "$ref": "#/$defs/PermissionProof"
+        },
+        "key_package": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "minLength": 4,
+          "maxLength": 10924
+        },
+        "welcome": {
+          "$ref": "#/$defs/PayloadBytes"
+        }
+      },
+      "required": [
+        "intent",
+        "claim",
+        "allocation",
+        "change",
+        "key_package",
+        "welcome"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryRecord": {
+      "type": "object",
+      "properties": {
+        "bundle": {
+          "$ref": "#/$defs/RecoveryBundle"
+        },
+        "receipt": {
+          "$ref": "#/$defs/RecoverySigned"
+        }
+      },
+      "required": [
+        "bundle",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryPublicRecord": {
+      "type": "object",
+      "properties": {
+        "bundle": {
+          "$ref": "#/$defs/RecoveryPublicBundle"
+        },
+        "receipt": {
+          "$ref": "#/$defs/RecoverySigned"
+        }
+      },
+      "required": [
+        "bundle",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "RecoveryOperationRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "claim",
+                "close"
+              ]
+            },
+            "intent": {
+              "$ref": "#/$defs/RecoverySigned"
+            },
+            "proof": {
+              "$ref": "#/$defs/RecoverySigned"
+            }
+          },
+          "required": [
+            "kind",
+            "intent",
+            "proof"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "accept"
+            },
+            "bundle": {
+              "$ref": "#/$defs/RecoveryBundle"
+            }
+          },
+          "required": [
+            "kind",
+            "bundle"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "get"
+            },
+            "service_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "conversation_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "recovery_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "kind",
+            "service_id",
+            "conversation_id",
+            "recovery_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RecoveryOperationResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "state": {
+              "const": "absent"
+            },
+            "head": {
+              "$ref": "#/$defs/PermissionCheckpoint"
+            }
+          },
+          "required": [
+            "state",
+            "head"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "state": {
+              "enum": [
+                "allocated",
+                "accepted",
+                "closed"
+              ]
+            },
+            "head": {
+              "$ref": "#/$defs/PermissionCheckpoint"
+            },
+            "intent": {
+              "$ref": "#/$defs/RecoverySigned"
+            },
+            "allocation": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/RecoverySigned"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "receipt": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/RecoverySigned"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "record": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/RecoveryRecord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "key_package": {
+              "type": "string",
+              "contentEncoding": "base64",
+              "maxLength": 10924
+            }
+          },
+          "required": [
+            "state",
+            "head",
+            "intent",
+            "allocation",
+            "receipt",
+            "record"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "absent 是一次观察，不是封口；allocated 不是 R1；accepted/closed 原件永久保留。head 是当前观察，须另用挑战绑定 head 判断新鲜度。"
+    },
+    "RecoveryOperationResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": {
+          "$ref": "#/$defs/RecoveryOperationResult"
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "IdentitySourceMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "device_id",
+        "signature_key"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "device_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "signature_key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        }
+      }
+    },
+    "IdentitySourceSignedRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "properties": {
+        "statement_bytes": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "maxLength": 524288
+        },
+        "signature_bytes": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "minLength": 88,
+          "maxLength": 88
+        }
+      }
+    },
+    "IdentitySourceRoots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "issuer",
+        "audience",
+        "business_key",
+        "receipt_key"
+      ],
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "issuer": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "audience": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "business_key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        },
+        "receipt_key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        }
+      }
+    },
+    "IdentitySourceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration",
+        "permit",
+        "approval",
+        "accepted_at_ms",
+        "status"
+      ],
+      "properties": {
+        "registration": {
+          "$ref": "#/$defs/IdentitySourceSignedRecord"
+        },
+        "permit": {
+          "$ref": "#/$defs/IdentitySourceSignedRecord"
+        },
+        "approval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IdentitySourceSignedRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accepted_at_ms": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "revoked"
+          ]
+        }
+      }
+    },
+    "IdentitySourceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "service_id",
+        "account_id",
+        "version",
+        "previous_sha256",
+        "devices"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-authorized-device-directory-1"
+        },
+        "service_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "account_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$"
+        },
+        "previous_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "devices": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/IdentitySourceEntry"
+          }
+        }
+      }
+    },
+    "IdentitySourcePermit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "body"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-business-permit-1"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "service_id",
+            "issuer",
+            "audience",
+            "subject",
+            "permit_id",
+            "target",
+            "challenge_sha256",
+            "challenge_nonce",
+            "purpose",
+            "issued_at_ms",
+            "expires_at_ms"
+          ],
+          "properties": {
+            "service_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "issuer": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "audience": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "subject": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "permit_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "target": {
+              "$ref": "#/$defs/IdentitySourceMember"
+            },
+            "challenge_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge_nonce": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+/]{43}=$"
+            },
+            "purpose": {
+              "enum": [
+                "first_device",
+                "add_device"
+              ]
+            },
+            "issued_at_ms": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$"
+            },
+            "expires_at_ms": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$"
+            }
+          }
+        }
+      }
+    },
+    "IdentitySourceApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "body"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-account-device-approval-1"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "service_id",
+            "approval_id",
+            "actor",
+            "target",
+            "permit_sha256",
+            "previous_version",
+            "previous_sha256",
+            "expires_at_ms"
+          ],
+          "properties": {
+            "service_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "approval_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "actor": {
+              "$ref": "#/$defs/IdentitySourceMember"
+            },
+            "target": {
+              "$ref": "#/$defs/IdentitySourceMember"
+            },
+            "permit_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "previous_version": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$"
+            },
+            "previous_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "expires_at_ms": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$"
+            }
+          }
+        }
+      }
+    },
+    "IdentitySourceDirectoryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "body"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-authorized-directory-response-1"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "service_id",
+            "requester",
+            "account_id",
+            "request_id",
+            "challenge",
+            "snapshots"
+          ],
+          "properties": {
+            "service_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "requester": {
+              "$ref": "#/$defs/IdentitySourceMember"
+            },
+            "account_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "snapshots": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "$ref": "#/$defs/IdentitySourceSnapshot"
+              }
+            }
+          }
+        }
+      }
+    },
+    "IdentitySourceIndependentHead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "body"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-independent-directory-head-1"
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "service_id",
+            "actor",
+            "requester",
+            "account_id",
+            "request_id",
+            "challenge",
+            "version",
+            "snapshot_sha256"
+          ],
+          "properties": {
+            "service_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "actor": {
+              "$ref": "#/$defs/IdentitySourceMember"
+            },
+            "requester": {
+              "$ref": "#/$defs/IdentitySourceMember"
+            },
+            "account_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$"
+            },
+            "snapshot_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "IdentitySourceDocument": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/IdentitySourcePermit"
+        },
+        {
+          "$ref": "#/$defs/IdentitySourceApproval"
+        },
+        {
+          "$ref": "#/$defs/IdentitySourceDirectoryResponse"
+        },
+        {
+          "$ref": "#/$defs/IdentitySourceIndependentHead"
+        }
+      ],
+      "description": "Ed25519签domain+NUL+规范紧凑UTF-8原字节；字段序与Rust结构/固定向量一致，未知字段拒绝；签名和跨字段/时效/授权链须由Rust验证。"
+    },
+    "IdentitySourceOperationRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "account_id",
+            "subject",
+            "device_id",
+            "signature_key",
+            "registration_id",
+            "purpose"
+          ],
+          "properties": {
+            "kind": {
+              "const": "challenge"
+            },
+            "account_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "subject": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "device_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "signature_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+/]{43}=$"
+            },
+            "registration_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "purpose": {
+              "enum": [
+                "first_device",
+                "add_device"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "permit",
+            "registration",
+            "approval",
+            "access_token"
+          ],
+          "properties": {
+            "kind": {
+              "const": "complete"
+            },
+            "permit": {
+              "$ref": "#/$defs/IdentitySourceSignedRecord"
+            },
+            "registration": {
+              "$ref": "#/$defs/IdentitySourceSignedRecord"
+            },
+            "approval": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/IdentitySourceSignedRecord"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "access_token": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 256
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "service_id",
+            "requester",
+            "account_id",
+            "request_id",
+            "challenge"
+          ],
+          "properties": {
+            "kind": {
+              "const": "directory"
+            },
+            "service_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "requester": {
+              "$ref": "#/$defs/IdentitySourceMember"
+            },
+            "account_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "account_id",
+            "device_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "revoke"
+            },
+            "account_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "device_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            }
+          }
+        }
+      ],
+      "description": "显式身份来源模式。challenge/complete/revoke仅业务后端凭证；directory仅已登记设备凭证。许可不等于联系人信任或群权限。"
+    },
+    "TrustedStartupManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "slot",
+        "generation",
+        "roots",
+        "scope",
+        "anchor_public_key",
+        "anchor_config_sha256"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-startup-manifest-1"
+        },
+        "slot": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "roots": {
+          "$ref": "#/$defs/IdentitySourceRoots"
+        },
+        "scope": {
+          "$ref": "#/$defs/RebuildSuccessorScope"
+        },
+        "anchor_public_key": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "anchor_config_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "TrustedStartupApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "slot",
+        "previous_generation",
+        "previous_sha256",
+        "action",
+        "manifest"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-startup-approval-1"
+        },
+        "slot": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "previous_generation": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "previous_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "const": "absent"
+            }
+          ]
+        },
+        "action": {
+          "enum": [
+            "install",
+            "rotate",
+            "disable"
+          ]
+        },
+        "manifest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrustedStartupManifest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "disable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "manifest": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "manifest": {
+                "$ref": "#/$defs/TrustedStartupManifest"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TrustedStartupResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "slot",
+        "challenge",
+        "generation",
+        "manifest_sha256",
+        "disabled"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "rim-startup-response-1"
+        },
+        "slot": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "challenge": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "const": "absent"
+            }
+          ]
+        },
+        "disabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "RecoveryW1PolicyEnvelope": {
+      "$ref": "join-recovery-witness.schema.json#/$defs/PolicyEnvelope"
+    },
+    "RecoveryW1Activation": {
+      "$ref": "join-recovery-witness.schema.json#/$defs/Activation"
+    },
+    "RecoveryW1WitnessRequest": {
+      "$ref": "join-recovery-witness.schema.json#/$defs/WitnessRequest"
+    },
+    "RecoveryW1WitnessResponse": {
+      "$ref": "join-recovery-witness.schema.json#/$defs/WitnessResponse"
+    },
+    "RecoveryW1WitnessDelivery": {
+      "$ref": "join-recovery-witness.schema.json#/$defs/WitnessDelivery"
+    },
+    "RecoveryW1InstallationFact": {
+      "$ref": "join-recovery-witness.schema.json#/$defs/InstallationFact"
+    },
+    "RecoveryW1InstalledRecord": {
+      "$ref": "join-recovery-witness.schema.json#/$defs/InstalledRecord"
     }
   }
 }

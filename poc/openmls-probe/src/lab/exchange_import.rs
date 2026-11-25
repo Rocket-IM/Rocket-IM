@@ -99,11 +99,12 @@ pub(super) fn import(state: &mut DeviceState, package: SignedRecord) -> Result<V
         "exchange_challenge_required",
         "对照挑战已被消费或更换",
     )?;
-    ensure(
-        continuing || state.permissions.exchange.imports.len() < stored::LIMIT,
-        "resource_exhausted",
-        "对照导入达到128条上限",
-    )?;
+    if !continuing && state.permissions.exchange.imports.len() >= stored::LIMIT {
+        return Ok(
+            serde_json::json!({"consistency": consistency_state::capacity_pause(
+            state, "consistency_exchange_capacity"), "state":"consistency_paused"}),
+        );
+    }
     let mut comparison = None;
     for record in state.permissions.recovery.records.values() {
         let key = state
@@ -140,10 +141,18 @@ pub(super) fn import(state: &mut DeviceState, package: SignedRecord) -> Result<V
                 state,
                 consistency_state::ForkEvidence {
                     predecessor: body.predecessor.clone(),
-                    left: local,
-                    right: body.record.clone(),
+                    left: local.into(),
+                    right: body.record.clone().into(),
                 },
             )?;
+            if state.permissions.consistency.status
+                == consistency_state::Status::EvidenceCapacityExhausted
+            {
+                return Ok(
+                    serde_json::json!({"consistency": consistency_state::inspect(state),
+                    "state":"consistency_paused"}),
+                );
+            }
             stored::Outcome::ForkDetected
         }
         Some(_) => {

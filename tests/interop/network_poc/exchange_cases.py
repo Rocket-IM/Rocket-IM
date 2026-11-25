@@ -99,7 +99,7 @@ def matching_and_retry(lab):
     assert_status(lab, "no_known_conflict")
     check(lab.rust("b1", "wire_inspect") == before, "公开证据导入修改了 MLS 或消息状态")
     check(lab.http_count == http_before, "离线交换依赖 Service HTTP 入口")
-    send(lab)
+    packet = send(lab)
     next_request = begin(lab)["request"]
     check(next_request != request, "新交换错误复用已经消费的挑战")
     retry = lab.rust("b1", "consistency_exchange_import", package=delivered)
@@ -107,6 +107,9 @@ def matching_and_retry(lab):
     blocked(lab)
     lab.rust("b1", "consistency_exchange_cancel")
     lab.start()
+    accepted = lab.submit(packet, device="b1")
+    lab.rust("b1", "wire_accept", logical_message_id="q02_ready", attempt_id="P1",
+             acceptance_receipt=accepted["acceptance_receipt"])
     observe(lab, current_head(lab))
     send(lab, logical="exchange_after_retry")
 

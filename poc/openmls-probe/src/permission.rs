@@ -128,6 +128,18 @@ pub fn execute(input: &str) -> Result<Value, PermissionError> {
         .map_err(|_| PermissionError::new("invalid_permission", "校验请求 JSON 无效"))?;
     if let Some(operation) = dispatch.operation {
         return match operation.as_str() {
+            "verify_recovery_request"
+            | "verify_recovery_control"
+            | "verify_recovery_root"
+            | "verify_recovery_candidate"
+            | "verify_recovery_accepted"
+            | "verify_recovery_receipt"
+            | "verify_witness_policy"
+            | "verify_witness_activation" => crate::join_recovery::execute(input),
+            "verify_key_package_request" | "verify_key_package" => {
+                crate::key_package::execute(input)
+            }
+            "verify_identity_source" => crate::identity_source::execute(input),
             "verify_device_registration" => crate::device_registration::execute(input),
             "verify_rebuild_stream" | "verify_rebuild_pull" => {
                 crate::rebuild_stream::execute(input)

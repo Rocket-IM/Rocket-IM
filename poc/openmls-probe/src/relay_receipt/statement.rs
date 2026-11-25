@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize)]
 #[serde(untagged)]
 pub(super) enum Statement {
+    IdentitySource(Box<crate::identity_source::Document>),
+    Recovery(Box<crate::join_recovery::Receipt>),
+    KeyPackage(Box<crate::key_package::Receipt>),
     Permission(Box<ReceiptStatement>),
     Message(Box<MessageAcceptanceStatement>),
     MessageClosure(Box<crate::message_closure::MessageClosureStatement>),
@@ -25,6 +28,18 @@ pub(super) enum Statement {
 impl Statement {
     pub(super) fn domain(&self) -> Result<&'static [u8], PermissionError> {
         match self {
+            Self::IdentitySource(s) => {
+                s.validate()?;
+                Ok(s.domain())
+            }
+            Self::Recovery(s) => {
+                s.validate()?;
+                s.domain()
+            }
+            Self::KeyPackage(s) => {
+                s.validate()?;
+                Ok(crate::key_package::RECEIPT_DOMAIN)
+            }
             Self::Reclamation(s) => {
                 s.validate()?;
                 Ok(crate::message_reclamation::SIGNING_DOMAIN)

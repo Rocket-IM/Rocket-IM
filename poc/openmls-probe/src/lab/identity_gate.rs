@@ -10,6 +10,24 @@ use crate::{
 
 pub(super) fn require(state: &DeviceState, identity: &DeviceIdentity) -> Result<(), LabError> {
     identity.validate()?;
+    super::identity_source::require(
+        state,
+        &Member {
+            account_id: identity.account_id.clone(),
+            device_id: identity.device_id.clone(),
+            signature_key: identity.signature_key.clone(),
+        },
+        false,
+    )?;
+    require_verified(state, identity)
+}
+
+/// 接纳公开补链证据只校验核验事实；不能要求已安装目标水位，否则无法消除缺口。
+pub(super) fn require_verified(
+    state: &DeviceState,
+    identity: &DeviceIdentity,
+) -> Result<(), LabError> {
+    identity.validate()?;
     if *identity == stored::own(state) {
         return Ok(());
     }
@@ -172,6 +190,7 @@ fn permission_output(
 }
 
 pub(super) fn check(state: &DeviceState, operation: &Operation) -> Result<(), LabError> {
+    super::identity_source::gate(state, operation)?;
     match operation {
         Operation::Create { peers } => {
             for peer in peers {

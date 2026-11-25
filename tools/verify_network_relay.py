@@ -114,7 +114,7 @@ CASES = [
     ("X11", "请求导出导入取消的端侧原子快照恢复", migration_faults.client_atomicity),
     ("X12", "迁移签名器失败事务退出及丢响应的原记录恢复", migration_faults.service_atomicity),
     ("S01", "原发送及接收混合历史的显式迁移且不改变原消息状态", sent_history_cases.mixed_history),
-    ("S02", "丢接受响应和已准备后继时迟到原证明保持唯一接受", sent_history_cases.lost_ack_and_superseded),
+    ("S02", "拒绝无证明后继并保持迟到原接受的唯一性", sent_history_cases.lost_ack_and_superseded),
     ("S03", "发送接受证明绑定原尝试和上下文且冲突保留原事实", sent_history_cases.proof_binding),
     ("S04", "封口或终态拒绝后的已接受替代才可成为发送历史", sent_history_cases.closed_then_replaced),
     ("S05", "迁移与目标正常收件保持独立副本和原去重语义", sent_history_cases.native_received_copy),
@@ -163,8 +163,8 @@ def needs_permissions(ident):
 
 
 def needs_signed_pages(ident):
-    # 生命周期声明必须来自本次验证的签名页，不能用无签名的普通收发装置。
-    return ident in ("M11", "P04") or ident.startswith(("R", "H", "J", "D", "X", "S", "F", "E"))
+    # 权限场景的默认发送和恢复同样需要本次真实 Service 回执与固定公钥。
+    return ident == "M11" or ident.startswith(("P", "R", "H", "J", "D", "X", "S", "F", "E"))
 
 
 def build(binary, output):

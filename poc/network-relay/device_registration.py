@@ -94,4 +94,6 @@ def complete_device_registration(store, db, device, req):
     result = registered(statement)
     db.execute("UPDATE device_registrations SET proof_json=?,result_json=? WHERE account=? AND device=? AND registration_id=?",
                (exact, encode_json(result).decode(), *pair, statement["registration_id"]))
+    from key_package_storage import directory_update
+    directory_update(db, pair[0])
     return result

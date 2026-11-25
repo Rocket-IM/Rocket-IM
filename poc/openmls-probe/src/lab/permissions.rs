@@ -2,7 +2,7 @@
 
 use super::{
     checked, codec, ensure, permission_state as stored, state::DeviceState, wire, wire_types,
-    LabError, Operation, MAX_RECORDS,
+    LabError, Operation,
 };
 use crate::permission::{
     self, Action, Identity, PermissionCheckpoint, Proof, Statement, SIGNING_DOMAIN,
@@ -12,6 +12,15 @@ use serde_json::{json, Value};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), LabError> {
+    #[cfg(feature = "key-package-probe")]
+    if matches!(
+        operation,
+        Operation::JoinRecoverySignProbe { .. }
+            | Operation::JoinRecoveryChangeProbe { .. }
+            | Operation::JoinRecoveryWitnessSignProbe { .. }
+    ) {
+        return Ok(());
+    }
     // 一致性观察不授予权限；候选/移除门禁不应阻止取证或清理独立的 Q02 暂停。
     if matches!(
         operation,
@@ -34,6 +43,11 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
                     | Operation::WireReadPending
                     | Operation::WireReadInspect
                     | Operation::PermissionInspect
+                    | Operation::JoinRecovery { .. }
+                    | Operation::KeyPackageInspect
+                    | Operation::KeyPackageGenerate { .. }
+                    | Operation::KeyPackageRequest { .. }
+                    | Operation::KeyPackageResponse { .. }
                     | Operation::PermissionPinMember { .. }
                     | Operation::IdentityTrustObserve { .. }
                     | Operation::IdentityTrustPrepare { .. }
@@ -68,6 +82,19 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
         "signed_permission_required",
         "签名权限模式禁止旧控制或消息路径绕过",
     )?;
+    if state.permissions.pending.is_some() {
+        if let Operation::KeyPackageGenerate { request_id, .. } = operation {
+            // 候选安装会整体替换 provider；只可重读候选创建前已保存的材料。
+            ensure(
+                state
+                    .key_packages
+                    .as_ref()
+                    .is_some_and(|pool| pool.requests.contains_key(request_id)),
+                "permission_pending",
+                "先确定原权限候选，才能生成新的私有材料",
+            )?;
+        }
+    }
     if state.permissions.pending.is_some()
         || state.permissions.recovery.intent.is_some()
         || state.permissions.recovery.access_removed
@@ -87,7 +114,13 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
                     | Operation::WireClose { .. }
                     | Operation::WireReject { .. }
                     | Operation::PermissionInspect
+                    | Operation::JoinRecovery { .. }
+                    | Operation::KeyPackageInspect
+                    | Operation::KeyPackageGenerate { .. }
+                    | Operation::KeyPackageRequest { .. }
+                    | Operation::KeyPackageResponse { .. }
                     | Operation::PermissionPrepare { .. }
+                    | Operation::PermissionPrepareClaim { .. }
                     | Operation::PermissionPrepareAdd { .. }
                     | Operation::PermissionPrepareDevice { .. }
                     | Operation::PermissionPinMember { .. }
@@ -187,55 +220,11 @@ pub(super) fn prepare_change(
     validity_secs: Option<u16>,
     key_package: Option<String>,
 ) -> Result<Value, LabError> {
-    wire_types::id(&change_id)?;
-    ensure(
-        !state.permissions.recovery.access_removed,
-        "access_removed",
-        "本机已被移除",
-    )?;
-    ensure(
-        validity_secs.is_none_or(|value| (1..=300).contains(&value)),
-        "invalid_permission",
-        "有效期必须为1到300秒",
-    )?;
-    super::permission_recovery::check_prepare(state, &change_id, &action)?;
-    if let Some(pending) = &state.permissions.pending {
-        let statement = Statement::parse(&codec::decode(&pending.change.statement_bytes)?)?;
-        ensure(
-            statement.change_id == change_id
-                && statement.action.same_intent(&action)
-                && validity_secs.is_none_or(|seconds| {
-                    statement
-                        .expires_at_unix_secs
-                        .parse::<u64>()
-                        .ok()
-                        .zip(statement.issued_at_unix_secs.parse::<u64>().ok())
-                        .is_some_and(|(end, start)| end - start == u64::from(seconds))
-                }),
-            "pending_conflict",
-            "已有不同的待确认权限变更",
-        )?;
-        return super::permission_admission::prepared(state, &pending.change, true);
-    }
-    if let Some(change) = state.permissions.applied.get(&change_id) {
-        let statement = Statement::parse(&codec::decode(&change.statement_bytes)?)?;
-        ensure(
-            statement.action.same_intent(&action),
-            "permission_conflict",
-            "相同变更 ID 对应不同意图",
-        )?;
+    if let Some(change) =
+        super::permission_prepare::check(state, &change_id, &action, validity_secs)?
+    {
         return super::permission_admission::prepared(state, change, true);
     }
-    ensure(
-        state.permissions.applied.len() < MAX_RECORDS,
-        "resource_exhausted",
-        "权限记录已满",
-    )?;
-    ensure(
-        state.permissions.recovery.prepare_count < 64,
-        "permission_epoch_budget",
-        "同一已验证epoch最多准备64个候选，需验证下一epoch才能继续",
-    )?;
     let checkpoint = state
         .permissions
         .checkpoint
@@ -246,7 +235,6 @@ pub(super) fn prepare_change(
         device_id: state.context.device.clone(),
     };
     let remaining = checkpoint.remaining(&actor, &action)?;
-    super::permission_admission::check_new_member(state, &action)?;
     stored::validate_current(state, checkpoint, &state.group()?)?;
     let version = wire_types::decimal(&checkpoint.authorization_version)?
         .checked_add(1)
@@ -272,6 +260,7 @@ pub(super) fn prepare_change(
         }
     }
     let signer = state.signer()?;
+    let allocation = super::key_package_join::for_change(state, &change_id)?;
     let (commit, join) = if let Action::AddMember {
         member,
         welcome_sha256,
@@ -296,6 +285,7 @@ pub(super) fn prepare_change(
         (
             commit,
             Some(permission::admission::JoinMaterial {
+                allocation: allocation.clone(),
                 key_package,
                 welcome: codec::encode(&welcome),
             }),
@@ -331,7 +321,16 @@ pub(super) fn prepare_change(
     let mut nonce = [0u8; 32];
     checked("random_source", getrandom::getrandom(&mut nonce))?;
     let statement = Statement {
-        protocol_version: "rim-permission-1".into(),
+        protocol_version: if allocation.is_some() {
+            "rim-permission-2"
+        } else {
+            "rim-permission-1"
+        }
+        .into(),
+        allocation_sha256: allocation
+            .as_ref()
+            .map(|a| crate::key_package::digest(&a.receipt))
+            .transpose()?,
         change_id,
         service_id: checkpoint.service_id.clone(),
         conversation_id: checkpoint.conversation_id.clone(),

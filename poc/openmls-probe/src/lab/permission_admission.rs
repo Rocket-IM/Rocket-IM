@@ -252,6 +252,25 @@ pub(super) fn prepare(
     validity_secs: Option<u16>,
     mode: JoinMode,
 ) -> Result<Value, LabError> {
+    let action = intent(
+        state,
+        &change_id,
+        member,
+        &key_package,
+        history_policy,
+        mode,
+    )?;
+    permissions::prepare_change(state, change_id, action, validity_secs, Some(key_package))
+}
+
+pub(super) fn intent(
+    state: &DeviceState,
+    change_id: &str,
+    member: Member,
+    key_package: &str,
+    history_policy: String,
+    mode: JoinMode,
+) -> Result<Action, LabError> {
     ensure(
         state.permissions.recovery.relay_receipt_key.is_some(),
         "receipt_pin_required",
@@ -263,7 +282,7 @@ pub(super) fn prepare(
         "仅支持入群后历史策略",
     )?;
     let key_package_sha256 =
-        permission::commit_digest(&permission::types::bytes(&key_package, 512 * 1024)?);
+        permission::commit_digest(&permission::types::bytes(key_package, 512 * 1024)?);
     let welcome_sha256 = "0".repeat(64);
     let action = match mode {
         JoinMode::Member => Action::AddMember {
@@ -285,11 +304,11 @@ pub(super) fn prepare(
                 .permissions
                 .admission
                 .materials
-                .contains_key(&change_id),
+                .contains_key(change_id),
         "resource_exhausted",
         "入群候选材料已满",
     )?;
-    permissions::prepare_change(state, change_id, action, validity_secs, Some(key_package))
+    Ok(action)
 }
 
 pub(super) fn prepared(

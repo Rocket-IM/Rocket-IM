@@ -1,0 +1,21 @@
+{
+  "listen": "127.0.0.1:8443",
+  "database_url": "REPLACE_WITH_EXPLICIT_TEST_DATABASE_DSN",
+  "recovery_state": "/absolute/private-maintenance/service-state.json",
+  "tls_cert": "/absolute/path/server.pem",
+  "tls_key": "/absolute/path/server.key",
+  "service": "test-service",
+  "conversation": "test-chat",
+  "devices": [],
+  "business": {
+    "credential_key_env": "ROCKET_IM_CREDENTIAL_KEY",
+    "principals": [
+      {
+        "id": "your-business",
+        "token_sha256": "REPLACE_WITH_RANDOM_BUSINESS_CREDENTIAL_SHA256",
+        "not_before": "2026-11-24T00:00:00Z",
+        "expires_at": "2026-11-25T00:00:00Z"
+      }
+    ]
+  }
+}

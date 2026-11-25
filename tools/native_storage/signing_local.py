@@ -102,10 +102,11 @@ def sign_local(path, identifier, identity_ref, requirement):
     系统启动、Developer ID 或公证验收。后续必须独立验证签名与业务行为。
     """
     target = Path(path).resolve(strict=True)
-    output = (STORAGE_OUTPUT / 'signing').resolve()
-    if not output.is_relative_to((ROOT / 'dist').resolve()):
+    outputs = [(STORAGE_OUTPUT / 'signing').resolve(),
+               (ROOT / 'dist/platform-release/persistent/runs').resolve()]
+    if not all(output.is_relative_to((ROOT / 'dist').resolve()) for output in outputs):
         raise ValueError('直接签名输出必须位于本项目 dist 内')
-    if not target.is_relative_to(output) or not target.is_file():
+    if not any(target.is_relative_to(output) for output in outputs) or not target.is_file():
         raise ValueError('直接签名仅允许本轮 signing 输出内的实验副本')
     if target.stat().st_nlink != 1:
         raise ValueError('直接签名不接受硬链接，必须先复制已验收程序')

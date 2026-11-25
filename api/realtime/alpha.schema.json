@@ -1,0 +1,1063 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rocket-im.invalid/alpha1",
+  "title": "固定双测试设备 Alpha1 HTTP/WSS 契约",
+  "$defs": {
+    "Scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "account": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "device": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        }
+      },
+      "required": [
+        "service",
+        "account",
+        "device"
+      ]
+    },
+    "Identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "identity_key": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "scope",
+        "identity_key"
+      ]
+    },
+    "Material": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/Identity"
+        },
+        "key_package": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$",
+          "maxLength": 196608
+        }
+      },
+      "required": [
+        "identity",
+        "key_package"
+      ]
+    },
+    "Welcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "welcome": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$",
+          "maxLength": 196608
+        }
+      },
+      "required": [
+        "welcome"
+      ]
+    },
+    "Envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "conversation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "sender_account": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "sender_device": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "message_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "context": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "ciphertext": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$",
+          "maxLength": 196608
+        }
+      },
+      "required": [
+        "service",
+        "conversation",
+        "sender_account",
+        "sender_device",
+        "message_id",
+        "context",
+        "ciphertext"
+      ]
+    },
+    "Acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "message_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "sequence": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "envelope_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "request_id",
+        "message_id",
+        "sequence",
+        "envelope_hash"
+      ]
+    },
+    "Event": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sequence": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$"
+            },
+            "kind": {
+              "const": "message"
+            },
+            "acceptance": {
+              "$ref": "#/$defs/Acceptance"
+            },
+            "envelope": {
+              "$ref": "#/$defs/Envelope"
+            }
+          },
+          "required": [
+            "sequence",
+            "kind",
+            "acceptance",
+            "envelope"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sequence": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$"
+            },
+            "kind": {
+              "const": "delivered"
+            },
+            "acceptance": {
+              "$ref": "#/$defs/Acceptance"
+            }
+          },
+          "required": [
+            "sequence",
+            "kind",
+            "acceptance"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sequence": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$"
+            },
+            "kind": {
+              "const": "unavailable"
+            },
+            "acceptance": {
+              "$ref": "#/$defs/Acceptance"
+            }
+          },
+          "required": [
+            "sequence",
+            "kind",
+            "acceptance"
+          ]
+        }
+      ]
+    },
+    "Page": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "upper": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "next": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/Event"
+          }
+        }
+      },
+      "required": [
+        "after",
+        "upper",
+        "next",
+        "events"
+      ]
+    },
+    "Session": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "alpha1"
+        },
+        "service": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "conversation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "own": {
+          "$ref": "#/$defs/Identity"
+        },
+        "peer": {
+          "$ref": "#/$defs/Identity"
+        },
+        "creator": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "version",
+        "service",
+        "conversation",
+        "own",
+        "peer",
+        "creator"
+      ]
+    },
+    "Request": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "session"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "publish_material"
+            },
+            "body": {
+              "$ref": "#/$defs/Material"
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "peer_material"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "publish_welcome"
+            },
+            "body": {
+              "$ref": "#/$defs/Welcome"
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "welcome"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {},
+              "required": []
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "send"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "request_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                },
+                "envelope": {
+                  "$ref": "#/$defs/Envelope"
+                }
+              },
+              "required": [
+                "request_id",
+                "envelope"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "poll"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "after": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,18})$"
+                },
+                "upper": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,18})$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4
+                }
+              },
+              "required": [
+                "after",
+                "upper",
+                "limit"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "processed"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sequence": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,18})$"
+                },
+                "disposition": {
+                  "enum": [
+                    "received",
+                    "context_retired"
+                  ],
+                  "default": "received",
+                  "description": "默认保持旧客户端成功处理；context_retired只可针对已退休上下文的不可解密原件，生成unavailable而非delivered。精确重复须保持原处置。"
+                }
+              },
+              "required": [
+                "sequence"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "recovery_reserve"
+            },
+            "body": {
+              "$ref": "#/$defs/RecoveryReservation"
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "recovery_query"
+            },
+            "body": {
+              "$ref": "#/$defs/RecoveryQuery"
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            "op": {
+              "const": "recovery_publish"
+            },
+            "body": {
+              "$ref": "#/$defs/RecoveryPublish"
+            }
+          },
+          "required": [
+            "id",
+            "op",
+            "body"
+          ]
+        }
+      ]
+    },
+    "Reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "result": {},
+        "error": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "ok",
+        "result",
+        "error"
+      ]
+    },
+    "RecoveryReservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "successor-alpha1"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "target": {
+          "$ref": "#/$defs/Identity"
+        },
+        "peer": {
+          "$ref": "#/$defs/Identity"
+        },
+        "conversation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "old_context": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "request_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "deadline": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        }
+      },
+      "required": [
+        "version",
+        "id",
+        "target",
+        "peer",
+        "conversation",
+        "old_context",
+        "previous",
+        "request",
+        "request_hash",
+        "deadline"
+      ]
+    },
+    "RecoveryTransport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "successor-alpha1"
+        },
+        "round_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "deadline": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,18})$"
+        }
+      },
+      "required": [
+        "version",
+        "round_id",
+        "deadline"
+      ]
+    },
+    "RecoveryOffer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/Identity"
+        },
+        "peer": {
+          "$ref": "#/$defs/Identity"
+        },
+        "conversation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "old_context": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "request_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "key_package": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$",
+          "maxLength": 524288
+        },
+        "transport": {
+          "$ref": "#/$defs/RecoveryTransport"
+        }
+      },
+      "required": [
+        "target",
+        "peer",
+        "conversation",
+        "old_context",
+        "previous",
+        "request",
+        "request_hash",
+        "key_package",
+        "transport"
+      ]
+    },
+    "RecoveryFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sender": {
+          "$ref": "#/$defs/Identity"
+        },
+        "body": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "offer"
+                },
+                "offer": {
+                  "$ref": "#/$defs/RecoveryOffer"
+                }
+              },
+              "required": [
+                "kind",
+                "offer"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "approval"
+                },
+                "context": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "welcome": {
+                  "type": "string",
+                  "pattern": "^(?:[0-9a-f]{2})+$",
+                  "maxLength": 524288
+                }
+              },
+              "required": [
+                "kind",
+                "context",
+                "welcome"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "ready"
+                },
+                "context": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "approval_hash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "kind",
+                "context",
+                "approval_hash"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "commit"
+                },
+                "context": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "ready_hash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "kind",
+                "context",
+                "ready_hash"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "close"
+                },
+                "context": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "kind",
+                "context"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "installed"
+                },
+                "context": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "receipt_hash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "kind",
+                "context",
+                "receipt_hash"
+              ]
+            }
+          ]
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{128}$"
+        }
+      },
+      "required": [
+        "sender",
+        "body",
+        "signature"
+      ],
+      "description": "packet为此规范JSON原字节的小写hex；字段顺序跟随对应Rust结构。Ed25519签名输入为Rocket-IM/SDK/recovery/v1\\0加[sender,body]规范JSON；Offer上下文为完整offer规范JSON的SHA256。网络transport也进入签名与上下文。"
+    },
+    "RecoveryRound": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reservation": {
+          "$ref": "#/$defs/RecoveryReservation"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "reserved",
+            "offered",
+            "approved",
+            "ready",
+            "committed",
+            "complete",
+            "closing",
+            "closed"
+          ]
+        },
+        "materials": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 8,
+          "properties": {
+            "offer": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            },
+            "approval": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            },
+            "ready": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            },
+            "commit": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            },
+            "close_target": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            },
+            "close_peer": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            },
+            "installed_target": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            },
+            "installed_peer": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})+$",
+              "maxLength": 524288
+            }
+          }
+        }
+      },
+      "required": [
+        "reservation",
+        "context",
+        "status",
+        "materials"
+      ],
+      "description": "唯一活动轮，最多16轮；单轮编码不超过600KiB-2048字节，材料账本保留。双方Installed证明前不开放新上下文。恢复转交不占普通设备信箱序号。"
+    },
+    "RecoveryPublish": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "kind": {
+          "enum": [
+            "offer",
+            "approval",
+            "ready",
+            "commit",
+            "close_target",
+            "close_peer",
+            "installed_target",
+            "installed_peer"
+          ]
+        },
+        "packet": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{2})+$",
+          "maxLength": 524288
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "packet"
+      ]
+    },
+    "RecoveryQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Request"
+    },
+    {
+      "$ref": "#/$defs/Reply"
+    }
+  ]
+}

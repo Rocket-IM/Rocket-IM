@@ -37,6 +37,15 @@ def accepted_count(lab, device="b1"):
     return lab.rust(device, "wire_inspect")["accepted_outbox_count"]
 
 
+def check_acceptance_transition(before, after, logical, ident="P1"):
+    expected = copy.deepcopy(before)
+    check(expected["send_order"]["pending"] == {"logical_message_id": logical, "attempt_id": ident},
+          "接受前发送门不是本次精确原尝试")
+    expected["accepted_outbox_count"] += 1
+    expected["send_order"]["pending"] = None
+    check(after == expected, "接受提交除原事实记账与精确发送门释放外改变了状态")
+
+
 def mixed_history(lab):
     own = [sent(lab, "sent_old_" + str(i)) for i in range(2)]
     inbound = publish(lab, "received_old_mixed")
@@ -76,19 +85,22 @@ def lost_ack_and_superseded(lab):
         raise AssertionError("消息接受丢响应装置未触发")
     except (http.client.RemoteDisconnected, ConnectionResetError):
         pass
-    # 当前封口输入仍是可信实验调度器边界：故意给出矛盾假设以验证迟到真实接受事实优先。
-    lab.rust("b1", "wire_send", logical_message_id="late_ack", attempt_id="P2", payload="synthetic-late-ack",
-             replaces_attempt_id="P1", closure_id="synthetic_incorrect_closure")
+    # 当前契约要求先保存签名终态；裸 closure_id 不能生成已接受原尝试的后继。
+    error = reject_unchanged(lab, "b1", "wire_send", logical_message_id="late_ack", attempt_id="P2",
+                             payload="synthetic-late-ack", replaces_attempt_id="P1",
+                             closure_id="synthetic_incorrect_closure")
+    check(error["code"] == "send_order_pending", "无证明后继未被原未决门阻断")
     joined(lab, count=0)
     lab.restart()
     original = attempt(lab, "late_ack")
     check(original["outcome"] == "accepted" and accepted_count(lab) == 0, "普通查询被自动视作本机已验证接受")
+    check(attempt(lab, "late_ack", operation="close_attempt") == original,
+          "已接受原尝试被封口请求改写为可替代状态")
     before = lab.rust("b1", "wire_inspect")
     result = ack(lab, (packet, original))
     after = lab.rust("b1", "wire_inspect")
     check(result["acceptance_id"] == original["acceptance_id"] and not result["duplicate"], "迟到证明未绑定原P1")
-    check({k: v for k, v in before.items() if k != "accepted_outbox_count"}
-          == {k: v for k, v in after.items() if k != "accepted_outbox_count"}, "迟到接受回退了当前密码或尝试状态")
+    check_acceptance_transition(before, after, "late_ack")
     for ident, predecessor in (("P2", "P1"), ("P3", "P2")):
         reject_unchanged(lab, "b1", "wire_send", logical_message_id="late_ack", attempt_id=ident,
                          payload="synthetic-late-ack", replaces_attempt_id=predecessor, closure_id="synthetic_incorrect_closure")
@@ -100,7 +112,7 @@ def lost_ack_and_superseded(lab):
 
 
 def proof_binding(lab):
-    first, second = sent(lab, "proof_first", save=False), sent(lab, "proof_second", save=False)
+    first = sent(lab, "proof_first", save=False)
     joined(lab, count=0)
     packet, accepted = first
     fields = {"logical_message_id": "proof_first", "attempt_id": "P1", "acceptance_receipt": accepted["acceptance_receipt"]}
@@ -108,8 +120,7 @@ def proof_binding(lab):
     bad["acceptance_receipt"]["signature_bytes"] = mutate_bytes(bad["acceptance_receipt"]["signature_bytes"])
     reject_unchanged(lab, "b1", "wire_accept", **bad)
     for changes in ({"logical_message_id": "unknown"}, {"attempt_id": "P2"},
-                    {"acceptance_receipt": second[1]["acceptance_receipt"]}, {"acceptance_receipt": accepted},
-                    {"acceptance_receipt": None}):
+                    {"acceptance_receipt": accepted}, {"acceptance_receipt": None}):
         reject_unchanged(lab, "b1", "wire_accept", **{**fields, **changes})
     for device in ("a1", "a2", "b2", "c1"):
         reject_unchanged(lab, device, "wire_accept", **fields)
@@ -119,20 +130,28 @@ def proof_binding(lab):
         reject_unchanged(lab, "b1", "wire_accept", **{**fields, "acceptance_receipt": receipt})
     check(accepted_count(lab) == 0, "错误证明部分确认了发送记录")
     ack(lab, first)
+    second = sent(lab, "proof_second", save=False)
+    reject_unchanged(lab, "b1", "wire_accept", **{**fields, "acceptance_receipt": second[1]["acceptance_receipt"]})
+    reject_unchanged(lab, "b1", "wire_accept", logical_message_id="proof_second", attempt_id="P1",
+                     acceptance_receipt=accepted["acceptance_receipt"])
     alternate = signed_for_packet(lab, packet, accepted, acceptance_id="different_acceptance")
     reject_unchanged(lab, "b1", "wire_accept", **{**fields, "acceptance_receipt": alternate})
     collision = signed_for_packet(lab, second[0], second[1], acceptance_id=accepted["acceptance_id"])
     reject_unchanged(lab, "b1", "wire_accept", logical_message_id="proof_second", attempt_id="P1", acceptance_receipt=collision)
+    check(accepted_count(lab) == 1, "跨消息证明或冲突接受ID部分确认了第二条发送")
     ack(lab, second)
     lab.rust("b2", "history_import", **submit(lab, prepared(lab, "correct_after_invalid_ack", [first, second])))
 
 
 def closed_then_replaced(lab):
     first = lab.rust("b1", "wire_send", logical_message_id="closed_sent", attempt_id="P1", payload="synthetic-replaced")
-    closed = attempt(lab, "closed_sent", operation="close_attempt")
+    request = lab.rust("b1", "wire_close_request", logical_message_id="closed_sent", attempt_id="P1")
+    closed = lab.http("b1", "close_attempt", request)
     check(closed["outcome"] == "cancelled_before_accept", "未提交旧尝试未封口")
     reject_unchanged(lab, "b1", "wire_accept", logical_message_id="closed_sent", attempt_id="P1", acceptance_receipt=closed)
     lab.submit(first, device="b1", expected=409)
+    lab.rust("b1", "wire_close", logical_message_id="closed_sent", attempt_id="P1",
+             closure_receipt=closed["closure_receipt"])
     second = lab.rust("b1", "wire_send", logical_message_id="closed_sent", attempt_id="P2", payload="synthetic-replaced",
                       replaces_attempt_id="P1", closure_id=closed["closure_id"])
     accepted = lab.submit(second, device="b1", replaces_attempt_id="P1", closure_id=closed["closure_id"])
@@ -144,6 +163,8 @@ def closed_then_replaced(lab):
     rejected = lab.submit(stale, device="b1", expected=409)
     check(rejected["outcome"] == "rejected_final", "旧版本首次提交未终态拒绝")
     reject_unchanged(lab, "b1", "wire_accept", logical_message_id="rejected_sent", attempt_id="P1", acceptance_receipt=rejected)
+    lab.rust("b1", "wire_reject", logical_message_id="rejected_sent", attempt_id="P1",
+             rejection_receipt=rejected["rejection_receipt"])
     current = lab.rust("b1", "wire_send", logical_message_id="rejected_sent", attempt_id="P2", payload="synthetic-stale",
                        replaces_attempt_id="P1", closure_id=rejected["closure_id"])
     current_accepted = lab.submit(current, device="b1", replaces_attempt_id="P1", closure_id=rejected["closure_id"])

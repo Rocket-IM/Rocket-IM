@@ -42,7 +42,10 @@ def atomic_head_and_resume(lab):
     observe(lab, head, failpoint="after_save", expected_exit=85)
     assert_status(lab, "no_known_conflict")
     observe(lab, head)
-    send(lab)
+    packet = send(lab)
+    accepted = lab.submit(packet, device="b1")
+    lab.rust("b1", "wire_accept", logical_message_id="q02_ready", attempt_id="P1",
+             acceptance_receipt=accepted["acceptance_receipt"])
     record = accept(lab, prepare(lab, "atomic_rollback")["change"])
     recover(lab, record, "a1", "b1")
     old = sign_head(lab, lab.checkpoint)
@@ -138,7 +141,9 @@ def cached_crypto_guards(lab):
     # 请求参数与原记录完全相同，防止先命中缓存后绕过检查闸。
     for device, operation, fields in operations:
         error = reject_unchanged(lab, device, operation, **fields)
-        check(error["code"] == "consistency_paused", operation + " 绕过了检查闸")
+        # 旧 send 入口已由发送顺序协议永久禁用，该拒绝先于 Q02 门禁。
+        expected = "send_order_required" if operation == "send" else "consistency_paused"
+        check(error["code"] == expected, operation + " 未按预期门禁拒绝: " + error["code"])
     check(lab.rust("b1", "wire_inspect") == before, "拒绝操作改变密码/发送状态")
     # 已有接受事实仍可记账；不会生成新密文或解除检查闸。
     acceptance = lab.submit(cached_message, device="b1")

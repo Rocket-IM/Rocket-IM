@@ -1,0 +1,11 @@
+{
+  "name": "@rocket-im/stage0-desktop-storage",
+  "version": "0.1.0-stage0.1",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "description": "Stage 0 Node desktop consumption of precompiled Rust SQLite; synthetic data only",
+  "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
+  "files": ["dist", "bin", "artifact.json", "licenses", "dependencies.json", "README.md"],
+  "engines": {"node": ">=22"}
+}

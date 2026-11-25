@@ -61,7 +61,7 @@ def public_subject(pair):
     return {"account_id": pair[0], "device_id": pair[1]}
 
 
-def check_fixture(fixture):
+def check_fixture(fixture, identity_mode=False):
     required = {"service_id", "controller_token", "devices", "conversation"}
     if not required <= set(fixture) or set(fixture) - required - {"permission_checkpoint", "relay_receipt_key"}:
         raise ValueError("fixture 字段不正确")
@@ -69,7 +69,7 @@ def check_fixture(fixture):
     if not isinstance(fixture["controller_token"], str) or not 16 <= len(fixture["controller_token"]) <= 256:
         raise ValueError("controller_token 必须为 16—256 字符的合成凭证")
     devices = fixture["devices"]
-    if not isinstance(devices, list) or not 2 <= len(devices) <= 6:
+    if not isinstance(devices, list) or not (len(devices) == 0 if identity_mode else 2 <= len(devices) <= 6):
         raise ValueError("fixture devices 数量须为 2—6")
     seen, tokens, public_keys = set(), {fixture["controller_token"]}, set()
     for item in devices:
@@ -95,7 +95,7 @@ def check_fixture(fixture):
     if not isinstance(ref, str) or len(ref) != 64 or any(c not in "0123456789abcdef" for c in ref):
         raise ValueError("crypto_state_ref 必须为 64 位小写十六进制")
     members = [subject(m) for m in conv["members"]]
-    if len(members) < 2 or len(set(members)) != len(members) or not set(members) <= seen:
+    if (len(members) != 0 if identity_mode else len(members) < 2) or len(set(members)) != len(members) or not set(members) <= seen:
         raise ValueError("fixture members 缺少设备或重复")
     if "permission_checkpoint" in fixture:
         from permission_contract import validate_checkpoint
@@ -117,11 +117,14 @@ def check_fixture(fixture):
 
 
 class Store:
-    def __init__(self, path, fixture, permission_verifier=None, receipt_signer=None):
+    def __init__(self, path, fixture, permission_verifier=None, receipt_signer=None, identity_config=None,
+                 recovery_witness_config=None):
         self.permission_verifier = permission_verifier
         self.receipt_signer = receipt_signer
         self.path = Path(path).absolute()
-        check_fixture(fixture)
+        check_fixture(fixture, identity_config is not None)
+        if identity_config is not None:
+            self.identity_config = identity_config
         receipt_key = receipt_signer.public_key() if receipt_signer is not None else None
         if "relay_receipt_key" in fixture and fixture["relay_receipt_key"] != receipt_key:
             raise ValueError("启动Service凭证公钥与实际密钥不一致")
@@ -149,13 +152,28 @@ class Store:
                 raise ValueError("已有数据库服务实例不匹配")
             from permissions import install_schema
             previous_schema = self.meta(db, "schema")
-            self.permission_enabled = install_schema(db, previous_schema, fixture.get("permission_checkpoint"), not tables, receipt_key, fixture["devices"])
+            if previous_schema == "rim-poc-identity-source-1":
+                if identity_config is None: raise ValueError("身份来源数据库必须显式配置原信任根")
+                previous_schema = "rim-poc-storage-10"
+            self.permission_enabled = install_schema(db, previous_schema, fixture.get("permission_checkpoint"), not tables, receipt_key, fixture["devices"], identity_config is not None)
             from rebuild_stream_storage import install
             install(db, fixture, not tables)
             from reclamation_storage import install as install_reclamation
             install_reclamation(db, previous_schema)
             from registration_storage import install as install_registration
             install_registration(db, previous_schema)
+            from key_package_storage import install as install_key_packages
+            install_key_packages(db, previous_schema)
+            from join_recovery_storage import install as install_recovery
+            install_recovery(db, previous_schema)
+            from join_recovery_witness import install as install_witness_config
+            install_witness_config(self, db, recovery_witness_config)
+            from join_recovery_storage import verify_persisted
+            verify_persisted(self, db)
+            if identity_config is not None:
+                from identity_source_storage import install as install_identity_source
+                install_identity_source(self, identity_config, db)
+                db.execute("UPDATE meta SET value='rim-poc-identity-source-1' WHERE key='schema'")
             db.commit()
         self.path.chmod(0o600)
 
@@ -246,3 +264,5 @@ def revoke_device(db, pair):
     db.execute("UPDATE devices SET revoked=1 WHERE account=? AND device=?", pair)
     db.execute("DELETE FROM members WHERE account=? AND device=?", pair)
     remove_access(db, pair)
+    from key_package_storage import revoke
+    revoke(db, pair)

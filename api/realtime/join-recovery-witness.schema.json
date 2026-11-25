@@ -1,0 +1,2026 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rocket-IM E10C-W1 恢复见证冻结规范",
+  "description": "FROZEN_SPEC_NOT_IMPLEMENTED：独立规范文件，未接入现有实现、旧 message.schema.json 或 HTTP 路由。依本轮用户授权已在规范层审定采纳 W1 信任/可用性/保守迁移取舍；真实部署信任根/独立控制域仍未验证。JSON Schema 只验形状，原字节、签名、摘要、跨对象绑定、预算、时序、实际 MLS/存储/锚和权限门禁须另作验证。本轮不运行实现测试，不构造缺 update-path 私有 Commit，不重试历史平台阻断。",
+  "x-contract-status": "FROZEN_SPEC_NOT_IMPLEMENTED",
+  "x-profile": "E10C-W1",
+  "x-signature-algorithm": "Ed25519 (not Ed25519ph); 32-byte non-weak public key, 64-byte signature; strict verification",
+  "x-signature-rule": "signature = Ed25519.sign(key, UTF8(domain including one terminal NUL byte) || exact decoded statement_bytes). JSON parsing never replaces original bytes. Reject duplicate keys at all depths, invalid UTF-8, BOM, trailing non-whitespace content, missing/extra fields and unknown versions. Different valid UTF-8 JSON encodings are different originals; identical semantic objects do not imply byte-identical retry.",
+  "x-signature-domains": {
+    "rim-recovery-request-2": "Rocket-IM/POC/recovery-request/v2\u0000",
+    "rim-permission-4": "Rocket-IM/POC/permission-change/v4\u0000",
+    "rim-recovery-receipt-2": "Rocket-IM/POC/recovery-receipt/v2\u0000",
+    "rim-recovery-witness-request-1": "Rocket-IM/POC/recovery-witness-request/v1\u0000",
+    "rim-recovery-witness-response-1": "Rocket-IM/POC/recovery-witness-response/v1\u0000"
+  },
+  "x-hash-rules": {
+    "policy": {
+      "domain_utf8": "Rocket-IM/POC/recovery-witness-policy/v1\u0000",
+      "algorithm": "SHA-256(domain || u64be(len(P)) || P)",
+      "parts": [
+        "exact decoded policy_bytes"
+      ],
+      "format": "64 lowercase hex"
+    },
+    "signed_record": {
+      "domain_utf8": "Rocket-IM/POC/recovery-signed-record/v1\u0000",
+      "algorithm": "SHA-256(domain || each u64be(len(part)) || part)",
+      "parts": [
+        "decoded statement_bytes",
+        "decoded signature_bytes"
+      ]
+    },
+    "candidate": {
+      "domain_utf8": "Rocket-IM/POC/recovery-candidate/v1\u0000",
+      "algorithm": "SHA-256(domain || each u64be(len(part)) || part)",
+      "parts": [
+        "decoded statement_bytes",
+        "decoded signature_bytes",
+        "decoded commit_bytes"
+      ]
+    },
+    "admission": {
+      "domain_utf8": "Rocket-IM/POC/admission-record/v1\u0000",
+      "algorithm": "SHA-256(domain || each u64be(len(part)) || part)",
+      "parts": [
+        "decoded change.statement_bytes",
+        "decoded change.signature_bytes",
+        "decoded change.commit_bytes",
+        "decoded receipt.statement_bytes",
+        "decoded receipt.signature_bytes"
+      ]
+    },
+    "material_and_source": {
+      "algorithm": "SHA-256(exact raw bytes)",
+      "uses": [
+        "commit_sha256",
+        "welcome_sha256",
+        "key_package_sha256",
+        "old_leaf_sha256 (raw leaf TLS bytes)",
+        "SourceRef.source_sha256"
+      ]
+    }
+  },
+  "x-version-matrix": {
+    "policy": "rim-recovery-witness-policy-1",
+    "request_and_control": "rim-recovery-request-2",
+    "candidate": "rim-permission-4",
+    "allocation_accepted_closed": "rim-recovery-receipt-2",
+    "witness_request": "rim-recovery-witness-request-1",
+    "witness_response": "rim-recovery-witness-response-1",
+    "rules": "rim-recovery-witness-rules-1",
+    "root_admission": "rim-permission-2 + rim-permission-receipt-1 (unchanged)",
+    "current_admission": "verified root, legacy recovery (rim-permission-3 + rim-recovery-receipt-1), or W1 recovery (rim-permission-4 + rim-recovery-receipt-2)",
+    "unknown_version": "reject before state mutation; no optional policy, version retry, downgrade or stripping fields"
+  },
+  "x-storage-contract": {
+    "device_state_version": 3,
+    "mandatory_state": "witness_state with authenticated Activation and all policy/request/response/installation associations, including activation before any candidate; Activation.policy_ref may be explicit null to enable fail-closed W1 without an available witness policy",
+    "relay_recovery_schema": "2",
+    "outer_relay_schema": "existing global/identity-source markers may remain only if the mandatory recovery_schema=2 check is enforced on every load; missing/unknown marker rejects",
+    "migration": "validate in temporary state then commit atomically with existing anchor coordination; failure preserves old state; old programs must reject W1 state",
+    "legacy_installed": "retain original installation facts and exact retry subject to global gates; never synthesize W1 witness",
+    "legacy_uninstalled_target": "preserve old R0 and material occupancy, deny first Welcome install after activation; joined survivors may still process old Commit under old rules; only lawful new attempt can bind P",
+    "layout_scope": "Only outer version 3, mandatory witness_state/activation, exact-original associations and load-time verification are frozen; the complete DeviceState/physical database layout is not frozen by this schema.",
+    "activation_updates": "Policy absence never disables W1. Later binding requires authenticated monotonically greater Activation revision; all old activation originals remain. Intent/candidate/receipt/witness policy references are always non-null."
+  },
+  "x-semantic-invariants": [
+    "P trust is independently established before Intent, never by its own signature or by Service selection. PolicyRef and witness_profile equal across intent/claim/close/allocation/candidate/R0/request/response/install record.",
+    "P is immutable for a candidate even after accepted/closed. Directory refs are exact sorted unique A/T/W account union; W is present and qualified in predecessor and successor.",
+    "New candidate tuple must be request-2, claim-2, allocation receipt-2, permission-4 and terminal receipt-2. Historic admission references are distinct and do not permit mixed candidate tuples.",
+    "R0 binds P but never references later W installation/witness. W processes the exact accepted private Commit from a non-pending actual predecessor, commits installation before signing.",
+    "Witness request digest hashes the exact signed request; response context/challenge matches. Neither fresh challenge nor signature proves global freshness or remote execution.",
+    "T independently validates actual Welcome, package, all leaf lifetimes and public successor; no claim of full epoch-secret equality with W.",
+    "Expiry: intent/candidate use existing 1..300 second bounds; witness request 1..60 seconds and <= package not_after; response <= request expiry, issued_at<=now<expires_at on first use. No clock rollback or deadline refresh on exact retry.",
+    "Known verified higher facts/revocation/conflict are observed before first install; cached witness original remains immutable but supplemental authentic facts must be provided.",
+    "Only one current active challenge per uninstalled endpoint, at most 16 distinct challenges per candidate; exact retry consumes no new quota. Cancel/replace and Apply serialize.",
+    "No implementation/business/security PASS follows from schema or format vectors. Deployment trust roots and real independence remain separate prerequisites.",
+    "Activation with explicit null policy_ref enables W1 fail-closed even when no eligible W exists; it never permits a legacy first recovery install. Missing policy_ref is invalid. Subsequent policy binding uses an authorized monotonic activation revision, never modifies old activation/candidate originals."
+  ],
+  "x-wire-budgets": {
+    "signed_witness_request_bytes": 8192,
+    "signed_witness_response_bytes": 16384,
+    "envelope": "actual complete UTF-8 JSON bytes in fixed compact outer order statement_bytes,signature_bytes; no escaped base64; inner raw JSON unchanged",
+    "compact_envelope_overhead_with_64_byte_signature": 131,
+    "maximum_decoded_request_statement_bytes": 6045,
+    "maximum_decoded_response_statement_bytes": 12189,
+    "note": "maxLength on Base64 is only a preliminary shape bound; enforce exact full envelope wire byte limits before decoding/persisting; attachment transport and existing ledger budgets remain independently bounded",
+    "policy_decoded_bytes": 8192,
+    "original_signed_statement_decoded_bytes": 16384,
+    "witness_challenges_per_candidate": 16,
+    "target_ledger_and_evidence_bytes": 8388608
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Policy"
+    },
+    {
+      "$ref": "#/$defs/PolicyEnvelope"
+    },
+    {
+      "$ref": "#/$defs/Intent"
+    },
+    {
+      "$ref": "#/$defs/Claim"
+    },
+    {
+      "$ref": "#/$defs/Close"
+    },
+    {
+      "$ref": "#/$defs/Statement"
+    },
+    {
+      "$ref": "#/$defs/Receipt"
+    },
+    {
+      "$ref": "#/$defs/Bundle"
+    },
+    {
+      "$ref": "#/$defs/PublicBundle"
+    },
+    {
+      "$ref": "#/$defs/Record"
+    },
+    {
+      "$ref": "#/$defs/PublicRecord"
+    },
+    {
+      "$ref": "#/$defs/WitnessRequest"
+    },
+    {
+      "$ref": "#/$defs/WitnessResponse"
+    },
+    {
+      "$ref": "#/$defs/InstallationFact"
+    },
+    {
+      "$ref": "#/$defs/WitnessDelivery"
+    },
+    {
+      "$ref": "#/$defs/Activation"
+    },
+    {
+      "$ref": "#/$defs/InstalledRecord"
+    }
+  ],
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]{1,64}(?![\\s\\S])"
+    },
+    "U64": {
+      "type": "string",
+      "maxLength": 20,
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)(?![\\s\\S])",
+      "description": "0 至 18446744073709551615 的十进制字符串；禁止前导零。"
+    },
+    "PositiveU64": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/U64"
+        },
+        {
+          "not": {
+            "const": "0"
+          }
+        }
+      ]
+    },
+    "Hash": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+    },
+    "StateRef": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}(?![\\s\\S])",
+      "description": "Rust 探针的公共群检查点摘要：SHA-256(固定域字节 || GroupContext TLS 序列化字节)，输出 64 位小写十六进制。公共结构含协议版本、套件、群标识、epoch、树哈希、已确认 transcript 和扩展；不导出私有状态。",
+      "x-hash-domain-utf8": "Rocket-IM/rim-poc-1/MLS-GroupContext\u0000",
+      "x-context-encoding": "OpenMLS GroupContext.tls_serialize_detached()"
+    },
+    "SignatureKey": {
+      "type": "string",
+      "minLength": 44,
+      "maxLength": 44,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 32,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。",
+      "x-exact-decoded-bytes": 32
+    },
+    "SignatureBytes": {
+      "type": "string",
+      "minLength": 88,
+      "maxLength": 88,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 64,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。",
+      "x-exact-decoded-bytes": 64
+    },
+    "GroupId": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 344,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 256,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "StatementBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 21848,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 16384,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "PolicyBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 10924,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 8192,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "KeyPackageRef": {
+      "type": "string",
+      "minLength": 44,
+      "maxLength": 44,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 32,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。",
+      "x-exact-decoded-bytes": 32
+    },
+    "KeyPackageBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 10924,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 8192,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "MlsMessageBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 699052,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 524288,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "WitnessRequestBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 8060,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 6045,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "WitnessResponseBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 16252,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 12189,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "PublicEvidenceBytes": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 1228800,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?(?![\\s\\S])",
+      "contentEncoding": "base64",
+      "x-max-decoded-bytes": 921600,
+      "description": "严格标准带填充 Base64；边界须另验解码后非空、解码字节数及重新编码与原字符串完全相等。"
+    },
+    "Member": {
+      "type": "object",
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "device_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signature_key": {
+          "$ref": "#/$defs/SignatureKey"
+        }
+      },
+      "required": [
+        "account_id",
+        "device_id",
+        "signature_key"
+      ],
+      "additionalProperties": false,
+      "description": "完整设备身份；32 字节强 Ed25519 公钥另作密码核验。不同身份/钥不证明独立控制域。"
+    },
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "group_id": {
+          "$ref": "#/$defs/GroupId"
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "group_id"
+      ],
+      "additionalProperties": false
+    },
+    "SourceRef": {
+      "type": "object",
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/Hash"
+        }
+      },
+      "required": [
+        "source_id",
+        "source_sha256"
+      ],
+      "additionalProperties": false,
+      "description": "对准确公开来源原字节的 SHA-256 引用，不是来源授权或诚实性的证明；缺少原件/既有可信授权时不能凭摘要自举信任。安装凭据与附带来源均摘要其保存的完整原字节，不重序列化。"
+    },
+    "PolicyRef": {
+      "type": "object",
+      "properties": {
+        "policy_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "policy_version": {
+          "$ref": "#/$defs/PositiveU64"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/Hash"
+        }
+      },
+      "required": [
+        "policy_id",
+        "policy_version",
+        "policy_sha256"
+      ],
+      "additionalProperties": false,
+      "description": "policy_sha256 摘要准确 PolicyBytes：SHA-256(policy 域 || u64be(字节长度) || 原字节)。Policy 正文不包含自身摘要；policy_version 是单调策略修订号，不是协议版本。"
+    },
+    "Independence": {
+      "type": "object",
+      "properties": {
+        "control_domain_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "confirmation_source_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "assumption": {
+          "const": "honest_uncompromised_not_controlled_by_actor_or_target"
+        }
+      },
+      "required": [
+        "control_domain_id",
+        "confirmation_source_ref",
+        "assumption"
+      ],
+      "additionalProperties": false,
+      "description": "本档位预先指定的 W 本身诚实、钥未失陷且不受 A/T 控制；同主体多设备不增加独立性。来源声明不自动证明实际独立性。"
+    },
+    "Policy": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-witness-policy-1"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "policy_version": {
+          "$ref": "#/$defs/PositiveU64"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "witness": {
+          "$ref": "#/$defs/Member"
+        },
+        "validation_rules_version": {
+          "const": "rim-recovery-witness-rules-1"
+        },
+        "trust_source_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "change_authority_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "independence": {
+          "$ref": "#/$defs/Independence"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_id",
+        "policy_version",
+        "scope",
+        "target",
+        "witness",
+        "validation_rules_version",
+        "trust_source_ref",
+        "change_authority_ref",
+        "independence"
+      ],
+      "additionalProperties": false,
+      "description": "可信本地固定策略原件，单指定 W、1-of-1；无自签授权。可信分发/变更根与真实控制域仍须独立建立。T 先持久固定此原件，再签目标意图；每个候选即使 accepted/closed 后也不可替换策略。"
+    },
+    "PolicyEnvelope": {
+      "type": "object",
+      "properties": {
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "policy_bytes": {
+          "$ref": "#/$defs/PolicyBytes"
+        }
+      },
+      "required": [
+        "policy_ref",
+        "policy_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "PolicyBytes 解码后严格解析为 Policy，字段对应与摘要由语义校验器核验；本封装不带签名且不能自行建立策略授权。"
+    },
+    "AdmissionRef": {
+      "type": "object",
+      "properties": {
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "record_sha256": {
+          "$ref": "#/$defs/Hash"
+        }
+      },
+      "required": [
+        "change_id",
+        "record_sha256"
+      ],
+      "additionalProperties": false,
+      "description": "沿用 admission-record/v1 五部分摘要。必须取得准确被引用 change/receipt 原件并校验其版本对：根仅普通 permission-2+permission-receipt-1；current 可为根、legacy recovery permission-3+recovery-receipt-1 或 W1 permission-4+recovery-receipt-2。缺原件拒绝，不能由摘要猜版本；引用旧入口不等于允许新候选混用旧格式。"
+    },
+    "Floor": {
+      "type": "object",
+      "properties": {
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        }
+      },
+      "required": [
+        "authorization_version",
+        "crypto_state_ref"
+      ],
+      "additionalProperties": false
+    },
+    "DirectoryRef": {
+      "type": "object",
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/PositiveU64"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Hash"
+        }
+      },
+      "required": [
+        "account_id",
+        "version",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "description": "沿用已验证设备目录原件摘要规则。引用准确目录，不能用裸版本号作新鲜性证明。"
+    },
+    "DirectoryRefs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DirectoryRef"
+      },
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "description": "恰为 A/T/W 的 account_id 并集，按 ASCII account_id 升序去重；必须逐引用核验准确目录及所需身份/资格。跨字段相等与排序需语义校验。"
+    },
+    "PermissionCheckpoint": {
+      "type": "object",
+      "properties": {
+        "service_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "conversation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "crypto_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "owner_account_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Member"
+          },
+          "minItems": 2,
+          "maxItems": 6,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "service_id",
+        "conversation_id",
+        "authorization_version",
+        "crypto_state_ref",
+        "owner_account_id",
+        "members"
+      ],
+      "additionalProperties": false,
+      "description": "沿既有检查点语义：成员按(account_id,device_id)严格排序、身份/公钥唯一且含群主；state_ref 只是公共 GroupContext 摘要，不证明全部 epoch 秘密相同。"
+    },
+    "CompleteCheckpoint": {
+      "type": "object",
+      "properties": {
+        "group_id": {
+          "$ref": "#/$defs/GroupId"
+        },
+        "epoch": {
+          "$ref": "#/$defs/U64"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/PermissionCheckpoint"
+        }
+      },
+      "required": [
+        "group_id",
+        "epoch",
+        "checkpoint"
+      ],
+      "additionalProperties": false,
+      "description": "群/epoch 与完整权限检查点一并绑定；scope、Commit 前后 epoch、R0 声明和 W 实际结果均须对应。"
+    },
+    "SignedRecord": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/StatementBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/SignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "签名只验证解码后的准确原声明字节，绝不验证重序列化副本。"
+    },
+    "Intent": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-request-2"
+        },
+        "kind": {
+          "const": "intent"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signer": {
+          "$ref": "#/$defs/Member"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Hash"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "predecessor": {
+          "$ref": "#/$defs/Floor"
+        },
+        "known_floor": {
+          "$ref": "#/$defs/Floor"
+        },
+        "directory_refs": {
+          "$ref": "#/$defs/DirectoryRefs"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "history_policy": {
+          "const": "from_recovery"
+        },
+        "issued_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "kind",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "request_id",
+        "signer",
+        "nonce",
+        "change_id",
+        "root_admission",
+        "current_admission",
+        "actor",
+        "predecessor",
+        "known_floor",
+        "directory_refs",
+        "key_package_sha256",
+        "history_policy",
+        "issued_at_unix_secs",
+        "expires_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "signer 必须为 P.target，P.witness 与 A/T 身份及钥均不同；known_floor 等于 predecessor；意图窗口仍为 1—300 秒且只在首次使用边界检查当前有效性。"
+    },
+    "Claim": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-request-2"
+        },
+        "kind": {
+          "const": "claim"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signer": {
+          "$ref": "#/$defs/Member"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Hash"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "reason": {
+          "const": null
+        }
+      },
+      "required": [
+        "protocol_version",
+        "kind",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "request_id",
+        "signer",
+        "nonce",
+        "recovery_id",
+        "change_id",
+        "intent_sha256",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "description": "批准者签名；policy_ref/profile/范围和准确 Intent 原件摘要全部对应。reason 必须显式 null。"
+    },
+    "CloseReason": {
+      "enum": [
+        "cancelled",
+        "predecessor_changed",
+        "expired",
+        "preparation_failed"
+      ]
+    },
+    "Close": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-request-2"
+        },
+        "kind": {
+          "const": "close"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signer": {
+          "$ref": "#/$defs/Member"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Hash"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "reason": {
+          "$ref": "#/$defs/CloseReason"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "kind",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "request_id",
+        "signer",
+        "nonce",
+        "recovery_id",
+        "change_id",
+        "intent_sha256",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "description": "T 或 A 按原权限关闭；不能把 accepted 改为 closed，不能换绑定 P。"
+    },
+    "RecoveryRequest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Intent"
+        },
+        {
+          "$ref": "#/$defs/Claim"
+        },
+        {
+          "$ref": "#/$defs/Close"
+        }
+      ]
+    },
+    "RecoveryAction": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "recover_join"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "allocation_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_ref": {
+          "$ref": "#/$defs/KeyPackageRef"
+        },
+        "welcome_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "history_policy": {
+          "const": "from_recovery"
+        },
+        "previous_epoch": {
+          "$ref": "#/$defs/U64"
+        },
+        "old_leaf_index": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/U64"
+            }
+          ],
+          "x-numeric-maximum": "4294967295"
+        },
+        "old_leaf_sha256": {
+          "$ref": "#/$defs/Hash"
+        }
+      },
+      "required": [
+        "kind",
+        "recovery_id",
+        "root_admission",
+        "current_admission",
+        "target",
+        "intent_sha256",
+        "allocation_sha256",
+        "key_package_sha256",
+        "key_package_ref",
+        "welcome_sha256",
+        "history_policy",
+        "previous_epoch",
+        "old_leaf_index",
+        "old_leaf_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "Statement": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-permission-4"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "previous_authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "authorization_version": {
+          "$ref": "#/$defs/U64"
+        },
+        "from_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "to_state_ref": {
+          "$ref": "#/$defs/StateRef"
+        },
+        "action": {
+          "$ref": "#/$defs/RecoveryAction"
+        },
+        "commit_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Hash"
+        },
+        "issued_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "change_id",
+        "actor",
+        "previous_authorization_version",
+        "authorization_version",
+        "from_state_ref",
+        "to_state_ref",
+        "action",
+        "commit_sha256",
+        "nonce",
+        "issued_at_unix_secs",
+        "expires_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "A 签名的恢复候选；完整 P 与所有 Intent/Claim/Allocation 上下文必须对应。原候选期限不扩大目标意图期限。新包/Welcome/Commit 摘要沿现有 SHA-256(raw bytes)。"
+    },
+    "Proof": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/StatementBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/SignatureBytes"
+        },
+        "commit_bytes": {
+          "$ref": "#/$defs/MlsMessageBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes",
+        "commit_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "statement_bytes 解码为 Statement；签名域严格 permission-change/v4。JSON 形状通过不代表 Commit 是合法 MLS、更不证明实际安装。"
+    },
+    "AllocatedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "allocated"
+        },
+        "claim_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_ref": {
+          "$ref": "#/$defs/KeyPackageRef"
+        },
+        "predecessor": {
+          "$ref": "#/$defs/Floor"
+        }
+      },
+      "required": [
+        "kind",
+        "claim_sha256",
+        "key_package_sha256",
+        "key_package_ref",
+        "predecessor"
+      ],
+      "additionalProperties": false
+    },
+    "AcceptedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "accepted"
+        },
+        "allocation_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "candidate_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/PermissionCheckpoint"
+        }
+      },
+      "required": [
+        "kind",
+        "allocation_sha256",
+        "candidate_sha256",
+        "checkpoint"
+      ],
+      "additionalProperties": false
+    },
+    "ClosedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "closed"
+        },
+        "close_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "reason": {
+          "$ref": "#/$defs/CloseReason"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/PermissionCheckpoint"
+        },
+        "allocation_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Hash"
+            },
+            {
+              "const": null
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "close_sha256",
+        "reason",
+        "checkpoint",
+        "allocation_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "Receipt": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-receipt-2"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AllocatedResult"
+            },
+            {
+              "$ref": "#/$defs/AcceptedResult"
+            },
+            {
+              "$ref": "#/$defs/ClosedResult"
+            }
+          ]
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "recovery_id",
+        "change_id",
+        "root_admission",
+        "current_admission",
+        "target",
+        "actor",
+        "intent_sha256",
+        "result"
+      ],
+      "additionalProperties": false,
+      "description": "Service 签名；三种回执都绑定同一 P/Intent。accepted 只证明 R0，不包含其后才生成的 W 安装凭据或见证，避免循环依赖。"
+    },
+    "SignedIntent": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      ],
+      "x-decoded-statement-schema": "#/$defs/Intent"
+    },
+    "SignedClaim": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      ],
+      "x-decoded-statement-schema": "#/$defs/Claim"
+    },
+    "SignedClose": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      ],
+      "x-decoded-statement-schema": "#/$defs/Close"
+    },
+    "SignedReceipt": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      ],
+      "x-decoded-statement-schema": "#/$defs/Receipt"
+    },
+    "Bundle": {
+      "type": "object",
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/SignedIntent"
+        },
+        "claim": {
+          "$ref": "#/$defs/SignedClaim"
+        },
+        "allocation": {
+          "$ref": "#/$defs/SignedAllocation"
+        },
+        "change": {
+          "$ref": "#/$defs/Proof"
+        },
+        "key_package": {
+          "$ref": "#/$defs/KeyPackageBytes"
+        },
+        "welcome": {
+          "$ref": "#/$defs/MlsMessageBytes"
+        }
+      },
+      "required": [
+        "intent",
+        "claim",
+        "allocation",
+        "change",
+        "key_package",
+        "welcome"
+      ],
+      "additionalProperties": false,
+      "description": "本候选内部必须是 request-2/claim-2/receipt-2/permission-4 的同一 P 链；allocation.result 必须 allocated。策略原件已本地固定，不用不可信随包策略替换。"
+    },
+    "PublicBundle": {
+      "type": "object",
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/SignedIntent"
+        },
+        "claim": {
+          "$ref": "#/$defs/SignedClaim"
+        },
+        "allocation": {
+          "$ref": "#/$defs/SignedAllocation"
+        },
+        "change": {
+          "$ref": "#/$defs/Proof"
+        }
+      },
+      "required": [
+        "intent",
+        "claim",
+        "allocation",
+        "change"
+      ],
+      "additionalProperties": false,
+      "description": "供 W/其他幸存者读取；不暴露目标 Welcome 或私有 bundle。"
+    },
+    "Record": {
+      "type": "object",
+      "properties": {
+        "bundle": {
+          "$ref": "#/$defs/Bundle"
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedAccepted"
+        }
+      },
+      "required": [
+        "bundle",
+        "receipt"
+      ],
+      "additionalProperties": false,
+      "description": "receipt.result 必须 accepted；核验候选/分配/原意图摘要及检查点。"
+    },
+    "PublicRecord": {
+      "type": "object",
+      "properties": {
+        "bundle": {
+          "$ref": "#/$defs/PublicBundle"
+        },
+        "receipt": {
+          "$ref": "#/$defs/SignedAccepted"
+        }
+      },
+      "required": [
+        "bundle",
+        "receipt"
+      ],
+      "additionalProperties": false,
+      "description": "完整公开 R0；accepted_ref 使用本 change 与 receipt 原字节计算 admission-record/v1。"
+    },
+    "WitnessRequest": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-witness-request-1"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "validation_rules_version": {
+          "const": "rim-recovery-witness-rules-1"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "witness": {
+          "$ref": "#/$defs/Member"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "accepted_ref": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "commit_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "welcome_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_ref": {
+          "$ref": "#/$defs/KeyPackageRef"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "challenge": {
+          "$ref": "#/$defs/Hash"
+        },
+        "issued_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "validation_rules_version",
+        "scope",
+        "actor",
+        "target",
+        "witness",
+        "root_admission",
+        "current_admission",
+        "recovery_id",
+        "change_id",
+        "accepted_ref",
+        "commit_sha256",
+        "welcome_sha256",
+        "key_package_sha256",
+        "key_package_ref",
+        "request_id",
+        "challenge",
+        "issued_at_unix_secs",
+        "expires_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "T 签名；32 字节随机 challenge，窗口 1—60 秒且不晚于新包 not_after。同一 scope/current 只有一个活动 challenge，最多 16 个不同 challenge/候选，替换或取消先持久。引用的是准确 accepted R0，不能把原 current_admission 与该后继混淆。"
+    },
+    "WitnessResponse": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-witness-response-1"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "validation_rules_version": {
+          "const": "rim-recovery-witness-rules-1"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "witness": {
+          "$ref": "#/$defs/Member"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "accepted_ref": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "commit_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "welcome_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_ref": {
+          "$ref": "#/$defs/KeyPackageRef"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "challenge": {
+          "$ref": "#/$defs/Hash"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "previous": {
+          "$ref": "#/$defs/CompleteCheckpoint"
+        },
+        "next": {
+          "$ref": "#/$defs/CompleteCheckpoint"
+        },
+        "installation_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "highest_known": {
+          "$ref": "#/$defs/CompleteCheckpoint"
+        },
+        "known_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "minItems": 0,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "issued_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        },
+        "expires_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "validation_rules_version",
+        "scope",
+        "actor",
+        "target",
+        "witness",
+        "root_admission",
+        "current_admission",
+        "recovery_id",
+        "change_id",
+        "accepted_ref",
+        "commit_sha256",
+        "welcome_sha256",
+        "key_package_sha256",
+        "key_package_ref",
+        "request_id",
+        "challenge",
+        "request_sha256",
+        "previous",
+        "next",
+        "installation_ref",
+        "highest_known",
+        "known_evidence_refs",
+        "issued_at_unix_secs",
+        "expires_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "指定 W 签名；准确请求签名原件摘要/全部上下文对应。只可依据非 pending 幸存者路径实际校验精确私有 Commit 并持久 R1 的凭据；不是远程执行证明，不声称 W 解密过 Welcome。response 窗口不得超过原请求；highest_known 的事实须有可核验原件，不证明全局最新。"
+    },
+    "SignedWitnessRequest": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/WitnessRequestBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/SignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "签名封装的实际 UTF-8 wire JSON 字节总数受限；canonical 外层顺序 statement_bytes,signature_bytes，无空白且不转义 Base64。内层原声明不要求 JCS 或规范重排。",
+      "x-decoded-statement-schema": "#/$defs/WitnessRequest",
+      "x-max-wire-envelope-bytes": 8192,
+      "x-wire-envelope-format": "{\"statement_bytes\":\"<base64>\",\"signature_bytes\":\"<base64>\"}"
+    },
+    "SignedWitnessResponse": {
+      "type": "object",
+      "properties": {
+        "statement_bytes": {
+          "$ref": "#/$defs/WitnessResponseBytes"
+        },
+        "signature_bytes": {
+          "$ref": "#/$defs/SignatureBytes"
+        }
+      },
+      "required": [
+        "statement_bytes",
+        "signature_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "签名封装的实际 UTF-8 wire JSON 字节总数受限；canonical 外层顺序 statement_bytes,signature_bytes，无空白且不转义 Base64。内层原声明不要求 JCS 或规范重排。",
+      "x-decoded-statement-schema": "#/$defs/WitnessResponse",
+      "x-max-wire-envelope-bytes": 16384,
+      "x-wire-envelope-format": "{\"statement_bytes\":\"<base64>\",\"signature_bytes\":\"<base64>\"}"
+    },
+    "PublicEvidenceAttachment": {
+      "type": "object",
+      "properties": {
+        "reference": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "evidence_bytes": {
+          "$ref": "#/$defs/PublicEvidenceBytes"
+        }
+      },
+      "required": [
+        "reference",
+        "evidence_bytes"
+      ],
+      "additionalProperties": false,
+      "description": "已知事实的准确公开原件；必须先按既有事实类型/版本/可信来源核验，不能因 source_sha256 一致就信任裸字段。unknown 事实类型/版本不得忽略；引用原件不可得时不能据其放行。"
+    },
+    "WitnessDelivery": {
+      "type": "object",
+      "properties": {
+        "response": {
+          "$ref": "#/$defs/SignedWitnessResponse"
+        },
+        "known_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PublicEvidenceAttachment"
+          },
+          "minItems": 0,
+          "maxItems": 64
+        },
+        "supplemental_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PublicEvidenceAttachment"
+          },
+          "minItems": 0,
+          "maxItems": 64
+        }
+      },
+      "required": [
+        "response",
+        "known_evidence",
+        "supplemental_evidence"
+      ],
+      "additionalProperties": false,
+      "description": "response 仍为先保存的原字节。known_evidence 覆盖 response 中全部 known_evidence_refs；补充提供 W 签发后新获知的更高水位/撤销/冲突。T 先核验并观察全部有效事实再判断首次安装；无原件时保持待核验。附件按既有有界公开同步/分段传输，不能作为不受限单包；签名封装 8/16 KiB 不包含附件，但不豁免外层 transport 限额。"
+    },
+    "Activation": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-witness-activation-1"
+        },
+        "activation_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "activation_version": {
+          "$ref": "#/$defs/PositiveU64"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "policy_ref": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PolicyRef"
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "trusted_authorization_ref": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "activated_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        },
+        "legacy_uninstalled_target": {
+          "const": "deny_first_install"
+        },
+        "legacy_installed": {
+          "const": "retain_scoped"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "activation_id",
+        "activation_version",
+        "witness_profile",
+        "scope",
+        "target",
+        "policy_ref",
+        "trusted_authorization_ref",
+        "activated_at_unix_secs",
+        "legacy_uninstalled_target",
+        "legacy_installed"
+      ],
+      "additionalProperties": false,
+      "description": "必须先独立确认可信授权，再和本地 version=3/witness_state 原子落盘并纳入锚。policy_ref 必填但可显式 null：仅表示 W1 门禁已启用、尚无可用固定策略，仍拒绝目标首次恢复安装，不回退 legacy；缺少 W 的 A/T 群也能先启用保护。后续只能经可信授权追加更高 activation_version 的新原件来绑定/改变 P，保留旧原件与水位；既有候选的 P 永不重绑。服务响应或请求参数不能临时关闭门禁。非 null 策略须与本 scope/target 一致。"
+    },
+    "InstalledRecord": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-witness-installation-record-1"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "validation_rules_version": {
+          "const": "rim-recovery-witness-rules-1"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "witness": {
+          "$ref": "#/$defs/Member"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "accepted_ref": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "commit_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "welcome_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_ref": {
+          "$ref": "#/$defs/KeyPackageRef"
+        },
+        "request": {
+          "$ref": "#/$defs/SignedWitnessRequest"
+        },
+        "response": {
+          "$ref": "#/$defs/SignedWitnessResponse"
+        },
+        "actual_next": {
+          "$ref": "#/$defs/CompleteCheckpoint"
+        },
+        "challenge_consumed": {
+          "const": true
+        },
+        "key_package_consumed": {
+          "const": true
+        },
+        "installed_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "validation_rules_version",
+        "scope",
+        "actor",
+        "target",
+        "witness",
+        "root_admission",
+        "current_admission",
+        "recovery_id",
+        "change_id",
+        "accepted_ref",
+        "commit_sha256",
+        "welcome_sha256",
+        "key_package_sha256",
+        "key_package_ref",
+        "request",
+        "response",
+        "actual_next",
+        "challenge_consumed",
+        "key_package_consumed",
+        "installed_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "T 与群/R1/材料/challenge/锚关联同一一致性提交；此对象为关联规范，不是完整 DeviceState，也不以布尔字段代替真实安装和存储验证。精确已装重试先遵守原操作全局门禁，再可返回历史事实。"
+    },
+    "InstallationFact": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-witness-installation-1"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "validation_rules_version": {
+          "const": "rim-recovery-witness-rules-1"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "witness": {
+          "$ref": "#/$defs/Member"
+        },
+        "accepted_ref": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "commit_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "welcome_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "key_package_ref": {
+          "$ref": "#/$defs/KeyPackageRef"
+        },
+        "previous": {
+          "$ref": "#/$defs/CompleteCheckpoint"
+        },
+        "next": {
+          "$ref": "#/$defs/CompleteCheckpoint"
+        },
+        "installed_at_unix_secs": {
+          "$ref": "#/$defs/U64"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "validation_rules_version",
+        "scope",
+        "actor",
+        "target",
+        "witness",
+        "accepted_ref",
+        "commit_sha256",
+        "welcome_sha256",
+        "key_package_sha256",
+        "key_package_ref",
+        "previous",
+        "next",
+        "installed_at_unix_secs"
+      ],
+      "additionalProperties": false,
+      "description": "W 与真实 R1 同一提交保存的公开安装事实原件，无签名、无自身 hash、不含私钥/provider/群秘密；installation_ref.source_id 是另行持久关联的本地唯一凭据 ID，source_sha256=SHA-256(准确事实 UTF-8 原字节)。签出响应时核对持久原件和实际状态；此事实不是远程执行证明。"
+    },
+    "AllocationReceipt": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-receipt-2"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "result": {
+          "$ref": "#/$defs/AllocatedResult"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "recovery_id",
+        "change_id",
+        "root_admission",
+        "current_admission",
+        "target",
+        "actor",
+        "intent_sha256",
+        "result"
+      ],
+      "additionalProperties": false,
+      "description": "Service 签名；三种回执都绑定同一 P/Intent。accepted 只证明 R0，不包含其后才生成的 W 安装凭据或见证，避免循环依赖。"
+    },
+    "AcceptedReceipt": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-receipt-2"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "result": {
+          "$ref": "#/$defs/AcceptedResult"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "recovery_id",
+        "change_id",
+        "root_admission",
+        "current_admission",
+        "target",
+        "actor",
+        "intent_sha256",
+        "result"
+      ],
+      "additionalProperties": false,
+      "description": "Service 签名；三种回执都绑定同一 P/Intent。accepted 只证明 R0，不包含其后才生成的 W 安装凭据或见证，避免循环依赖。"
+    },
+    "ClosedReceipt": {
+      "type": "object",
+      "properties": {
+        "protocol_version": {
+          "const": "rim-recovery-receipt-2"
+        },
+        "witness_profile": {
+          "const": "E10C-W1"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/PolicyRef"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "recovery_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "change_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "root_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "current_admission": {
+          "$ref": "#/$defs/AdmissionRef"
+        },
+        "target": {
+          "$ref": "#/$defs/Member"
+        },
+        "actor": {
+          "$ref": "#/$defs/Member"
+        },
+        "intent_sha256": {
+          "$ref": "#/$defs/Hash"
+        },
+        "result": {
+          "$ref": "#/$defs/ClosedResult"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "witness_profile",
+        "policy_ref",
+        "scope",
+        "recovery_id",
+        "change_id",
+        "root_admission",
+        "current_admission",
+        "target",
+        "actor",
+        "intent_sha256",
+        "result"
+      ],
+      "additionalProperties": false,
+      "description": "Service 签名；三种回执都绑定同一 P/Intent。accepted 只证明 R0，不包含其后才生成的 W 安装凭据或见证，避免循环依赖。"
+    },
+    "SignedAllocation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      ],
+      "x-decoded-statement-schema": "#/$defs/AllocationReceipt"
+    },
+    "SignedAccepted": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      ],
+      "x-decoded-statement-schema": "#/$defs/AcceptedReceipt"
+    },
+    "SignedClosed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/SignedRecord"
+        }
+      ],
+      "x-decoded-statement-schema": "#/$defs/ClosedReceipt"
+    },
+    "Control": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Claim"
+        },
+        {
+          "$ref": "#/$defs/Close"
+        }
+      ]
+    }
+  },
+  "x-required-activation-format-vectors": [
+    "positive: explicit null Activation.policy_ref has valid shape and implies active W1 with first recovery install blocked",
+    "positive: authorized greater activation_version binds non-null PolicyRef while preserving prior original",
+    "negative: missing policy_ref, untrusted binding, same/lower activation_version, legacy fallback, existing candidate P replacement",
+    "negative: null policy_ref in Intent/Claim/Close/Statement/Receipt/WitnessRequest/WitnessResponse"
+  ]
+}

@@ -1,8 +1,14 @@
-//! 阶段0发布包验证：单实例仅有一个双设备MLS群，状态只存内存。
-//! 不提供网络、持久恢复、成员变更或业务身份认证；不能用于生产聊天。
+//! 单实例仅有一个双设备 MLS 群。默认内存接口保留原发布包验证行为。
+//! 可选 storage 仅供 im-sdk 持久适配；不提供网络、成员变更或业务身份认证。
 //! 私钥和第三方密码类型不跨公共边界。close释放本实例，不承诺所有分配已安全擦除。
 mod error;
 mod identity;
+#[cfg(feature = "storage")]
+#[doc(hidden)]
+pub mod recovery;
+#[cfg(feature = "storage")]
+#[doc(hidden)]
+pub mod storage;
 use error::require;
 pub use error::{Error, ErrorCode, Result};
 use openmls::prelude::{
@@ -27,6 +33,8 @@ struct Active {
     credential: CredentialWithKey,
     package: Vec<u8>,
     group: Option<MlsGroup>,
+    #[cfg(feature = "storage")]
+    binding: Option<storage::Binding>,
 }
 
 enum State {
@@ -74,6 +82,8 @@ impl Device {
                 credential,
                 package,
                 group: None,
+                #[cfg(feature = "storage")]
+                binding: None,
             })),
         })
     }
@@ -192,6 +202,15 @@ impl Device {
             let bytes = crypto(welcome.to_bytes())?;
             protocol_bytes(&bytes)?;
             active.group = Some(group);
+            #[cfg(feature = "storage")]
+            {
+                active.binding = Some(storage::Binding {
+                    conversation: conversation_id,
+                    account: peer_account_id,
+                    device: peer_device_id,
+                    key: peer_identity_key,
+                });
+            }
             active.package.clear();
             Ok(bytes)
         })
@@ -250,6 +269,15 @@ impl Device {
                 &creator_identity_key,
             )?;
             active.group = Some(crypto(staged.into_group(&active.provider))?);
+            #[cfg(feature = "storage")]
+            {
+                active.binding = Some(storage::Binding {
+                    conversation: conversation_id,
+                    account: creator_account_id,
+                    device: creator_device_id,
+                    key: creator_identity_key,
+                });
+            }
             active.package.clear();
             Ok(())
         })

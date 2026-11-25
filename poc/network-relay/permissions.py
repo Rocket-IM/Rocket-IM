@@ -10,7 +10,7 @@ from join_materials import existing_join, install_join_schema, prepare_join, req
 from storage import replace_members, revoke_device, subject
 from synchronization import MAX_PAGE_BYTES
 
-SCHEMA_VERSION = "rim-poc-storage-8"
+SCHEMA_VERSION = "rim-poc-storage-10"
 PERMISSION_SCHEMA = """
 CREATE TABLE permission_checkpoint (singleton INTEGER PRIMARY KEY CHECK(singleton=1),
     initial_version TEXT NOT NULL, checkpoint TEXT NOT NULL);
@@ -26,8 +26,8 @@ CREATE TABLE permission_resolutions (change_id TEXT PRIMARY KEY, actor_account T
 """
 
 
-def install_schema(db, old_version, fixture_checkpoint, new_database, receipt_key=None, fixture_devices=()):
-    if old_version not in {"rim-poc-1", "rim-poc-storage-2", "rim-poc-storage-3", "rim-poc-storage-4", "rim-poc-storage-5", "rim-poc-storage-6", "rim-poc-storage-7", SCHEMA_VERSION}:
+def install_schema(db, old_version, fixture_checkpoint, new_database, receipt_key=None, fixture_devices=(), identity_source=False):
+    if old_version not in {"rim-poc-1", "rim-poc-storage-2", "rim-poc-storage-3", "rim-poc-storage-4", "rim-poc-storage-5", "rim-poc-storage-6", "rim-poc-storage-7", "rim-poc-storage-8", "rim-poc-storage-9", SCHEMA_VERSION}:
         raise ValueError("不支持该实验数据库版本")
     if not db.in_transaction:
         db.execute("BEGIN IMMEDIATE")
@@ -49,7 +49,7 @@ def install_schema(db, old_version, fixture_checkpoint, new_database, receipt_ke
             raise ValueError("不能用启动 fixture 为已有 legacy 数据库注入权限检查点")
         pinned = db.execute("SELECT value FROM meta WHERE key='relay_receipt_key'").fetchone()
         if pinned is None and receipt_key is not None:
-            if not new_database or not has_checkpoint:
+            if not new_database or (not has_checkpoint and not identity_source):
                 raise ValueError("只有具备权限检查点的新空库可以固定 Service 凭证公钥")
             db.execute("INSERT INTO meta VALUES ('relay_receipt_key',?)", (receipt_key,))
         elif pinned is not None and pinned["value"] != receipt_key:
@@ -59,7 +59,7 @@ def install_schema(db, old_version, fixture_checkpoint, new_database, receipt_ke
         if old_version in {"rim-poc-1", "rim-poc-storage-2", "rim-poc-storage-3", "rim-poc-storage-4"}:
             from history_transfers import HISTORY_SCHEMA
             db.execute(HISTORY_SCHEMA)
-        if old_version not in {"rim-poc-storage-6", "rim-poc-storage-7", SCHEMA_VERSION}:
+        if old_version not in {"rim-poc-storage-6", "rim-poc-storage-7", "rim-poc-storage-8", "rim-poc-storage-9", SCHEMA_VERSION}:
             from lifecycle_backfill import install
             install(db)
         else:
@@ -99,6 +99,8 @@ def submit_permission_change(store, db, device, req):
     conv = store.context(db, device, req["service_id"], req["conversation_id"])
     record, checkpoint = checkpoint_record(db)
     statement = validate_proof(req["change"])
+    from join_recovery_storage import namespace
+    namespace(db, statement["change_id"])
     resolved = existing_resolution(store, db, device, req["change"], statement)
     if resolved is not None and resolved["outcome"] == "closed":
         raise ProtocolError("permission_closed", "该权限候选已永久封口，不能迟到接受", status=409)
@@ -117,6 +119,8 @@ def submit_permission_change(store, db, device, req):
         raise ProtocolError("permission_verifier_unavailable", "未配置公共权限验证器", status=503)
     if statement["action"]["kind"] in JOIN_ACTIONS:
         require_join(store, db)
+        from key_package_admission import check as check_allocation
+        check_allocation(db, statement, req["join"])
         validated = store.permission_verifier.verify(checkpoint, req["change"], statement, join=req["join"])
     else:
         validated = store.permission_verifier.verify(checkpoint, req["change"], statement)
@@ -129,6 +133,8 @@ def submit_permission_change(store, db, device, req):
         raise ProtocolError("permission_conflict", "持久权限检查点与会话投影不一致", status=409)
     if statement["action"]["kind"] in JOIN_ACTIONS:
         prepare_join(store, db, checkpoint, statement, req["join"])
+        from key_package_admission import check as check_allocation
+        check_allocation(db, statement, req["join"])
     now = int(time.time())
     if not int(statement["issued_at_unix_secs"]) <= now < int(statement["expires_at_unix_secs"]):
         raise ProtocolError("permission_expired", "首次接受不在权限声明有效期内", status=403)
@@ -146,11 +152,17 @@ def submit_permission_change(store, db, device, req):
                *actor, statement["nonce"], encoded_proof, encode_json(value).decode()))
     if statement["action"]["kind"] in JOIN_ACTIONS:
         save_join(db, statement, req["change"], value["receipt"], req["join"])
+    from key_package_admission import accept as accept_allocation
+    accept_allocation(db, statement)
     db.execute("UPDATE permission_checkpoint SET checkpoint=? WHERE singleton=1", (encode_json(next_checkpoint).decode(),))
     replace_members(db, [(m["account_id"], m["device_id"]) for m in next_checkpoint["members"]])
     db.execute("UPDATE conversation SET authorization_version=?,crypto_state_ref=?", (next_version, next_checkpoint["crypto_state_ref"]))
     if statement["action"]["kind"] == "revoke_device":
         revoke_device(db, (statement["action"]["account_id"], statement["action"]["device_id"]))
+    if statement.get("allocation_sha256") is not None:
+        from key_package_commit import TimedResult
+        metadata = json.loads(db.execute("SELECT metadata FROM kp_materials WHERE allocation=?", (statement["allocation_sha256"],)).fetchone()[0])
+        return TimedResult(value, metadata["not_after"])
     return value
 
 
@@ -164,7 +176,7 @@ def permission_page(store, db, device, req, records=False):
     after = parse_u64(req["after_version"], "after_version")
     if not initial <= after <= current:
         raise ProtocolError("cursor_invalid", "权限链游标不属于已保留的检查点范围", status=409)
-    rows = db.execute("SELECT authorization_version,proof,result FROM permission_changes WHERE version_offset>? ORDER BY version_offset LIMIT ?",
+    rows = db.execute("SELECT change_id,authorization_version,proof,result FROM permission_changes WHERE version_offset>? ORDER BY version_offset LIMIT ?",
                       (after - initial, parse_u64(req["limit"], "limit")))
     entries, size, next_version = [], 0, after
     for row in rows:
@@ -174,7 +186,14 @@ def permission_page(store, db, device, req, records=False):
             receipt = json.loads(row["result"]).get("receipt")
             if receipt is None:
                 raise ProtocolError("permission_conflict", "已接受记录缺少终态凭证", status=409)
-            item = {"change": proof, "receipt": receipt}
+            recovery = db.execute("SELECT bundle FROM recovery_attempts WHERE change_id=? AND state='accepted'", (row["change_id"],)).fetchone()
+            if recovery is None:
+                item = {"change": proof, "receipt": receipt}
+            else:
+                bundle = json.loads(recovery["bundle"])
+                item = {"recovery": {"bundle": {k: bundle[k] for k in ("intent", "claim", "allocation", "change")}, "receipt": receipt}}
+                if len(encode_json(item)) > MAX_PAGE_BYTES:
+                    raise ProtocolError("resource_exhausted", "恢复公开证明超过权限页容量", status=429)
         item_size = len(encode_json(item))
         if entries and size + item_size > MAX_PAGE_BYTES:
             break

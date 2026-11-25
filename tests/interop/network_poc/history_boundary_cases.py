@@ -4,7 +4,7 @@ import base64
 import copy
 
 from .fixture import check
-from .history_cases import advance, assert_valid, checkpoint, publish, receive_record, signed_for_packet
+from .history_cases import advance, assert_valid, checkpoint, publish, publish_accepted, receive_record, signed_for_packet
 from .permission_cases import REVOKE_A2, reject_unchanged, version
 from .permission_recovery_cases import communicate, recover
 
@@ -44,7 +44,7 @@ def cached_removed_sender(lab):
 
 
 def missing_history_evidence(lab):
-    publish(lab, "history_without_proof")
+    publish_accepted(lab, "history_without_proof")
     advance(lab, "advance_before_unsigned_old_slot")
     page = lab.pull("b1")
     del page["events"][0]["event"]["acceptance_receipt"]
@@ -57,7 +57,7 @@ def missing_history_evidence(lab):
     state = lab.rust("b1", "wire_inspect")
     check(state["sync"]["pending_count"] == 0 and state["sync"]["processed_cursor"] == "1"
           and state["inbox_count"] == 0, "不可追认的旧事件永久等待或被记为成功")
-    publish(lab, "valid_after_unproven_old")
+    publish_accepted(lab, "valid_after_unproven_old")
     lab.download("b1", lab.pull("b1", "1"))
     valid = lab.rust("b1", "wire_process")
     assert_valid(valid, 1)
@@ -66,11 +66,11 @@ def missing_history_evidence(lab):
 
 
 def future_then_history(lab):
-    oldest = publish(lab, "old_before_future")
+    oldest = publish_accepted(lab, "old_before_future")
     first = advance(lab, "future_step_one", devices=("a1", "a2"))
-    middle = publish(lab, "middle_before_future")
+    middle = publish_accepted(lab, "middle_before_future")
     second = advance(lab, "future_step_two", REVOKE_A2, devices=("a1",))
-    newest = publish(lab, "future_newest")
+    newest = publish_accepted(lab, "future_newest")
     # 先提交两步授权链之外的合法未来密文；它需要等待，不能误标历史丢失。
     packet, accepted = newest
     error = reject_unchanged(lab, "b1", "wire_receive", **packet["envelope"],
@@ -86,7 +86,7 @@ def future_then_history(lab):
 
 
 def revoked_receiver(lab):
-    packet, accepted = publish(lab, "old_for_revoked_target")
+    packet, accepted = publish_accepted(lab, "old_for_revoked_target")
     terminal = advance(lab, "revoke_historical_receiver", REVOKE_A2, devices=("a1", "b1"))
     recover(lab, terminal, "a2")
     lab.pull("a2", expected=403)

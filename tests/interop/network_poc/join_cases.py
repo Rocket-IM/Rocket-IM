@@ -67,6 +67,8 @@ def assert_no_old_history(lab, old):
 def new_member_flow(lab):
     setup(lab)
     old = publish(lab, "before_join")
+    lab.rust("a1", "wire_accept", logical_message_id="before_join", attempt_id="P1",
+             acceptance_receipt=old[1]["acceptance_receipt"])
     late = lab.prepare("unaccepted_before_join")
     lab.http("d1", "get_permission_records", {"service_id": SERVICE, "conversation_id": CONVERSATION,
              "after_version": "1", "limit": "32"}, expected=403)
@@ -74,9 +76,17 @@ def new_member_flow(lab):
     record = accept_add(lab, candidate)
     check(version(lab, "a1") == "1", "R0 服务接受冒充发起端完成 R1")
     reject_unchanged(lab, "d1", "wire_send", logical_message_id="not_joined", attempt_id="P1", payload="synthetic")
-    check(lab.submit(late, expected=409)["outcome"] == "rejected_final", "加入后首次提交旧目标集未拒绝")
+    rejected = lab.submit(late, expected=409)
+    check(rejected["outcome"] == "rejected_final", "加入后首次提交旧目标集未拒绝")
+    lab.rust("a1", "wire_reject", logical_message_id="unaccepted_before_join", attempt_id="P1",
+             rejection_receipt=rejected["rejection_receipt"])
     recover(lab, record, "a1", "a2", "c1")
-    current = publish(lab, "after_join_before_welcome")
+    # 原未接受消息取得签名拒绝后，只能在补齐 R1 后生成同内容的精确后继。
+    successor = lab.prepare("unaccepted_before_join", attempt="P2", replaces_attempt_id="P1",
+                            closure_id=rejected["closure_id"])
+    current = successor, lab.submit(successor, replaces_attempt_id="P1", closure_id=rejected["closure_id"])
+    lab.rust("a1", "wire_accept", logical_message_id="unaccepted_before_join", attempt_id="P2",
+             acceptance_receipt=current[1]["acceptance_receipt"])
     bundle = material(lab, "first_join")
     check(bundle == {"record": record, "join": candidate["join"]}, "加入材料与接受原证据不一致")
     join(lab, bundle)
@@ -227,11 +237,15 @@ def closed_candidate(lab):
 def history_after_join(lab):
     setup(lab)
     old = publish(lab, "before_real_join")
+    lab.rust("a1", "wire_accept", logical_message_id="before_real_join", attempt_id="P1",
+             acceptance_receipt=old[1]["acceptance_receipt"])
     candidate = prepare_add(lab, "history_join")
     record = accept_add(lab, candidate)
     recover(lab, record, "a1", "a2", "b1", "c1")
     join(lab, material(lab, "history_join"))
     own_history = publish(lab, "after_real_join")
+    lab.rust("a1", "wire_accept", logical_message_id="after_real_join", attempt_id="P1",
+             acceptance_receipt=own_history[1]["acceptance_receipt"])
     removal = accept(lab, prepare(lab, "after_join_remove")["change"])
     recover(lab, removal, "a1", "a2", "b1", "d1")
     history = lab.rust("d1", "wire_inspect")["history"]["past_epochs"]

@@ -1,0 +1,14 @@
+[package]
+name = "rocket-im-desktop-runtime"
+version = "0.2.0-dev.10"
+edition = "2021"
+rust-version = "1.91.0"
+publish = false
+
+[dependencies]
+rocket-im-sdk = { path = "../im-sdk", features = ["protected-storage", "network"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+
+[features]
+test-hooks = ["rocket-im-sdk/persistent-test-hooks"]

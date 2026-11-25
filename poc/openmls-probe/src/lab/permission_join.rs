@@ -66,7 +66,7 @@ pub(super) fn anchor(
     Ok(permissions::inspect(state))
 }
 
-fn verify_next(
+pub(super) fn verify_next(
     state: &DeviceState,
     record: &RecoveryRecord,
 ) -> Result<(PermissionCheckpoint, Statement), LabError> {
@@ -159,6 +159,9 @@ pub(super) fn advance(state: &mut DeviceState, record: RecoveryRecord) -> Result
         "到达本机 Add 时必须实际验证 Welcome，不能越过或只推进公共水位",
     )?;
     permission_admission::remember(state, &next);
+    if let Some(recovery) = &mut state.join_recovery {
+        recovery.public_head = Some(next.clone());
+    }
     state
         .permissions
         .admission
@@ -181,6 +184,7 @@ pub(super) fn join(
     state: &mut DeviceState,
     record: RecoveryRecord,
     join: JoinMaterial,
+    failpoint: super::CrashPoint,
 ) -> Result<Value, LabError> {
     let parsed = Statement::parse(&codec::decode(&record.change.statement_bytes)?)?;
     if let Some(previous) = &state.permissions.admission.joined_record {
@@ -204,9 +208,10 @@ pub(super) fn join(
         "join_identity",
         "入群材料不是发给本机的",
     )?;
+    let pooled = super::key_package_join::first_join(state, &statement, &join, member)?;
     permission::admission::verify_material(&statement, &join)?;
     ensure(
-        codec::decode(&join.key_package)? == state.key_package,
+        pooled || codec::decode(&join.key_package)? == state.key_package,
         "join_identity",
         "入群 KeyPackage 与本机原始一次性材料不同",
     )?;
@@ -227,6 +232,9 @@ pub(super) fn join(
         "welcome_validation",
         ProcessedWelcome::new_from_welcome(&provider, &config, welcome),
     )?;
+    if matches!(failpoint, super::CrashPoint::AfterWelcomeKeys) {
+        std::process::exit(83);
+    }
     let actual_package = processed
         .own_key_package()
         .ok_or_else(|| LabError::new("join_identity", "Welcome 未使用本机 KeyPackage"))?;
@@ -234,7 +242,7 @@ pub(super) fn join(
         checked(
             "welcome_validation",
             actual_package.tls_serialize_detached(),
-        )? == state.key_package,
+        )? == codec::decode(&join.key_package)?,
         "join_identity",
         "Welcome 使用的 KeyPackage 不符",
     )?;
@@ -271,6 +279,9 @@ pub(super) fn join(
         "welcome_context",
         "Welcome 的实际群状态或完整身份集与签名后继不同",
     )?;
+    if matches!(failpoint, super::CrashPoint::AfterWelcomeValidation) {
+        std::process::exit(84);
+    }
     super::wire_history::enable(&provider, &mut group)?;
     let key = state
         .permissions
@@ -283,6 +294,15 @@ pub(super) fn join(
     state.group_id = Some(group.group_id().as_slice().to_vec());
     state.permissions.admission.joined_epoch = Some(group.epoch().as_u64().to_string());
     state.provider = provider;
+    if pooled {
+        let hash = crate::permission::commit_digest(&codec::decode(&join.key_package)?);
+        state
+            .key_packages
+            .as_mut()
+            .and_then(|s| s.packages.get_mut(&hash))
+            .ok_or_else(|| LabError::new("key_package_missing", "材料缺失"))?
+            .consumed = true;
+    }
     state.wire.configuration = Some(wire_types::Configuration {
         conversation_id: next.conversation_id.clone(),
         authorization_version: next.authorization_version.clone(),

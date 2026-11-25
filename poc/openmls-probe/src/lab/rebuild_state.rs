@@ -217,6 +217,35 @@ pub(super) fn guard(state: &DeviceState, operation: &Operation) -> Result<(), La
                 "重建仅允许无旧历史的同账号新设备",
             )
         }
+        // 隔离后继先核验批准范围的精确公钥，不能要求已入群才允许核验。
+        // 外层仍须独立锚预约；这里只开放公开身份事实，不授予群/历史权限。
+        Operation::IdentityTrustObserve { identity }
+        | Operation::IdentityTrustConfirm {
+            independent_identity: identity,
+            ..
+        } => ensure(
+            !matches!(operation, Operation::IdentityTrustConfirm { display, .. }
+                    if display.purpose != crate::identity_trust::Purpose::Verify)
+                && identity.service_id == plan.trust.checkpoint.service_id
+                && plan.trust.checkpoint.members.iter().any(|member| {
+                    member.account_id == identity.account_id
+                        && member.device_id == identity.device_id
+                        && member.signature_key == identity.signature_key
+                }),
+            "rebuild_trust",
+            "隔离后继仅能核验批准范围内的精确设备公钥",
+        ),
+        Operation::IdentityTrustPrepare { target, purpose } => ensure(
+            *purpose == crate::identity_trust::Purpose::Verify
+                && plan
+                    .trust
+                    .checkpoint
+                    .members
+                    .iter()
+                    .any(|member| member.identity() == *target),
+            "rebuild_trust",
+            "隔离后继仅能准备批准范围内的核验，不能换钥或扩大信任",
+        ),
         Operation::Inspect
         | Operation::PermissionInspect
         | Operation::IdentityTrustInspect { .. }

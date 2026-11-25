@@ -24,7 +24,8 @@ class RegistrationTests(RegistrationFixture):
         saved = self.snapshot()
         self.assertEqual(len(saved["device_public_keys"]), 1)
         self.assertIsNone(pending["device_registrations"][0][-1])
-        for table in set(initial) - {"device_public_keys", "device_registrations"}:
+        self.assertEqual(len(saved["kp_directories"]), 1)
+        for table in set(initial) - {"device_public_keys", "device_registrations", "kp_directories"}:
             self.assertEqual(saved[table], initial[table])
         self.store = Store(self.path, self.fixture, self.verifier)
         with patch("device_registration.now_ms", return_value=999999999):

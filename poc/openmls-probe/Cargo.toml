@@ -30,7 +30,15 @@ name = "openmls-secret-surface-scan"
 path = "src/bin/secret_surface_scan.rs"
 required-features = ["m01-secret-probe"]
 
+[[bin]]
+name = "openmls-trusted-startup"
+path = "src/bin/trusted_startup.rs"
+
 [features]
+# 默认关闭；仅隔离组合 Commit/Welcome/旧秘密机制验证，无业务恢复入口。
+expired-join-probe = []
+# 默认关闭；仅隔离矩阵构造恶意材料、缺失或损坏bundle及容量边界。
+key-package-probe = []
 # 默认关闭；仅原生隔离验收计数 wire_send 的实际 MLS 消息创建调用。
 wire-send-probe = []
 # 默认关闭；仅把已验签的空设备流设到固定大序号测试起点，不生成历史事件。
@@ -60,3 +68,18 @@ openmls = { version = "=0.9.0", features = ["js"] }
 wasm-bindgen = "=0.2.128"
 # 与官方 openmls-wasm 示例一致，为签名与密码提供者启用浏览器随机源。
 getrandom = { version = "=0.2.17", features = ["js"] }
+
+[[bin]]
+name = "openmls-expired-join-probe"
+path = "src/bin/expired_join_probe.rs"
+required-features = ["expired-join-probe"]
+
+[[bin]]
+name = "openmls-recovery-capacity-fixture"
+path = "src/bin/recovery_capacity_fixture.rs"
+required-features = ["key-package-probe"]
+
+[[bin]]
+name = "openmls-recovery-bundle-fixture"
+path = "src/bin/recovery_bundle_fixture.rs"
+required-features = ["key-package-probe"]

@@ -13,9 +13,13 @@ def digest(value):
     return hashlib.sha256(value).hexdigest()
 
 
+def device_identity(lab, device):
+    return lab.identities[device] if hasattr(lab, "identities") else identity(device)
+
+
 def public_identity(lab, device):
     return {"protocol_version": "rim-device-identity-1", "service_id": lab.service,
-            **identity(device), "signature_key": lab.public[device]["signature_key"]}
+            **device_identity(lab, device), "signature_key": lab.public[device]["signature_key"]}
 
 
 class TrustSession:
@@ -40,7 +44,8 @@ class TrustSession:
     def request(self, operation, *, device=None, expected_error=None, expected_exit=None, **fields):
         device = device or self.device
         data = {"directory": str(self.lab.directory / device), "service": self.lab.service,
-                "account": identity(device)["account_id"], "device": device,
+                "account": device_identity(self.lab, device)["account_id"],
+                "device": device_identity(self.lab, device)["device_id"],
                 "operation": operation, **fields}
         record = {"operation": operation, "device": device,
                   "input_sha256": digest(json.dumps(data, sort_keys=True).encode())}
@@ -103,7 +108,7 @@ def verify_public(lab, observer, target):
     independent = public_identity(lab, target)
     with TrustSession(lab, observer) as session:
         session.request("identity_trust_observe", identity=independent)
-        display = session.request("identity_trust_prepare", target=identity(target), purpose="verify")["display"]
+        display = session.request("identity_trust_prepare", target=device_identity(lab, target), purpose="verify")["display"]
         result = session.request("identity_trust_confirm", display=display,
                                  independent_identity=independent, verification="synthetic_local")
     check(result["record"]["status"] == "verified", "合成独立核验未完成")

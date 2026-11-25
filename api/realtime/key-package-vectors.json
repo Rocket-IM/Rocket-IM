@@ -1,0 +1,126 @@
+{
+  "version": "rim-key-package-vectors-1",
+  "test_only_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "parameters": {
+    "default_lifetime_secs": "3600",
+    "maximum_lifetime_secs": "86400",
+    "batch_limit": "4",
+    "available_per_device": "8",
+    "request_limit": "64",
+    "material_limit": "32",
+    "logical_bytes_limit": "2097152",
+    "directory_device_limit": "8",
+    "directory_revision_limit": "16",
+    "claim_rate_per_actor_target": "16",
+    "claim_rate_window_ms": "60000"
+  },
+  "positive": [
+    {
+      "name": "signed-directory-challenge",
+      "proof": {
+        "signature_bytes": "+LPTJE/clEvjI+0J2QTKDjD+sbGFuqhziTI1Qd77H2/8ebD2+wspB4oiKMs4eO2JQi6ex7/qCTPexIqGCLVtAQ==",
+        "statement_bytes": "eyJwcm90b2NvbF92ZXJzaW9uIjoicmltLWtleS1wYWNrYWdlLXJlcXVlc3QtMSIsInNlcnZpY2VfaWQiOiJ2ZWN0b3Itc2VydmljZSIsInJlcXVlc3RfaWQiOiJkaXJlY3RvcnktMSIsImFjdG9yIjp7ImFjY291bnRfaWQiOiJhbGljZSIsImRldmljZV9pZCI6ImExIiwic2lnbmF0dXJlX2tleSI6IkE2RUh2L1BPRUw0ZGNOMFk1MHZBbVdmazFqQ2JwUTFmSGR5R1pCSlZNYmc9In0sImFjdGlvbiI6eyJraW5kIjoiZGlyZWN0b3J5IiwiYWNjb3VudF9pZCI6ImFsaWNlIiwiY2hhbGxlbmdlIjoiMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMTAxMDEwMSJ9fQ=="
+      },
+      "proof_sha256": "f42984ccf52889f91dd017168f8d27721e6b7b58aed0a9a08cd04c225d7b6caa",
+      "request": {
+        "action": {
+          "account_id": "alice",
+          "challenge": "0101010101010101010101010101010101010101010101010101010101010101",
+          "kind": "directory"
+        },
+        "actor": {
+          "account_id": "alice",
+          "device_id": "a1",
+          "signature_key": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg="
+        },
+        "protocol_version": "rim-key-package-request-1",
+        "request_id": "directory-1",
+        "service_id": "vector-service"
+      }
+    }
+  ],
+  "negative": [
+    {
+      "name": "unknown-generation",
+      "mutation": {
+        "identity_generation": "1"
+      },
+      "expected": "reject"
+    },
+    {
+      "name": "service-asserted-trust",
+      "mutation": {
+        "verified": true
+      },
+      "expected": "reject"
+    },
+    {
+      "name": "unsupported-version",
+      "mutation": {
+        "protocol_version": "rim-key-package-request-2"
+      },
+      "expected": "reject"
+    },
+    {
+      "name": "wrong-instance",
+      "mutation": {
+        "service_id": "S2"
+      },
+      "expected": "reject"
+    },
+    {
+      "name": "wrong-account",
+      "mutation": {
+        "actor.account_id": "bob"
+      },
+      "expected": "reject"
+    },
+    {
+      "name": "changed-challenge",
+      "mutation": {
+        "action.challenge": "0202020202020202020202020202020202020202020202020202020202020202"
+      },
+      "expected": "reject"
+    },
+    {
+      "name": "unsupported-join",
+      "mutation": {
+        "action.join_kind": "rejoin"
+      },
+      "expected": "reject"
+    },
+    {
+      "name": "noncanonical-version",
+      "mutation": {
+        "action.directory_version": "01"
+      },
+      "expected": "reject"
+    }
+  ],
+  "lifetime_vectors": [
+    {
+      "not_before": "100",
+      "not_after": "200",
+      "now": "99",
+      "accepted": false
+    },
+    {
+      "not_before": "100",
+      "not_after": "200",
+      "now": "100",
+      "accepted": true
+    },
+    {
+      "not_before": "100",
+      "not_after": "200",
+      "now": "199",
+      "accepted": true
+    },
+    {
+      "not_before": "100",
+      "not_after": "200",
+      "now": "200",
+      "accepted": false
+    }
+  ]
+}

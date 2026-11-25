@@ -11,7 +11,7 @@ from receipt_contract import validate_close
 
 MAX_OUTPUT = 64 * 1024
 VERIFIER_TIMEOUT = 3.0
-ERROR_STATUS = {"invalid_permission": 400, "permission_denied": 403, "permission_conflict": 409,
+ERROR_STATUS = {"recovery_invalid":400,"recovery_predecessor_changed":409,"key_package_invalid":400,"key_package_lifetime":400,"key_package_last_resort":400,"key_package_context":409,"key_package_allocation_required":409,"key_package_signature":403,"invalid_permission": 400, "permission_denied": 403, "permission_conflict": 409,
                 "permission_signature": 403, "permission_context": 403, "permission_version": 409,
                 "permission_commit": 403, "resource_exhausted": 429,
                 "invalid_join_material": 400, "join_identity": 403, "join_material_mismatch": 400,
@@ -22,6 +22,18 @@ ERROR_STATUS = {"invalid_permission": 400, "permission_denied": 403, "permission
                 "registration_invalid": 400, "registration_context": 403,
                 "registration_signature": 403, "registration_conflict": 409, "registration_expired": 409}
 
+ERROR_STATUS.update({code:409 for code in ("identity_source_invalid","identity_source_encoding","identity_source_root","identity_source_permit","identity_source_approval","identity_source_directory","identity_source_binding","identity_source_subject","identity_source_expired","identity_source_first","directory_gap","directory_context","directory_omission")})
+ERROR_STATUS.update({code: 409 for code in (
+    "w1_policy_missing", "w1_unsupported_version", "w1_no_eligible_witness",
+    "w1_witness_unavailable", "w1_witness_ineligible", "w1_policy_mismatch",
+    "w1_binding_mismatch", "w1_request_id_conflict", "w1_challenge_inactive",
+    "w1_deadline_expired", "w1_material_expired", "w1_predecessor_unavailable",
+    "w1_mls_validation_failed", "w1_local_unhealthy", "w1_superseded",
+    "w1_permission_denied", "w1_resource_exhausted", "w1_persistence_failed",
+    "w1_anchor_unresolved", "w1_policy_upgrade_required", "w1_already_grouped",
+    "w1_new_attempt_not_eligible", "w1_witness_not_installed",
+    "w1_activation_unauthorized", "w1_activation_rollback",
+)})
 
 def unavailable():
     return ProtocolError("permission_verifier_unavailable", "公共权限验证器不可用或返回无效结果", status=503)
@@ -38,7 +50,10 @@ class PermissionVerifier:
         if len(raw) > MAX_REQUEST_BYTES:
             raise ProtocolError("resource_exhausted", "公共验证器完整输入超过 1 MiB", status=429)
         try:
-            output, return_code = self._run(raw)
+            if request.get("operation") == "verify_identity_source":
+                output, return_code = run_helper(self.path, raw, VERIFIER_TIMEOUT, 512 * 1024, unavailable)
+            else:
+                output, return_code = self._run(raw)
             value = parse_json(output)
             fields(value, ("ok",), ("result", "error"))
             if value["ok"] is False and return_code == 1:

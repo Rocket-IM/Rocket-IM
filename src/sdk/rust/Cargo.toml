@@ -6,6 +6,7 @@ members = [
     "crates/bindings-uniffi",
     "crates/bindings-flutter",
     "crates/bindings-wasm",
+    "crates/bindings-desktop",
 ]
 
 [workspace.package]

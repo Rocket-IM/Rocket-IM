@@ -116,6 +116,64 @@ pub(super) fn recipients(
         .as_ref()
         .ok_or_else(|| LabError::new("trust_required", "缺少当前权限检查点"))?;
     permission_state::validate_current(state, current, group)?;
+    historical_recipients(state, current, header, epoch)
+}
+
+// 只对头中已落后于本机的权限版本提前检查。当前/未来版本继续由实际 MLS 判断，
+// 不把未来状态依赖误当作过期历史，也不从 Service 签名推导历史解密资格。
+pub(super) fn preflight(
+    state: &DeviceState,
+    header: &Header,
+    ciphertext: &[u8],
+    has_receipt: bool,
+) -> Result<(), LabError> {
+    let config = wire::configuration(state)?;
+    if super::wire_types::decimal(&header.authorization_version)?
+        >= super::wire_types::decimal(&config.authorization_version)?
+    {
+        return Ok(());
+    }
+    current_identity(state, header)?;
+    ensure(
+        state.permissions.recovery.relay_receipt_key.is_some() && has_receipt,
+        "historical_acceptance_required",
+        "首次接收历史消息需要固定Service钥及精确接受回执",
+    )?;
+    let current = state
+        .permissions
+        .checkpoint
+        .as_ref()
+        .ok_or_else(|| LabError::new("trust_required", "缺少当前权限检查点"))?;
+    ensure(
+        current.service_id == state.context.service
+            && current.conversation_id == config.conversation_id
+            && current.authorization_version == config.authorization_version
+            && current.crypto_state_ref == config.crypto_state_ref,
+        "trust_required",
+        "当前配置与已验证权限检查点不同",
+    )?;
+    // 只解析公开帧的 group/epoch/type，不加载本机 MLS 或检查秘密。
+    let protocol = super::codec::protocol(ciphertext)?;
+    ensure(
+        state.group_id.as_deref() == Some(protocol.group_id().as_slice()),
+        "identity_mismatch",
+        "消息不属于当前群",
+    )?;
+    ensure(
+        protocol.content_type() == ContentType::Application,
+        "invalid_envelope",
+        "预期应用密文",
+    )?;
+    historical_recipients(state, current, header, protocol.epoch().as_u64())?;
+    Ok(())
+}
+
+fn historical_recipients(
+    state: &DeviceState,
+    current: &PermissionCheckpoint,
+    header: &Header,
+    epoch: u64,
+) -> Result<Vec<Device>, LabError> {
     let old = state.permissions.history.past.get(&epoch).ok_or_else(|| {
         LabError::new(
             "history_unavailable",

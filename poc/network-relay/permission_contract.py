@@ -42,8 +42,8 @@ def validate_checkpoint(value):
 def validate_statement(statement):
     fields(statement, ("protocol_version", "change_id", "service_id", "conversation_id", "actor",
                        "previous_authorization_version", "authorization_version", "from_state_ref", "to_state_ref",
-                       "action", "commit_sha256", "nonce", "issued_at_unix_secs", "expires_at_unix_secs"))
-    if statement["protocol_version"] != "rim-permission-1":
+                       "action", "commit_sha256", "nonce", "issued_at_unix_secs", "expires_at_unix_secs"), ("allocation_sha256",))
+    if not ((statement["protocol_version"] == "rim-permission-1" and "allocation_sha256" not in statement) or (statement["protocol_version"] == "rim-permission-2" and "allocation_sha256" in statement)):
         invalid("不支持此权限证据版本")
     for name in ("change_id", "service_id", "conversation_id"):
         validate_id(statement[name], name)
@@ -54,6 +54,9 @@ def validate_statement(statement):
         parse_u64(statement[name], name)
     for name in ("from_state_ref", "to_state_ref", "commit_sha256", "nonce"):
         validate_state_ref(statement[name])
+    if "allocation_sha256" in statement:
+        validate_state_ref(statement["allocation_sha256"])
+        if statement["action"].get("kind") not in JOIN_ACTIONS: invalid("领取只用于加入")
     action = statement["action"]
     if not isinstance(action, dict):
         invalid("权限操作必须为对象")
@@ -112,5 +115,9 @@ def validate_permission_request(operation, value):
 
 
 def validate_join(value):
-    fields(value, ("key_package", "welcome"))
+    fields(value, ("key_package", "welcome"), ("allocation",))
+    if "allocation" in value:
+        from key_package_contract import request, signed, receipt
+        fields(value["allocation"], ("request", "receipt"))
+        request(value["allocation"]["request"]); receipt(signed(value["allocation"]["receipt"]))
     return tuple(decode_bytes(value[name], name, MAX_PAYLOAD_BYTES) for name in ("key_package", "welcome"))

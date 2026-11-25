@@ -18,6 +18,11 @@ pub mod authorization;
 pub mod device_registration;
 
 #[cfg(unix)]
+pub mod join_recovery;
+#[cfg(unix)]
+pub mod key_package;
+
+#[cfg(unix)]
 pub mod identity_trust;
 
 #[cfg(unix)]
@@ -278,3 +283,9 @@ mod tests {
         super::run_smoke().map(|_| ())
     }
 }
+
+#[cfg(unix)]
+pub mod identity_source;
+
+#[cfg(unix)]
+pub mod trusted_startup;

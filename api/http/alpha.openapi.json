@@ -1,0 +1,89 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Rocket-IM fixed-device Alpha",
+    "version": "alpha1",
+    "description": "仅本机开发验收。两个显式配置设备，单会话E2EE；TLS1.3，独立公钥核验，设备Bearer凭证不建立E2EE信任。 successor-alpha1增加设备鉴权下的recovery_reserve/recovery_query/recovery_publish；转交不代替端侧签名、信任或双方批准。schema3保留旧接受与信箱事实，旧消息不可解密终态与delivered分离。 Service 0.1.0-alpha.4新增schema4与service-backup-alpha1离线维护CLI；HTTP/WSS契约不变。受控恢复要求停服、原配置/身份/秘密和独立维护记录一致；过旧、未封存或错目标明确拒绝，不提供HTTP备份或通用管理员解密。"
+  },
+  "servers": [
+    {
+      "url": "https://127.0.0.1:8443"
+    }
+  ],
+  "security": [
+    {
+      "deviceBearer": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "deviceBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "数据库可达"
+          },
+          "503": {
+            "description": "不可用"
+          }
+        }
+      }
+    },
+    "/v1/rpc": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/alpha.schema.json#/$defs/Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "业务成功或显式错误；ok=true只在对应事务提交后",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/alpha.schema.json#/$defs/Reply"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "设备鉴权失败"
+          },
+          "413": {
+            "description": "超过600KiB"
+          },
+          "429": {
+            "description": "连接/请求并发上限"
+          }
+        }
+      }
+    },
+    "/v1/ws": {
+      "get": {
+        "description": "TLS WSS升级。同一Request/Reply契约，一次一个请求；不压缩。SDK每100ms驱动一次，空闲连接15秒关闭。HTTP成功/WSS写成功均不等于业务接受。",
+        "responses": {
+          "101": {
+            "description": "WebSocket"
+          },
+          "401": {
+            "description": "鉴权失败"
+          }
+        }
+      }
+    }
+  }
+}

@@ -29,7 +29,7 @@ class RegistrationMigrationTests(RegistrationFixture):
         for table in set(before) - {"__schema__", "meta"}:
             self.assertEqual(before[table], migrated[table])
         self.assertEqual(migrated["device_registrations"], ())
-        self.assertIn(("schema", "rim-poc-storage-8"), migrated["meta"])
+        self.assertIn(("schema", "rim-poc-storage-10"), migrated["meta"])
         for _ in range(2):
             Store(self.path, self.fixture, self.verifier)
             self.assertEqual(self.snapshot(), migrated)

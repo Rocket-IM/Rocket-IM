@@ -281,19 +281,18 @@ fn consistency_evidence_and_checkpoint_capacity_never_consume_check_or_r1() {
         f.call("B", json!({"operation":"consistency_challenge"}));
         let evidence = ForkEvidence {
             predecessor: cp.clone(),
-            left: accepted(&key, &first),
-            right: accepted(&key, &second),
+            left: accepted(&key, &first).into(),
+            right: accepted(&key, &second).into(),
         };
         edit(&f, "B", |state| {
             state.permissions.consistency.forks = vec![evidence; MAX_EVIDENCE];
         });
-        fail_atomic(
-            &f,
+        let result = f.call(
             "B",
             json!({"operation":"consistency_observe_fork","predecessor":cp,
             "left":accepted(&key,&first),"right":accepted(&key,&third)}),
-            "resource_exhausted",
         );
+        assert_eq!(result["status"], "evidence_capacity_exhausted");
         assert_eq!(inspect(&f, "B")["checking"], true);
         assert_eq!(inspect(&f, "B")["fork_evidence_count"], MAX_EVIDENCE);
     }
@@ -317,11 +316,11 @@ fn consistency_evidence_and_checkpoint_capacity_never_consume_check_or_r1() {
             });
         }
     });
-    fail_atomic(
-        &f,
-        "B",
-        json!({"operation":"consistency_observe_head","head":valid}),
-        "resource_exhausted",
+    let result = observe(&f, "B", &valid, false);
+    assert_eq!(result["status"], "evidence_capacity_exhausted");
+    assert_eq!(
+        observe(&f, "B", &valid, true)["status"],
+        "evidence_capacity_exhausted"
     );
     assert_eq!(inspect(&f, "B")["checking"], true);
     // 仅将容量边界装入合成状态；不把这些条目宣传为执行过的 MLS 变更。

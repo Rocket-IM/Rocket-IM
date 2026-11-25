@@ -39,7 +39,10 @@ def existing_join(db, change_id, join):
     row = db.execute("SELECT key_package,welcome FROM join_materials WHERE change_id=?", (change_id,)).fetchone()
     if row is None:
         raise ProtocolError("permission_conflict", "已接受的入群记录缺少同事务材料", status=409)
-    if dict(row) != join:
+    from key_package_admission import allocation_for
+    proof = db.execute("SELECT proof FROM permission_changes WHERE change_id=?", (change_id,)).fetchone()[0]
+    expected = dict(row) | allocation_for(db, validate_proof(json.loads(proof)))
+    if expected != join:
         raise ProtocolError("idempotency_conflict", "已接受的入群材料不可改变字节", status=409)
 
 
@@ -92,11 +95,14 @@ def get_join_material(store, db, device, req):
                      (req["change_id"],)).fetchone()
     if row is None or (row["account"], row["device"]) != (device["account"], device["device"]):
         raise ProtocolError("permission_denied", "入群材料仅允许原目标且当前有效的成员设备领取", status=403)
+    if db.execute("SELECT 1 FROM recovery_edges WHERE root_id=?", (req["change_id"],)).fetchone():
+        raise ProtocolError("recovery_superseded", "原入群入口已被恢复后继替代", status=409)
     change = json.loads(row["proof"])
     statement = validate_proof(change)
     if (statement["action"]["kind"] not in JOIN_ACTIONS or statement["change_id"] != req["change_id"]
             or statement["service_id"] != req["service_id"] or statement["conversation_id"] != req["conversation_id"]
             or (statement["action"]["member"]["account_id"], statement["action"]["member"]["device_id"]) != (row["account"], row["device"])):
         raise ProtocolError("permission_conflict", "持久材料与接受动作或目标不一致", status=409)
+    from key_package_admission import allocation_for
     return {"record": {"change": change, "receipt": json.loads(row["result"])["receipt"]},
-            "join": {"key_package": row["key_package"], "welcome": row["welcome"]}}
+            "join": {"key_package": row["key_package"], "welcome": row["welcome"], **allocation_for(db, statement)}}

@@ -1,7 +1,9 @@
 //! 挑战绑定的观察与显式恢复；合法的暂停结果必须返回 Ok 以提交证据。
 use super::{
     checked,
-    consistency_state::{self as stored, ForkEvidence, HeadEvidence, Status, MAX_EVIDENCE},
+    consistency_state::{
+        self as stored, ForkEvidence, ForkRecord, HeadEvidence, Status, MAX_EVIDENCE,
+    },
     ensure,
     state::DeviceState,
     LabError,
@@ -17,24 +19,12 @@ use crate::{
 use serde_json::{json, Value};
 
 fn context(state: &DeviceState) -> Result<(&PermissionCheckpoint, &str), LabError> {
-    let cp = state
-        .permissions
-        .checkpoint
-        .as_ref()
-        .ok_or_else(|| LabError::new("consistency_unavailable", "需要已验证的本群检查点"))?;
-    let key = state
-        .permissions
-        .recovery
-        .relay_receipt_key
-        .as_deref()
-        .ok_or_else(|| LabError::new("consistency_unavailable", "需要初始固定的 Service 公钥"))?;
+    let cp = super::join_recovery_state::checkpoint(state)
+        .map_err(|_| LabError::new("consistency_unavailable", "需要已验证的本群检查点"))?;
+    let key = super::join_recovery_state::key(state)
+        .map_err(|_| LabError::new("consistency_unavailable", "需要初始固定的 Service 公钥"))?;
     ensure(
-        state
-            .permissions
-            .consistency
-            .checkpoints
-            .get(&stored::version(cp)?)
-            == Some(cp),
+        super::join_recovery_consistency::covers(state, cp)?,
         "consistency_coverage",
         "本机当前检查点不在实际验证的覆盖范围内",
     )?;
@@ -72,6 +62,7 @@ pub(super) fn observe_head(
     head: SignedRecord,
     resume: bool,
 ) -> Result<Value, LabError> {
+    super::join_recovery_consistency::refresh(state)?;
     let (current, key) = context(state)?;
     let current = current.clone();
     let statement = consistency::verify(key, &head)?;
@@ -86,6 +77,24 @@ pub(super) fn observe_head(
         "consistency_context",
         "观察不属于本机、实例或会话",
     )?;
+    let recovery_reached = super::join_recovery_consistency::reached(state)?;
+    let heads_reached = state
+        .permissions
+        .consistency
+        .heads
+        .iter()
+        .map(|h| super::join_recovery_consistency::covers(state, &h.statement.checkpoint))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .all(|covered| covered);
+    let observed_reached = state
+        .permissions
+        .consistency
+        .highest_observed
+        .as_ref()
+        .map(|cp| super::join_recovery_consistency::covers(state, cp))
+        .transpose()?
+        .unwrap_or(true);
     let stored = &mut state.permissions.consistency;
     if stored.heads.iter().any(|previous| previous.head == head) {
         return Ok(result(state, true));
@@ -95,11 +104,9 @@ pub(super) fn observe_head(
         "consistency_challenge_required",
         "观察没有绑定未消费的持久挑战",
     )?;
-    ensure(
-        stored.heads.len() < MAX_EVIDENCE,
-        "resource_exhausted",
-        "观察证据达到上限",
-    )?;
+    if stored.heads.len() >= MAX_EVIDENCE {
+        return Ok(stored::capacity_pause(state, "consistency_head_capacity"));
+    }
     let cp = &statement.checkpoint;
     let version = stored::version(cp)?;
     let current_version = stored::version(&current)?;
@@ -140,17 +147,28 @@ pub(super) fn observe_head(
         stored.highest_observed = Some(cp.clone());
     }
     // 显式恢复只清 Q02；正常权限候选、未完成意图和已移除状态不在此修改。
-    let reached_floor = current_version >= highest_verified
-        && stored.highest_observed.as_ref().is_some_and(|floor| {
-            stored::version(floor)
-                .is_ok_and(|v| v <= current_version && stored.checkpoints.get(&v) == Some(floor))
-        });
-    if resume && stored.status != Status::ForkDetected && cp == &current && reached_floor {
+    let reached_floor = recovery_reached
+        && heads_reached
+        && observed_reached
+        && current_version >= highest_verified
+        && stored
+            .highest_observed
+            .as_ref()
+            .is_some_and(|floor| stored::version(floor).is_ok_and(|v| v <= current_version));
+    if resume
+        && !matches!(
+            stored.status,
+            Status::ForkDetected | Status::EvidenceCapacityExhausted
+        )
+        && cp == &current
+        && reached_floor
+    {
         stored.status = Status::NoKnownConflict;
         stored.reason = None;
     }
     stored.heads.push(HeadEvidence { head, statement });
     stored.challenge = None;
+    super::join_recovery_consistency::refresh(state)?;
     Ok(result(state, false))
 }
 
@@ -178,13 +196,29 @@ pub(super) fn observe_fork(
     )?;
     let mut successors = Vec::with_capacity(2);
     for record in [&evidence.left, &evidence.right] {
-        let (receipt, _) = receipts::verify_receipt(key, record)?;
-        ensure(
-            receipt.outcome == Outcome::Accepted,
-            "invalid_consistency",
-            "未接受提案或 closed 不构成分叉证据",
-        )?;
-        successors.push(permission::verify(&evidence.predecessor, &record.change)?.0);
+        successors.push(match record {
+            ForkRecord::Permission(record) => {
+                let (receipt, _) = receipts::verify_receipt(key, record)?;
+                ensure(
+                    receipt.outcome == Outcome::Accepted,
+                    "invalid_consistency",
+                    "未接受提案或 closed 不构成分叉证据",
+                )?;
+                permission::verify(&evidence.predecessor, &record.change)?.0
+            }
+            ForkRecord::Recovery { recovery, root } => {
+                let intent = crate::join_recovery::parse_intent(&recovery.bundle.intent)?;
+                ensure(
+                    state
+                        .group_id
+                        .as_ref()
+                        .is_some_and(|id| super::codec::encode(id) == intent.scope.group_id),
+                    "consistency_context",
+                    "恢复分叉原件不属于本机群",
+                )?;
+                crate::join_recovery::accepted_public(&evidence.predecessor, root, key, recovery)?.0
+            }
+        });
     }
     ensure(
         successors[0] != successors[1],
@@ -205,13 +239,59 @@ pub(super) fn observe_fork(
         "consistency_challenge_required",
         "先持久化检查会话再导入分叉证据",
     )?;
-    ensure(
-        stored.forks.len() < MAX_EVIDENCE,
-        "resource_exhausted",
-        "分叉证据达到上限",
-    )?;
+    if stored.forks.len() >= MAX_EVIDENCE {
+        return Ok(stored::capacity_pause(state, "consistency_fork_capacity"));
+    }
     stored.forks.push(evidence);
     stored.pause(Status::ForkDetected, "accepted_successor_fork");
     stored.challenge = None;
     Ok(result(state, false))
+}
+
+pub(super) fn preflight(state: &DeviceState, operation: &super::Operation) -> Result<(), LabError> {
+    use super::Operation;
+    if matches!(operation, Operation::ConsistencyChallenge) {
+        context(state)?;
+        ensure(
+            state.permissions.consistency.challenge.is_some()
+                || state.permissions.consistency.heads.len() < MAX_EVIDENCE,
+            "resource_exhausted",
+            "观察证据达到上限",
+        )?;
+        return Ok(());
+    }
+    if !matches!(
+        operation,
+        Operation::ConsistencyObserveHead { .. }
+            | Operation::ConsistencyResume { .. }
+            | Operation::ConsistencyObserveFork { .. }
+    ) {
+        return Ok(());
+    }
+    let raw = checked("state_encoding", serde_json::to_vec(state))?;
+    let mut metadata = checked("state_encoding", serde_json::from_slice(&raw))?;
+    match operation {
+        Operation::ConsistencyObserveHead { head } => {
+            observe_head(&mut metadata, head.clone(), false)?;
+        }
+        Operation::ConsistencyResume { head } => {
+            observe_head(&mut metadata, head.clone(), true)?;
+        }
+        Operation::ConsistencyObserveFork {
+            predecessor,
+            left,
+            right,
+        } => {
+            observe_fork(
+                &mut metadata,
+                ForkEvidence {
+                    predecessor: predecessor.clone(),
+                    left: left.clone(),
+                    right: right.clone(),
+                },
+            )?;
+        }
+        _ => {}
+    }
+    Ok(())
 }

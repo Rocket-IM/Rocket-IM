@@ -102,6 +102,8 @@ def group_anchor_and_history(lab):
     check(lab.rust("b2", "inspect")["group_id"] is None
           and lab.rust("b2", "inspect")["roster_version"] == before_roster, "公开锚扩充了账号信任或群状态")
     old = publish(lab, "before_b2_actual_join")
+    lab.rust("a1", "wire_accept", logical_message_id="before_b2_actual_join", attempt_id="P1",
+             acceptance_receipt=old[1]["acceptance_receipt"])
     candidate = prepare_device(lab, "after_b2_public_advance")
     record = accept_add(lab, candidate, "b1")
     reject_unchanged(lab, "b2", "permission_join_advance", record=record)

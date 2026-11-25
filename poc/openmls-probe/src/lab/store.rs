@@ -153,7 +153,14 @@ impl LockedDevice {
         )?;
         let mut state: DeviceState = checked("state_decoding", serde_json::from_slice(&plaintext))?;
         ensure(
-            state.version == 1 && state.context == *context,
+            ((state.version == 1
+                && state.join_recovery.is_none()
+                && state.witness_state.is_none())
+                || (state.version == 2
+                    && state.join_recovery.is_some()
+                    && state.witness_state.is_none())
+                || (state.version == 3 && state.witness_state.is_some()))
+                && state.context == *context,
             "wrong_context",
             "快照版本或设备上下文不匹配",
         )?;
@@ -166,10 +173,15 @@ impl LockedDevice {
         if restore_provider {
             state.restore_provider()?;
         }
+        super::identity_source::validate(&state)?;
+        super::key_package_state::validate(&state, restore_provider)?;
+        super::join_recovery_state::validate(&state)?;
+        super::join_recovery_witness_state::validate(&state)?;
         Ok(Some(state))
     }
 
     pub fn save(&self, state: &mut DeviceState, point: CrashPoint) -> Result<(), LabError> {
+        super::join_recovery_witness_state::budget(state, 0)?;
         state.capture_provider()?;
         let plaintext = checked("state_encoding", serde_json::to_vec(state))?;
         let context = checked(
@@ -178,6 +190,29 @@ impl LockedDevice {
         )?;
         if matches!(point, CrashPoint::BeforeSave) {
             std::process::exit(83);
+        }
+        #[cfg(feature = "key-package-probe")]
+        if state.witness_deadline.is_some() {
+            super::join_recovery_witness_probe::before_final_sample()?;
+        }
+        if let Some((start, end)) = state.recovery_deadline {
+            let now = super::join_recovery::now()?;
+            ensure(
+                start <= now && now < end,
+                if state.witness_deadline.is_some() {
+                    "w1_material_expired"
+                } else {
+                    "recovery_expired"
+                },
+                "首次加入保存前材料已过期",
+            )?;
+        }
+        if let Some(end) = state.witness_deadline {
+            ensure(
+                super::join_recovery::now()? < end,
+                "w1_deadline_expired",
+                "首次安装最终保存前见证已到期",
+            )?;
         }
         let commitment = snapshot::save_committed_with_hook(
             &self.directory.join("state.enc"),

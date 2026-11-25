@@ -1,4 +1,4 @@
-"""显式配置的 Service 自有签名器；从不读取用户解密私钥。"""
+"""显式配置的签名器客户端；Service与独立业务签发进程分别持钥，不读取用户解密私钥。"""
 
 import os
 import subprocess
@@ -11,6 +11,12 @@ from receipt_contract import (validate_consistency_head, validate_message_accept
 from history_contract import validate_history_receipt
 from rebuild_stream_contract import validate_binding, validate_page_receipt
 from stream_page_contract import validate_stream_page_receipt
+from key_package_contract import receipt, signed
+from join_recovery_contract import receipt_record
+
+def validate_key_package_receipt(record):
+    return receipt(signed(record))
+
 from reclamation_contract import validate_reclaim_receipt, validate_retention_receipt
 
 
@@ -29,7 +35,8 @@ class ReceiptSigner:
 
     def _call(self, request):
         try:
-            output, code = run_helper(self.path, encode_json({**request, "key_path": str(self.key_path)}), 3.0, 64 * 1024, unavailable)
+            limit = 768 * 1024 if request.get("statement", {}).get("protocol_version") == "rim-authorized-directory-response-1" else 96 * 1024
+            output, code = run_helper(self.path, encode_json({**request, "key_path": str(self.key_path)}), 3.0, limit, unavailable)
             value = parse_json(output)
             fields(value, ("ok", "result"))
             if code != 0 or value["ok"] is not True:
@@ -51,7 +58,8 @@ class ReceiptSigner:
     def sign(self, statement):
         if self.signature_key is None:
             raise unavailable()
-        validator = {"rim-permission-receipt-1": validate_receipt,
+        validator = {"rim-recovery-receipt-1": receipt_record, "rim-recovery-receipt-2": receipt_record,
+                     "rim-key-package-receipt-1": validate_key_package_receipt,"rim-permission-receipt-1": validate_receipt,
                      "rim-message-acceptance-1": validate_message_acceptance,
                      "rim-message-closure-1": validate_message_closure,
                      "rim-message-rejection-1": validate_message_rejection,

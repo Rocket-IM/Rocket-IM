@@ -272,13 +272,24 @@ fn exchange_capacity_is_atomic_and_old_snapshot_defaults_do_not_create_trust() {
     // 重新生成只绑定新请求的公开包，沿真实本机持有路径取得。
     edit(&f, "A", |state| state.permissions.exchange.exports.clear());
     let package = export(&f, "A", &request, "change");
-    fail_atomic(
-        &f,
-        "B",
-        json!({"operation":"consistency_exchange_import","package":package}),
-        "resource_exhausted",
+    let paused = import(&f, "B", &package);
+    assert_eq!(
+        paused["consistency"]["status"],
+        "evidence_capacity_exhausted"
     );
     assert_eq!(inspect(&f, "B")["consistency"]["checking"], true);
+    assert_eq!(inspect(&f, "B")["import_count"], exchange_state::LIMIT);
+    f.call("B", json!({"operation":"consistency_exchange_cancel"}));
+    assert_eq!(
+        inspect(&f, "B")["consistency"]["status"],
+        "evidence_capacity_exhausted"
+    );
+    f.fails(
+        "B",
+        json!({"operation":"wire_send","logical_message_id":"capacity_blocked",
+        "attempt_id":"P1","payload":"synthetic"}),
+        "consistency_paused",
+    );
     edit(&f, "B", |state| {
         let provider = std::mem::take(&mut state.provider);
         let mut value = serde_json::to_value(&*state).unwrap();
@@ -292,4 +303,39 @@ fn exchange_capacity_is_atomic_and_old_snapshot_defaults_do_not_create_trust() {
     assert_eq!(inspect(&f, "B")["import_count"], 0);
     assert_eq!(inspect(&f, "B")["consistency"]["checking"], true);
     assert_eq!(checkpoint(&f).authorization_version, "1");
+}
+
+#[test]
+fn exchange_matching_record_does_not_skip_later_invalid_stored_evidence() {
+    let (f, key) = setup();
+    let proof = prepare(&f, "A", "a_match");
+    let record = accepted(&key, &proof);
+    for device in ["A", "B"] {
+        recover(&f, device, &record);
+    }
+    let request = begin(&f, "A", "B");
+    let package = export(&f, "A", &request, "a_match");
+    let locked = LockedDevice::open(&f.root.join("B")).unwrap();
+    let mut state = locked
+        .load(&Context {
+            service: "S1".into(),
+            account: "B".into(),
+            device: "B".into(),
+        })
+        .unwrap()
+        .unwrap();
+    // 只构造损坏的后续公开原件，绝不伪称同一端实际应用两个不同后继。
+    let mut damaged = record;
+    damaged.receipt.signature_bytes = codec::encode(&[0; 64]);
+    state
+        .permissions
+        .recovery
+        .records
+        .insert("z_damaged".into(), damaged);
+    let before = serde_json::to_vec(&state).unwrap();
+    let error = crate::lab::exchange_import::import(&mut state, package).unwrap_err();
+    assert_eq!(error.code, "permission_signature");
+    assert_eq!(serde_json::to_vec(&state).unwrap(), before);
+    assert!(state.permissions.consistency.challenge.is_some());
+    assert!(state.permissions.exchange.imports.is_empty());
 }

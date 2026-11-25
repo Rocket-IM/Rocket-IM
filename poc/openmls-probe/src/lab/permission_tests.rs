@@ -6,6 +6,8 @@ use std::fs;
 
 #[path = "permission_boundary_tests.rs"]
 mod boundary;
+#[path = "permission_preflight_tests.rs"]
+mod preflight;
 #[path = "recovery_tests.rs"]
 mod recovery;
 

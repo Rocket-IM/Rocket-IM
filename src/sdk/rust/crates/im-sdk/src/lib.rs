@@ -1,6 +1,9 @@
-//! 阶段0发布验证的薄公共边界：每个设备单独串行访问密码核心，无UI、网络及持久恢复。
+//! 默认保留阶段0内存接口；可选 persistent 提供固定双设备测试身份的持久 SDK。
+//! 每个设备单独串行访问密码核心，无 UI 或网络工作者。
 //! 所有操作同步完成；平台桥接应放在工作线程或浏览器Worker，避免阻塞UI。
 use rocket_crypto_core::Device as CoreDevice;
+#[cfg(all(feature = "persistent", not(target_arch = "wasm32")))]
+pub mod persistent;
 pub use rocket_crypto_core::{Error, ErrorCode, MAX_MESSAGE_BYTES, MAX_PROTOCOL_BYTES, VERSION};
 use std::{
     panic::{catch_unwind, AssertUnwindSafe},

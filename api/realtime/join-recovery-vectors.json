@@ -1,0 +1,60 @@
+{
+  "version": "rim-recovery-vectors-1",
+  "test_only_seed_hex": "1717171717171717171717171717171717171717171717171717171717171717",
+  "positive": {
+    "proof": {
+      "signature_bytes": "uZ64A/TuTHeEX7BhnOhKInz/xpFlbxqZubqV7tQrn7ctTofoJBIEQPZyesr5akg4n4kK/vxQCRcEyhDl0MqLAg==",
+      "statement_bytes": "eyJhY3RvciI6eyJhY2NvdW50X2lkIjoiYm9iIiwiZGV2aWNlX2lkIjoiYjEiLCJzaWduYXR1cmVfa2V5IjoiR1g5ckkrRnNoVExHcThnNCtzMWVwNG0rREhheWtnTTBBNXY2aXowMmpXRT0ifSwiY2hhbmdlX2lkIjoiY2hhbmdlLXZlY3RvciIsImN1cnJlbnRfYWRtaXNzaW9uIjp7ImNoYW5nZV9pZCI6InByZXZpb3VzLXJlY292ZXJ5IiwicmVjb3JkX3NoYTI1NiI6IjE0MTQxNDE0MTQxNDE0MTQxNDE0MTQxNDE0MTQxNDE0MTQxNDE0MTQxNDE0MTQxNDE0MTQxNDE0MTQxNDE0MTQifSwiZGlyZWN0b3J5X3JlZnMiOlt7ImFjY291bnRfaWQiOiJib2IiLCJzaGEyNTYiOiIxNTE1MTUxNTE1MTUxNTE1MTUxNTE1MTUxNTE1MTUxNTE1MTUxNTE1MTUxNTE1MTUxNTE1MTUxNTE1MTUxNTE1IiwidmVyc2lvbiI6IjIifV0sImV4cGlyZXNfYXRfdW5peF9zZWNzIjoiMTc5MTkwMDMwMCIsImhpc3RvcnlfcG9saWN5IjoiZnJvbV9yZWNvdmVyeSIsImlzc3VlZF9hdF91bml4X3NlY3MiOiIxNzkxOTAwMDAwIiwia2V5X3BhY2thZ2Vfc2hhMjU2IjoiMTYxNjE2MTYxNjE2MTYxNjE2MTYxNjE2MTYxNjE2MTYxNjE2MTYxNjE2MTYxNjE2MTYxNjE2MTYxNjE2MTYxNiIsImtpbmQiOiJpbnRlbnQiLCJrbm93bl9mbG9vciI6eyJhdXRob3JpemF0aW9uX3ZlcnNpb24iOiI5MDA3MTk5MjU0NzQwOTkzIiwiY3J5cHRvX3N0YXRlX3JlZiI6IjExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTEifSwibm9uY2UiOiIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyMTIxMjEyIiwicHJlZGVjZXNzb3IiOnsiYXV0aG9yaXphdGlvbl92ZXJzaW9uIjoiOTAwNzE5OTI1NDc0MDk5MyIsImNyeXB0b19zdGF0ZV9yZWYiOiIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIn0sInByb3RvY29sX3ZlcnNpb24iOiJyaW0tcmVjb3ZlcnktcmVxdWVzdC0xIiwicmVxdWVzdF9pZCI6InJlY292ZXItdmVjdG9yIiwicm9vdF9hZG1pc3Npb24iOnsiY2hhbmdlX2lkIjoicm9vdC1hZGQiLCJyZWNvcmRfc2hhMjU2IjoiMTMxMzEzMTMxMzEzMTMxMzEzMTMxMzEzMTMxMzEzMTMxMzEzMTMxMzEzMTMxMzEzMTMxMzEzMTMxMzEzMTMxMyJ9LCJzY29wZSI6eyJjb252ZXJzYXRpb25faWQiOiJHMSIsImdyb3VwX2lkIjoiWVdOMGRXRnNMV2R5YjNWdyIsInNlcnZpY2VfaWQiOiJ2ZWN0b3Itc2VydmljZSJ9LCJzaWduZXIiOnsiYWNjb3VudF9pZCI6ImJvYiIsImRldmljZV9pZCI6ImIyIiwic2lnbmF0dXJlX2tleSI6Ik1kNitWZE44Y2lkb3NUY1RIS3BnaHdnTExndGd1VXZYaGRGRmRjK2ttTHc9In19"
+    },
+    "request": {
+      "actor": {
+        "account_id": "bob",
+        "device_id": "b1",
+        "signature_key": "GX9rI+FshTLGq8g4+s1ep4m+DHaykgM0A5v6iz02jWE="
+      },
+      "change_id": "change-vector",
+      "current_admission": {
+        "change_id": "previous-recovery",
+        "record_sha256": "1414141414141414141414141414141414141414141414141414141414141414"
+      },
+      "directory_refs": [
+        {
+          "account_id": "bob",
+          "sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+          "version": "2"
+        }
+      ],
+      "expires_at_unix_secs": "1791900300",
+      "history_policy": "from_recovery",
+      "issued_at_unix_secs": "1791900000",
+      "key_package_sha256": "1616161616161616161616161616161616161616161616161616161616161616",
+      "kind": "intent",
+      "known_floor": {
+        "authorization_version": "9007199254740993",
+        "crypto_state_ref": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "nonce": "1212121212121212121212121212121212121212121212121212121212121212",
+      "predecessor": {
+        "authorization_version": "9007199254740993",
+        "crypto_state_ref": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "protocol_version": "rim-recovery-request-1",
+      "request_id": "recover-vector",
+      "root_admission": {
+        "change_id": "root-add",
+        "record_sha256": "1313131313131313131313131313131313131313131313131313131313131313"
+      },
+      "scope": {
+        "conversation_id": "G1",
+        "group_id": "YWN0dWFsLWdyb3Vw",
+        "service_id": "vector-service"
+      },
+      "signer": {
+        "account_id": "bob",
+        "device_id": "b2",
+        "signature_key": "Md6+VdN8cidosTcTHKpghwgLLgtguUvXhdFFdc+kmLw="
+      }
+    },
+    "signed_record_sha256": "96217828186c6739a99b67030484aa297a5b4e8501a90c14a592e990f9de1f94"
+  }
+}

@@ -28,9 +28,11 @@ from synchronization import get_crypto_dependencies, pull_events, report_deliver
 from stream_pages import pull_events_signed
 from reclamation import confirm_reclaim, finish_reclaim
 from expiration_projection import project_for_request
+from key_packages import execute as key_package_lifecycle
+from join_recovery import execute as join_recovery
 from device_registration import begin_device_registration, complete_device_registration
 
-DISPATCH = {"submit_message": submit, "get_attempt": get_attempt, "close_attempt": close_attempt,
+DISPATCH = {"join_recovery": join_recovery,"key_package_lifecycle": key_package_lifecycle,"submit_message": submit, "get_attempt": get_attempt, "close_attempt": close_attempt,
             "pull_events": pull_events, "pull_events_signed": pull_events_signed,
             "report_delivery": report_delivery, "report_read": report_read,
             "get_crypto_dependencies": get_crypto_dependencies,
@@ -158,17 +160,15 @@ class Handler(BaseHTTPRequestHandler):
                     if req.get("action") in {"set_availability", "backfill_lifecycle"}:
                         hook = self.server.controls.take_hook()
                 else:
-                    device = self.server.store.authenticate(db, token)
-                    authorize_operation(db, device, operation)
-                    # 拉取先校验旧水位，再投影到期并读取新水位，避免未来游标跳过新通知。
-                    value = None
-                    if operation not in {"pull_events", "pull_events_signed", "pull_rebuild_events", "confirm_reclaim", "finish_reclaim", "begin_device_registration", "complete_device_registration"}:
-                        value = project_for_request(self.server.store, db, device, operation, req, DISPATCH[operation])
-                    if value is None:
-                        value = DISPATCH[operation](self.server.store, db, device, req)
-                    if operation in {"submit_message", "close_attempt", "report_delivery", "report_read", "submit_permission_change", "close_permission_change", "submit_history_transfer", "register_rebuild_stream", "pull_rebuild_events", "pull_events_signed", "confirm_reclaim", "finish_reclaim", "begin_device_registration", "complete_device_registration"}:
+                    if operation == "identity_source":
+                        from identity_source import execute as execute_identity_source
+                        value = execute_identity_source(self.server.store, db, token, req)
                         hook = self.server.controls.take_hook()
+                    else:
+                        value, hook = self.device_operation(db, token, operation, req)
                 self.before_commit(hook)
+                from key_package_commit import before_commit as check_material_deadline
+                check_material_deadline(value)
             self.after_commit(hook)
             if hook and hook["name"] == "drop_after_commit":
                 self.close_connection = True
@@ -191,6 +191,23 @@ class Handler(BaseHTTPRequestHandler):
             # Store 的上下文已完成回滚；异常也可能出现在提交后，不能宣称未记录。
             self.server.handle_error(self.request, self.client_address)
             self.error_response(ProtocolError("outcome_unknown", "请求处理失败，结果不确定，请查原尝试", outcome="outcome_unknown", status=503))
+
+    def device_operation(self, db, token, operation, req):
+        store = self.server.store
+        if hasattr(store, 'identity_config') and operation in {'begin_device_registration','complete_device_registration'}:
+            raise ProtocolError('identity_source_required','显式身份来源模式禁止旧注册入口',status=403)
+        hook = None
+        device = store.authenticate(db, token)
+        authorize_operation(db, device, operation)
+        # 拉取先校验旧水位，再投影到期并读取新水位，避免未来游标跳过新通知。
+        value = None
+        if operation not in {"pull_events", "pull_events_signed", "pull_rebuild_events", "confirm_reclaim", "finish_reclaim", "begin_device_registration", "complete_device_registration", "key_package_lifecycle", "join_recovery"}:
+            value = project_for_request(self.server.store, db, device, operation, req, DISPATCH[operation])
+        if value is None:
+            value = DISPATCH[operation](self.server.store, db, device, req)
+        if operation in {"submit_message", "close_attempt", "report_delivery", "report_read", "submit_permission_change", "close_permission_change", "submit_history_transfer", "register_rebuild_stream", "pull_rebuild_events", "pull_events_signed", "confirm_reclaim", "finish_reclaim", "begin_device_registration", "complete_device_registration", "key_package_lifecycle", "join_recovery"}:
+            hook = self.server.controls.take_hook()
+        return value, hook
 
     @staticmethod
     def before_commit(hook):
@@ -219,6 +236,8 @@ def main():
     parser.add_argument("--permission-verifier", type=Path)
     parser.add_argument("--receipt-signer", type=Path)
     parser.add_argument("--receipt-key", type=Path)
+    parser.add_argument("--identity-config", type=Path)
+    parser.add_argument("--recovery-witness-config", type=Path)
     args = parser.parse_args()
     if not args.database.is_absolute() or not args.fixture.is_absolute():
         parser.error("database 与 fixture 必须是绝对路径")
@@ -229,7 +248,9 @@ def main():
     if bool(args.receipt_signer) != bool(args.receipt_key):
         parser.error("--receipt-signer 与 --receipt-key 必须同时提供")
     signer = ReceiptSigner(args.receipt_signer, args.receipt_key) if args.receipt_signer else None
-    store = Store(args.database, fixture, verifier, signer)
+    identity_config = parse_json(args.identity_config.read_bytes()) if args.identity_config else None
+    if identity_config is not None and (verifier is None or signer is None): parser.error("身份来源模式需要验证器及回执签名器")
+    store = Store(args.database, fixture, verifier, signer, identity_config, args.recovery_witness_config)
     if store.permission_enabled and verifier is None:
         parser.error("已有权限检查点必须配置 --permission-verifier")
     server = RelayServer(("127.0.0.1", args.port), store, TestControls(args.enable_test_controls))

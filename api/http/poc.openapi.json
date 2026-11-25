@@ -1297,6 +1297,162 @@
           }
         }
       }
+    },
+    "/v1/key_package_lifecycle": {
+      "post": {
+        "operationId": "key_package_lifecycle",
+        "description": "有界目录与KeyPackage生命周期实验。设备先持久化签名请求，Service在同一个SQLite事务内核验注册、当前资格、批次/分配唯一性并保存准确结果。空库存为带签名的unavailable终态，补充后换请求及候选ID。目录来源仍是合成业务授权，Service签名不等于独立身份核验。请求账本64条、材料32份、2MiB、批次4份、可用8份/设备；最长TTL86400秒；不提供返回池或静默fallback。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/KeyPackageLifecycleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "持久化成功结果；未提交不得返回成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/KeyPackageLifecycleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/join_recovery": {
+      "post": {
+        "operationId": "join_recovery",
+        "description": "隔离过期入群恢复 POC：claim/accept/close/get。目标从恢复状态开始接收，历史另行授权。当前有效目标/指定 actor 可查自身原结果；其他成员仅经权限链读取公开证明。一次事务保存唯一活动槽/后继和终态，超时不释放；完整请求 1MiB、结果 900KiB，最多64次/目标且全局48MiB固定预留。该 R0 回执不证明真实 MLS R1。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/RecoveryOperationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "持久化成功结果；未提交不得返回成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../realtime/message.schema.json#/$defs/RecoveryOperationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionDenied"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnsupportedOperation"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/ResourceExhausted"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/TemporarilyUnavailable"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        }
+      }
+    },
+    "/v1/identity_source": {
+      "post": {
+        "operationId": "identity_source",
+        "summary": "Q01独立业务授权与设备目录最小POC",
+        "description": "仅--identity-config显式模式；业务后端挑战/完成/撤销与设备目录读取分别鉴权。新模式禁止旧注册入口；本机HTTP不代表生产TLS/业务认证。独立identity_issuer.py进程的/challenge、/complete、/status不属于本Service API。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../realtime/message.schema.json#/$defs/IdentitySourceOperationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "事务提交后的准确登记结果或经Service根签名的目录响应；不承诺全局新鲜"
+          },
+          "400": {
+            "description": "无效结构/版本/签名对象"
+          },
+          "401": {
+            "description": "业务后端/设备凭证无效"
+          },
+          "403": {
+            "description": "主体失效、旧入口旁路、撤销或无访问权"
+          },
+          "409": {
+            "description": "许可/批准/前驱冲突、过期或账号需要设备恢复"
+          },
+          "429": {
+            "description": "有界账本满额"
+          },
+          "503": {
+            "description": "业务状态/签名器/存储不可用，提交未知须查准确原件"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1469,6 +1625,20 @@
     "history_denied": 403,
     "history_expired": 409,
     "history_unavailable": 403,
-    "history_conflict": 409
+    "history_conflict": 409,
+    "key_package_invalid": 400,
+    "key_package_lifetime": 400,
+    "key_package_last_resort": 400,
+    "key_package_identity": 403,
+    "key_package_context": 409,
+    "key_package_source": 403,
+    "directory_stale": 409,
+    "directory_required": 409,
+    "key_package_predecessor": 409,
+    "key_package_change_conflict": 409,
+    "key_package_reuse": 409,
+    "key_package_allocated": 409,
+    "key_package_expired": 409,
+    "key_package_allocation_required": 409
   }
 }

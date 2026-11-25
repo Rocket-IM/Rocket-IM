@@ -61,6 +61,8 @@ pub enum Action {
 #[serde(deny_unknown_fields)]
 pub struct Statement {
     pub protocol_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allocation_sha256: Option<String>,
     pub change_id: String,
     pub service_id: String,
     pub conversation_id: String,
@@ -291,7 +293,10 @@ impl Statement {
         let statement: Self = serde_json::from_slice(raw)
             .map_err(|_| PermissionError::new("invalid_permission", "声明字段或 JSON 无效"))?;
         check(
-            statement.protocol_version == "rim-permission-1",
+            (statement.protocol_version == "rim-permission-1"
+                && statement.allocation_sha256.is_none())
+                || (statement.protocol_version == "rim-permission-2"
+                    && statement.allocation_sha256.is_some()),
             "invalid_permission",
             "权限协议版本不支持",
         )?;
@@ -311,6 +316,17 @@ impl Statement {
             &statement.nonce,
         ] {
             hash(value)?;
+        }
+        if let Some(value) = &statement.allocation_sha256 {
+            hash(value)?;
+            check(
+                matches!(
+                    statement.action,
+                    Action::AddMember { .. } | Action::AddDevice { .. }
+                ),
+                "invalid_permission",
+                "领取只能用于加入",
+            )?;
         }
         match &statement.action {
             Action::AddMember {

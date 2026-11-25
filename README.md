@@ -6,9 +6,9 @@ A self-hosted instant messaging project for integration into existing products, 
 
 [中文](#中文) · [English](#english) · [开发路线 / Roadmap](docs/开发路线与检查清单.md) · [Issues](https://github.com/Rocket-IM/Rocket-IM/issues)
 
-> **开发状态：阶段 0 验证中。** 当前提供隔离 POC 和最小 SDK 包实验，正式 IM Service、完整 SDK 与生产发布尚未交付。
+> **开发状态：阶段 0 验证中。** 当前提供隔离 POC、最小 SDK 包及固定双设备 Go Service 联网 Alpha，完整 IM Service、四端持久 SDK 与生产发布尚未交付。
 >
-> **Development status: stage 0 validation.** The repository contains isolated proofs of concept and minimal SDK package experiments. The full IM Service, complete SDKs and production releases are not yet available.
+> **Development status: stage 0 validation.** The repository contains isolated proofs of concept, minimal SDK packages and a fixed two-device Go Service network Alpha. The full IM Service, persistent SDKs for all four languages and production releases are not yet available.
 
 ## 中文
 
@@ -38,7 +38,7 @@ Rocket-IM 的目标是让开发者部署独立 IM Service、安装客户端 SDK�
 | 业务服务端 SDK | Go HTTP API 客户端；对接业务用户映射、凭证和管理 API，不依赖 Service 内部包或 IM 数据表 |
 | 示例与管理后台 | 各端公开 SDK 接入示例，以及可选 Vue 3 + TypeScript 管理后台 |
 
-“四端 SDK”指 Flutter、Swift、Kotlin、TypeScript 四种语言交付。TypeScript 的最终桌面宿主与绑定按实测确定；当前 Node 最小包使用预编译 Rust WASM，浏览器包独立验证。
+“四端 SDK”指 Flutter、Swift、Kotlin、TypeScript 四种语言交付。TypeScript 的最终桌面宿主与绑定按实测确定；原 Node 内存最小包使用预编译 Rust WASM，新增 macOS 持久联网包使用预编译 Rust 原生程序，浏览器包独立验证。
 
 发布流程负责生成绑定和预编译产物。目标是让 Flutter / Swift / Kotlin / TypeScript 接入方正常构建自己的应用，无需 Rust/Cargo 或绑定生成器；Service 使用者无需 Go 工具链。Rust crate 使用者按 Rust 工具链集成。
 
@@ -64,15 +64,26 @@ Rocket-IM 的目标是让开发者部署独立 IM Service、安装客户端 SDK�
 
 ### 当前进展
 
-状态核对：**2026-10-10**。项目仍处于阶段 0，完整阶段出口尚未通过。
+状态核对：**2026-11-24**。阶段0仍未通过；用户已授权先整合有限的双持久端 SDK 开发版本，其验收单独记录。
 
 | 已有工作 | 当前边界与记录 |
 |---|---|
-| 独立 Rust 内存核心与四端最小包 | 验证双设备建群、加解密、版本检查和独立包消费；包含限定跨端互通。当前实验 SDK 无网络、SQLite、业务登录、完整同步或附件能力。见[最小包验证](docs/四端最小发布验证.md)、[互通验证](docs/四端互通验证.md) |
+| 独立 Rust 内存核心与四端最小包 | 验证双设备建群、加解密、版本检查和独立包消费；包含限定跨端互通。这些原内存包无网络、SQLite、业务登录、完整同步或附件能力。见[最小包验证](docs/四端最小发布验证.md)、[互通验证](docs/四端互通验证.md) |
+| 有限双持久端 SDK 开发版本 | Rust 持久化核心和 macOS arm64 TypeScript 包，固定两个测试成员、显式公钥核验、普通加入、双向消息及未决恢复；完整候选精确安装，无候选由双方签名授权后继，同一原库保留身份、历史与请求。本机有限验收通过；开发包已接入 SQLCipher、专用系统钥匙串及显式本地退出，覆盖真实拒绝、重启、隔离和清理。另已通过合成自签身份下 dev.3→dev.4 的原身份/历史/恢复材料连续性与错签名拒绝，见[签名升级验收](docs/端侧存储与附件管理.md#22-sdk-签名升级与原身份连续性2026-10-21)。dev.5 新增本地已提交收发历史和稳定分页，保留旧库/身份及256条限额；并发追加、重启续页、恢复及系统拒绝均通过[本地分页验收](docs/端侧存储与附件管理.md#23-sdk-本地消息历史与稳定分页2026-10-21)。上述 dev.5 本地包无 Service 网络或 Windows 产物，非生产安全验收。见[秘密保护范围与验收](docs/端侧存储与附件管理.md#21-sdk-系统秘密保护与本地退出2026-10-21) |
+| Go Service + Rust 联网文本 Alpha | `src/backend/` 的真正 Go/PostgreSQL 服务，TLS 设备鉴权、固定公钥、幂等接受及持久信箱；dev.6 macOS arm64/Node 包由 Rust 自动建群、发送、重连、双游标补拉和送达状态。实际包的双向收发、离线多页、丢 ACK/超时、进程与提交边界恢复、越权及篡改拒绝单独验收。仅固定两个测试设备、单会话文本，不等于一期或阶段0完成。见[本机运行](deploy/README.md)及[联网验收](docs/端侧存储与附件管理.md#24-go-service与rust联网文本-alpha2026-11-24) |
+| 业务身份接入与 Go 服务端 SDK | 新增公开用户映射、固定设备公钥绑定、短期凭证及单凭证失效；独立Go模块只用标准库，业务后台保留自己的登录。真实版本化模块与dev.6包的本机接入验收见[业务身份记录](docs/端侧存储与附件管理.md#25-业务身份接入与-go-服务端-sdk2026-11-24)，公开接入见[Go SDK](src/server-sdk/go/README.md)与[业务示例](examples/business-backend/README.md)。目录公钥仍需独立核验；不包含动态成员或完整账号生命周期 |
+| 客户端自动凭证续期 | dev.7 由Rust管理真实到期、单次在途认证、有界退避和重连；TypeScript只提供可替换业务认证回调。最终实际包通过直连15组、故障16组、原联网14组、业务5组及退出HTTP专项1组验收，覆盖原密文恢复、跨账号/Service/设备隔离、退出取消及迟到结果。仅本机固定双设备范围，见[续期验收与产物](docs/端侧存储与附件管理.md#26-客户端自动凭证续期2026-11-24) |
+| 固定双端联网后继恢复 | dev.8由Rust交换原身份签名的恢复材料，双方明确授权后续接；保留原身份、公钥和历史，旧队列按真实接受/送达事实记录终态，不重加密原请求。实际新包、Go/PostgreSQL、双Node进程和版本化Go SDK的本机验收见[恢复验收与产物](docs/端侧存储与附件管理.md#27-固定双端联网后继恢复2026-11-24)。固定双设备单会话范围；完整阶段0、生产和分发仍未完成/批准 |
+| 联网持久包签名升级 | 真实dev.7→dev.8包在同一新合成签名要求下完成本机验收：原身份、公钥、历史分页、原请求/密文/接受事实与双游标连续；普通混合版本可收发，恢复须双方升级并明确授权，旧版拒读新版恢复状态。54组含重复回归，错签名/装配及锁定边界分别验证，256条限额不变。见[升级范围、产物与证据](docs/端侧存储与附件管理.md#28-联网持久包跨版本签名升级2026-11-24)；不代表生产签名或防回滚 |
+| 联网持久数据同机备份恢复 | dev.9新增公开加密备份/恢复，Rust拥有完整快照、钥匙串进度与原子安装；仅同机原路径/空间/系统秘密，过旧备份明确拒绝。真实包64组通过，原身份/历史/队列/接受事实/游标连续，执行未知仍须明确授权后继。见[恢复范围、用法与证据](docs/端侧存储与附件管理.md#29-联网持久数据同机备份恢复2026-11-24)。不包含跨设备秘密导出、Service回滚或全盘共同回滚证明 |
+| Service停服备份与受控恢复 | Service 0.1.0-alpha.4新增schema4和离线维护CLI，依赖数据库之外幸存的维护记录，仅将最新封存状态恢复到新空数据库。逐项保持接受事实、事件、凭证撤销和后继材料；未正常封存明确阻断。真实产物与独立dev.9消费的52组验收、用法和限制见[服务备份恢复](docs/服务备份恢复.md)。不代表自动崩溃恢复、共同回滚证明或生产灾备 |
+| Service异常退出对账 | alpha.5新增显式启用schema5及离线`reconcile`，提交前将完整候选承诺保存在独立维护记录中，提交后持久确认才开放成功结果。仅精确对应的完整状态允许重开，缺证据/分叉继续拒绝；真实产物与独立SDK消费83组、Go/race32项通过。见[异常对账契约](docs/服务备份恢复.md#7-异常退出对账契约与验收)。独立记录幸存、无其他写入者为前提，共同回退仍不可判定 |
+| 现有限额容量与时延 | 同机独立两轮各完成256条真实E2EE，另实测Service第257条明确拒绝；9套91组、35项Go/race通过，短凭证续期、取消、近满/满额恢复和原件连续性已验收。该dev.9基线中的未接受队列会阻塞补拉，大正文可能先触及端侧字节预算；该轮限额及运行版本未变。测量口径和限制见[容量与时延验收](docs/服务备份恢复.md#8-现有限额容量与时延验收)，不作生产容量承诺 |
+| 永久容量拒绝与补拉 | dev.10将已证明的Service容量拒绝持久化为rejected，原请求、密文和历史留在既有有界账本。真实第257条拒绝后双方游标达到256；原库升级、恢复、故障和续期共12套122组通过。普通256消息/1024请求及字节预算不变，Service仍alpha.5；请求或字节耗尽仍明确失败。见[契约、产物与验收](docs/端侧存储与附件管理.md#30-永久容量拒绝与补拉连续性2026-11-24)，仅限macOS arm64/Node本机范围 |
 | 密码与消息协议 POC | 隔离验证设备注册与首次信任、签名权限、发送顺序、精确重试、双游标、已读及回收恢复等路径。网络 Relay 是 Python HTTP/SQLite 实验装置，身份与独立信任输入仍有合成边界。见[安全模型](docs/安全与身份模型.md)、[协议草案](docs/消息协议草案.md) |
 | 原生与浏览器存储 POC | 验证 Rust 管理的显式事务、密码状态共同提交、崩溃恢复及独立锚；另有 macOS 受保护存储实验。尚未整合到四端内存 SDK。见[端侧存储](docs/端侧存储与附件管理.md)、[浏览器存储](docs/浏览器存储验证.md) |
 
-正式 Go Service、业务服务端 SDK、产品 Demo 与管理后台尚未实现。Windows Node 运行、移动真机、完整安全/容量及生产发布验收仍未完成；模拟器、本机或浏览器结果仅适用于各自记录的环境。剩余条件集中维护在[开发路线与检查清单](docs/开发路线与检查清单.md)。
+已有有限 Go Service Alpha 与 Go 业务身份 SDK；完整 Service、完整管理 SDK、产品 Demo 与管理后台尚未实现。Windows Node 运行、移动真机、完整安全/容量及生产发布验收仍未完成；模拟器、本机或浏览器结果仅适用于各自记录的环境。剩余条件集中维护在[开发路线与检查清单](docs/开发路线与检查清单.md)。
 
 ### 开始开发
 
@@ -103,7 +114,9 @@ cargo +1.98.1 test --manifest-path src/sdk/rust/Cargo.toml \
 ```text
 Rocket-IM/
 ├── api/                 # 阶段 0 实验协议源
-├── src/sdk/             # Rust 内存核心与四种语言的最小 SDK 包
+├── src/backend/         # 固定双设备Go/PostgreSQL Alpha
+├── deploy/              # 本机TLS配置与运行说明
+├── src/sdk/             # Rust核心、四种最小包及macOS持久联网包
 │   ├── rust/
 │   ├── flutter/
 │   ├── swift/
@@ -117,7 +130,7 @@ Rocket-IM/
 └── README.md
 ```
 
-后续 Go 实现归 `src/backend/`，业务服务端 SDK 归 `src/server-sdk/`，应用示例归 `src/apps/`，部署配置归 `deploy/`；这些目录尚未建立。文件落位与依赖方向见[项目文件结构](docs/项目文件结构.md)。
+Go 实现归 `src/backend/`，部署配置归 `deploy/`；独立业务 SDK 已在 `src/server-sdk/go/`，认证接入示例在 `examples/business-backend/`，各端完整应用示例 `src/apps/` 尚未建立。文件落位与依赖方向见[项目文件结构](docs/项目文件结构.md)。
 
 ### 文档导航
 
@@ -193,7 +206,7 @@ These are the intended deliverables. See [Current progress](#current-progress) f
 | Business backend SDK | Go HTTP API client for user mapping, credentials and management APIs; no dependency on Service internal packages or IM tables |
 | Examples and admin console | Public SDK integration examples and an optional Vue 3 + TypeScript admin console |
 
-The four SDKs refer to four language deliveries: Flutter, Swift, Kotlin and TypeScript. The final TypeScript desktop host and bindings require their own tests. The current minimal Node package uses precompiled Rust WASM; browser packages are validated separately.
+The four SDKs refer to four language deliveries: Flutter, Swift, Kotlin and TypeScript. The final TypeScript desktop host and bindings require their own tests. The original in-memory Node package uses precompiled Rust WASM; the new macOS persistent network package uses a precompiled native Rust executable. Browser packages are validated separately.
 
 The release process will generate bindings and precompile runtime artifacts. Flutter / Swift / Kotlin / TypeScript consumers should build their applications without Rust/Cargo or binding generators; Service consumers should not need Go tooling. Rust crate consumers use the Rust toolchain normally.
 
@@ -219,15 +232,26 @@ All 21 phase-one items and independent delivery of all four SDKs belong to phase
 
 ### Current progress
 
-Status reviewed: **2026-10-10**. The project remains in stage 0 and has not passed the full exit criteria.
+Status reviewed: **2026-11-24**. Stage 0 remains incomplete. The user has authorized an earlier, limited SDK development package with two persistent endpoints; its acceptance is recorded separately.
 
 | Existing work | Scope and records |
 |---|---|
-| Independent Rust in-memory core and minimal platform packages | Two-device group creation, encryption/decryption, version checks and independent package consumption, with limited cross-platform interoperability. The experimental SDKs have no networking, SQLite, business sign-in, complete synchronization or attachments. See [Package Validation](docs/四端最小发布验证.md) and [Interoperability Validation](docs/四端互通验证.md) |
+| Independent Rust in-memory core and minimal platform packages | Two-device group creation, encryption/decryption, version checks and independent package consumption, with limited cross-platform interoperability. These original in-memory packages have no networking, SQLite, business sign-in, complete synchronization or attachments. See [Package Validation](docs/四端最小发布验证.md) and [Interoperability Validation](docs/四端互通验证.md) |
+| Limited SDK development package with two persistent endpoints | Rust persistence and a macOS arm64 TypeScript package for two fixed test members, pinned public keys, ordinary joining, bidirectional messages and pending-operation recovery. Durable candidates install exactly; missing candidates use a successor authorized by both pinned endpoints, preserving identities, history and requests in the original databases. Scoped local acceptance has passed. The development package now integrates SQLCipher, a dedicated system keychain and explicit local logout, with actual refusal, restart, isolation and cleanup checks. Synthetic self-signed dev.3→dev.4 upgrades also preserve identities, history and recovery material, with mismatched signatures refused; see [Signature upgrade acceptance](docs/端侧存储与附件管理.md#22-sdk-签名升级与原身份连续性2026-10-21). dev.5 adds locally committed sent/received history and stable pagination while preserving old databases, identities and the 256-message limit; concurrent appends, restart continuation, recovery and system refusals passed [Local history acceptance](docs/端侧存储与附件管理.md#23-sdk-本地消息历史与稳定分页2026-10-21). The dev.5 local package described above has no Service networking or Windows artifact; this is not production security acceptance. See [Secret protection scope and acceptance](docs/端侧存储与附件管理.md#21-sdk-系统秘密保护与本地退出2026-10-21) |
+| Go Service + Rust network text Alpha | A real Go/PostgreSQL service in `src/backend/`, with TLS device authentication, pinned identities, idempotent acceptance and durable mailboxes. The dev.6 macOS arm64/Node package delegates group setup, sending, reconnects, dual-cursor sync and delivery state to Rust. Actual package acceptance covers bidirectional messages, offline pages, lost ACKs/timeouts, process and commit-boundary recovery, scope denial and tampering. Limited to two fixed test devices and one text conversation; not stage-0 or phase-one completion. See [Local operation](deploy/README.md) and [Network acceptance](docs/端侧存储与附件管理.md#24-go-service与rust联网文本-alpha2026-11-24) |
+| Business identity integration and Go server SDK | Public user mapping, fixed public-key binding, short-lived device credentials and individual credential invalidation. The independent Go module uses only the standard library; business login remains with the integrating backend. Actual versioned-module and dev.6 consumption is recorded in [Business identity acceptance](docs/端侧存储与附件管理.md#25-业务身份接入与-go-服务端-sdk2026-11-24); see the [Go SDK](src/server-sdk/go/README.md) and [business example](examples/business-backend/README.md). Public keys still require independent verification. Dynamic membership and full account lifecycle are excluded |
+| Automatic client credential renewal | dev.7 keeps real expiry, one in-flight authentication request, bounded backoff and reconnects in Rust; TypeScript supplies a replaceable business authentication callback. The final actual package passed 15 direct-connection, 16 fault, 14 networking-regression, 5 business-regression groups and one logout HTTP check, including original-ciphertext recovery, account/Service/device isolation, cancellation and late results. Limited to the local fixed-two-device scope; see [Renewal acceptance and artifacts](docs/端侧存储与附件管理.md#26-客户端自动凭证续期2026-11-24) |
+| Fixed two-device network successor recovery | dev.8 lets Rust exchange recovery materials signed by the original identities after explicit consent from both endpoints. Identities, public keys and history are retained; old queues reach truthful acceptance/delivery outcomes without re-encrypting original requests. Actual package, Go/PostgreSQL, two independent Node processes and versioned Go SDK acceptance are recorded in [Recovery acceptance and artifacts](docs/端侧存储与附件管理.md#27-固定双端联网后继恢复2026-11-24). Limited to two fixed devices and one conversation; stage 0, production and distribution remain incomplete or unapproved |
+| Signed upgrades of the persistent networking package | Real dev.7→dev.8 packages passed local acceptance under one fresh synthetic signing requirement, preserving identities, public keys, history pagination, original requests/ciphertext/acceptance and dual cursors. Ordinary mixed-version traffic works; recovery requires both endpoints to upgrade and explicitly consent, and old readers reject new recovery state. The 54 groups include repeated regressions; signing, assembly and lock boundaries are checked separately, with the 256-message limit unchanged. See [Upgrade scope, artifacts and evidence](docs/端侧存储与附件管理.md#28-联网持久包跨版本签名升级2026-11-24). This is neither production signing nor anti-rollback validation |
+| Same-machine backup and restore of persistent network data | dev.9 adds public encrypted backup/restore APIs, with Rust owning complete snapshots, keychain progress and atomic installation. Limited to the original machine, path, scope and system secrets; stale backups are refused. The actual package passed 64 groups preserving identities, history, queues, acceptance facts and cursors; unknown execution still requires explicit successor consent. See [Scope, usage and evidence](docs/端侧存储与附件管理.md#29-联网持久数据同机备份恢复2026-11-24). Cross-device secret export, Service rollback and joint full-state rollback proofs are excluded |
+| Controlled Service backup and restore after shutdown | Service 0.1.0-alpha.4 adds schema4 and an offline maintenance CLI. A surviving record outside the database binds the latest sealed state to a fresh empty target. Acceptance facts, events, credential revocations and successor materials are retained; unsealed runs are blocked. See [Service backup and restore](docs/服务备份恢复.md) for 52 acceptance groups using the actual executable and independent dev.9 consumers, usage and limits. Automatic crash recovery, joint rollback proofs and production disaster recovery are excluded |
+| Service reconciliation after abnormal exit | alpha.5 adds explicit schema5 enablement and offline `reconcile`. An independent record commits to the full candidate before the database commit; success is exposed only after durable external completion. Only exact matching states may reopen; missing evidence and forks remain blocked. Scoped acceptance passed 83 actual-artifact/independent-consumer groups and 32 Go/race tests; see [Reconciliation contract](docs/服务备份恢复.md#7-异常退出对账契约与验收). The independent record must survive without rollback and there must be no other writers; joint rollback remains indeterminate |
+| Capacity and latency within existing limits | Two independent local runs each completed 256 real E2EE messages; a separate real 257th send was explicitly rejected by the Service. Nine suites/91 groups and 35 Go/race tests passed, covering short credential renewal, cancellation, near/full-capacity recovery and original-fact continuity. In that dev.9 baseline, a retained unaccepted send blocks further synchronization, and larger payloads may hit local byte budgets first. That run kept limits and runtime versions unchanged. See [Capacity and latency acceptance](docs/服务备份恢复.md#8-现有限额容量与时延验收) for measurements and scope; this is not a production capacity claim |
+| Permanent capacity rejection and continued synchronization | dev.10 durably marks proven Service capacity refusals as rejected while preserving original requests, ciphertext and history in the existing bounded ledger. After a real 257th rejection, both endpoints reach cursor 256; twelve suites/122 groups cover original-database upgrade, recovery, faults and renewal. The 256 ordinary-message/1024-request and byte budgets remain unchanged, as does Service alpha.5; exhausted request or byte budgets still fail explicitly. See [Contract, artifacts and acceptance](docs/端侧存储与附件管理.md#30-永久容量拒绝与补拉连续性2026-11-24), scoped to local macOS arm64/Node |
 | Cryptographic and message protocol POCs | Isolated paths for device registration and first trust, signed permissions, send ordering, exact retries, dual cursors, read receipts and reclamation recovery. The network Relay is a Python HTTP/SQLite test harness; identity and independent trust inputs retain synthetic boundaries. See [Security Model](docs/安全与身份模型.md) and [Protocol Draft](docs/消息协议草案.md) |
 | Native and browser storage POCs | Rust-owned explicit transactions, joint cryptographic-state commits, crash recovery and independent anchors, plus a macOS protected-storage experiment. These are not integrated into the in-memory platform SDKs. See [Client Storage](docs/端侧存储与附件管理.md) and [Browser Storage](docs/浏览器存储验证.md) |
 
-The formal Go Service, business backend SDK, product demos and admin console are not implemented. Windows Node execution, physical mobile devices, full security/capacity checks and production release acceptance remain incomplete. Simulator, local-machine and browser results apply only to their recorded environments. Remaining criteria are maintained in the [Development Roadmap and Checklist](docs/开发路线与检查清单.md).
+A limited Go Service Alpha and Go business identity SDK are implemented; the full Service, full management SDK, product demos and admin console remain incomplete. Windows Node execution, physical mobile devices, full security/capacity checks and production release acceptance remain incomplete. Simulator, local-machine and browser results apply only to their recorded environments. Remaining criteria are maintained in the [Development Roadmap and Checklist](docs/开发路线与检查清单.md).
 
 ### Getting started
 
@@ -258,7 +282,9 @@ The main source directories currently present are:
 ```text
 Rocket-IM/
 ├── api/                 # Stage 0 experimental protocol sources
-├── src/sdk/             # Rust in-memory core and four language SDK packages
+├── src/backend/         # Fixed two-device Go/PostgreSQL Alpha
+├── deploy/              # Local TLS configuration and operation
+├── src/sdk/             # Rust core, minimal packages and macOS persistent networking
 │   ├── rust/
 │   ├── flutter/
 │   ├── swift/
@@ -272,7 +298,7 @@ Rocket-IM/
 └── README.md
 ```
 
-Future Go implementation belongs in `src/backend/`, business backend SDKs in `src/server-sdk/`, application examples in `src/apps/`, and deployment configuration in `deploy/`. These directories do not exist yet. Placement and dependency rules are defined in [Project Structure](docs/项目文件结构.md).
+Go implementation lives in `src/backend/` and deployment configuration in `deploy/`. The independent business SDK is in `src/server-sdk/go/`, with an authentication example in `examples/business-backend/`. Full application examples in `src/apps/` have not been created. Placement and dependency rules are defined in [Project Structure](docs/项目文件结构.md).
 
 ### Documentation
 

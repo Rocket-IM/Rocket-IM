@@ -41,12 +41,21 @@ fn verify_acceptance(
     Ok(())
 }
 
-pub(super) fn receive(
-    state: &mut DeviceState,
-    envelope: Envelope,
-    acceptance_id: Option<String>,
-    acceptance_receipt: Option<SignedRecord>,
-) -> Result<Value, LabError> {
+struct Input {
+    raw_header: Vec<u8>,
+    header: Header,
+    ciphertext: Vec<u8>,
+    key: String,
+    reclaimed: Option<Value>,
+}
+
+// 此处只读公开元数据；锚预检与真实接收共用，不能恢复 provider 或消费 ratchet。
+fn check(
+    state: &DeviceState,
+    envelope: &Envelope,
+    acceptance_id: Option<&str>,
+    acceptance_receipt: Option<&SignedRecord>,
+) -> Result<Input, LabError> {
     let raw_header = bytes(&envelope.header_bytes, 16 * 1024)?;
     let header = Header::parse(&raw_header)?;
     let ciphertext = bytes(&envelope.payload_bytes, 512 * 1024)?;
@@ -63,30 +72,33 @@ pub(super) fn receive(
         &header,
         &raw_header,
         &ciphertext,
-        acceptance_id.as_deref(),
-        acceptance_receipt.as_ref(),
+        acceptance_id,
+        acceptance_receipt,
     )?;
-    if let Some(result) = super::wire_reclaimed::receive(
-        state,
-        &header,
-        &raw_header,
-        &ciphertext,
-        acceptance_id.as_deref(),
-    )? {
-        return Ok(result);
+    let reclaimed =
+        super::wire_reclaimed::receive(state, &header, &raw_header, &ciphertext, acceptance_id)?;
+    let input = Input {
+        raw_header,
+        header,
+        ciphertext,
+        key,
+        reclaimed,
+    };
+    if input.reclaimed.is_some() {
+        return Ok(input);
     }
-    if let Some(id) = &acceptance_id {
+    if let Some(id) = acceptance_id {
         let exact_owner = state
             .wire
             .inbox
-            .get(&key)
-            .filter(|record| record.envelope == envelope)
-            .map(|_| super::wire_acceptance::Owner::Inbox(key.as_str()));
+            .get(&input.key)
+            .filter(|record| record.envelope == *envelope)
+            .map(|_| super::wire_acceptance::Owner::Inbox(input.key.as_str()));
         super::wire_acceptance::available(state, id, exact_owner)?;
     }
-    if let Some(record) = state.wire.inbox.get_mut(&key) {
-        if record.envelope == envelope {
-            if let Some(incoming) = &acceptance_id {
+    if let Some(record) = state.wire.inbox.get(&input.key) {
+        if record.envelope == *envelope {
+            if let Some(incoming) = acceptance_id {
                 ensure(
                     record.acceptance_id.is_some()
                         || acceptance_receipt.is_some()
@@ -102,20 +114,9 @@ pub(super) fn receive(
                     "acceptance_conflict",
                     "成功记录的接受ID不能替换",
                 )?;
-                if acceptance_receipt.is_some()
-                    || state.permissions.recovery.relay_receipt_key.is_none()
-                {
-                    record.acceptance_id = Some(incoming.clone());
-                }
             }
-            if let Some(receipt) = acceptance_receipt {
-                record.acceptance_receipt = Some(receipt);
-            }
-            // 已成功且字节完全相同，不重解密，也不赋予新的历史接收权限。
-            return Ok(
-                json!({"logical_message_id":header.logical_message_id,"attempt_id":header.attempt_id,
-                "payload_sha256":codec::digest_hex(&record.payload_digest),"duplicate":true}),
-            );
+            // 已成功原件即使历史已回收也可重试；接受证据和 ID 占用必须先验证。
+            return Ok(input);
         }
     }
     ensure(
@@ -123,6 +124,78 @@ pub(super) fn receive(
         "resource_exhausted",
         "接收去重记录已满",
     )?;
+    wire_history::preflight(
+        state,
+        &input.header,
+        &input.ciphertext,
+        acceptance_receipt.is_some(),
+    )?;
+    Ok(input)
+}
+
+pub(super) fn preflight(state: &DeviceState, operation: &super::Operation) -> Result<(), LabError> {
+    if let super::Operation::WireReceive {
+        header_bytes,
+        payload_bytes,
+        acceptance_id,
+        acceptance_receipt,
+    } = operation
+    {
+        check(
+            state,
+            &Envelope {
+                header_bytes: header_bytes.clone(),
+                payload_bytes: payload_bytes.clone(),
+            },
+            acceptance_id.as_deref(),
+            acceptance_receipt.as_ref(),
+        )?;
+    }
+    Ok(())
+}
+
+pub(super) fn receive(
+    state: &mut DeviceState,
+    envelope: Envelope,
+    acceptance_id: Option<String>,
+    acceptance_receipt: Option<SignedRecord>,
+) -> Result<Value, LabError> {
+    let Input {
+        raw_header,
+        header,
+        ciphertext,
+        key,
+        reclaimed,
+    } = check(
+        state,
+        &envelope,
+        acceptance_id.as_deref(),
+        acceptance_receipt.as_ref(),
+    )?;
+    if let Some(result) = reclaimed {
+        return Ok(result);
+    }
+    if let Some(record) = state
+        .wire
+        .inbox
+        .get_mut(&key)
+        .filter(|r| r.envelope == envelope)
+    {
+        if let Some(incoming) = &acceptance_id {
+            if acceptance_receipt.is_some()
+                || state.permissions.recovery.relay_receipt_key.is_none()
+            {
+                record.acceptance_id = Some(incoming.clone());
+            }
+        }
+        if let Some(receipt) = acceptance_receipt {
+            record.acceptance_receipt = Some(receipt);
+        }
+        return Ok(
+            json!({"logical_message_id":header.logical_message_id,"attempt_id":header.attempt_id,
+            "payload_sha256":codec::digest_hex(&record.payload_digest),"duplicate":true}),
+        );
+    }
     let mut group = state.group()?;
     ensure(group.is_active(), "device_revoked", "本机不在当前群中")?;
     let config = wire::configuration(state)?;

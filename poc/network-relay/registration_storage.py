@@ -48,7 +48,7 @@ def install(db, previous_schema):
         raise ValueError("注册迁移必须使用原启动事务")
     marker = db.execute("SELECT value FROM meta WHERE key='registration_schema'").fetchone()
     if marker is None:
-        if previous_schema == "rim-poc-storage-8":
+        if previous_schema in {"rim-poc-storage-8", "rim-poc-storage-9", "rim-poc-storage-10"}:
             raise ValueError("注册版本标记缺失，禁止补造注册事实")
         for statement in SCHEMA.strip().split(";"):
             if statement.strip():

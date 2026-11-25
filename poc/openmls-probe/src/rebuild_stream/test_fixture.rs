@@ -107,6 +107,7 @@ pub fn fixture() -> (Trust, Registration) {
     };
     let statement = Statement {
         protocol_version: "rim-permission-1".into(),
+        allocation_sha256: None,
         change_id: "join_A3".into(),
         service_id: "S1".into(),
         conversation_id: "G2".into(),

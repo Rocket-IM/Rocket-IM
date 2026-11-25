@@ -10,6 +10,7 @@ import time
 
 from .anchor_fixture import AnchorLab, private_json, sha256
 from .fixture import ACCOUNTS, SERVICE, check, identity
+from .first_trust_session import verify_public
 
 
 def decoded(statement):
@@ -66,6 +67,10 @@ class RebuildLab(AnchorLab):
         group = ("source", "source_twin", "source_peer")
         for device in group:
             self.public[device] = self.rust(device, "init")
+        for observer in group:
+            for target in group:
+                if observer != target:
+                    verify_public(self, observer, target)
         self.authorize_pair("source", "source_twin")
         self.authorize_pair("source_twin", "source")
         peers = [{"account": self.identities[d]["account_id"],
@@ -218,6 +223,9 @@ class RebuildLab(AnchorLab):
                               statement=statement)["receipt"]
 
     def joining(self, alias="successor"):
+        for member in ("source", "source_twin", "source_peer"):
+            verify_public(self, member, alias)
+            verify_public(self, alias, member)
         self.rust(alias, "permission_device_join_anchor", **{
             "checkpoint": self.trust["checkpoint"], "relay_receipt_key": self.relay_receipt_key})
         candidate = self.rust("source", "permission_prepare_device", change_id="rebuild_join",

@@ -7,6 +7,53 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Operation {
     Init,
+    IdentitySource {
+        command: super::identity_source::Command,
+    },
+    JoinRecovery {
+        command: super::join_recovery_state::Command,
+    },
+    #[cfg(feature = "key-package-probe")]
+    JoinRecoverySignProbe {
+        request: crate::join_recovery::Request,
+    },
+    #[cfg(feature = "key-package-probe")]
+    JoinRecoveryWitnessSignProbe {
+        kind: String,
+        statement_bytes: String,
+    },
+    #[cfg(feature = "key-package-probe")]
+    JoinRecoveryChangeProbe {
+        statement: crate::join_recovery::Statement,
+        commit_bytes: String,
+    },
+    #[cfg(feature = "key-package-probe")]
+    KeyPackageProbe {
+        mode: String,
+        request_id: String,
+        original: String,
+    },
+    KeyPackageGenerate {
+        request_id: String,
+        count: u8,
+        not_before: String,
+        not_after: String,
+        source_key: String,
+    },
+    KeyPackageRequest {
+        request_id: String,
+        action: crate::key_package::Action,
+        source_key: String,
+    },
+    KeyPackageResponse {
+        request_id: String,
+        receipt: crate::permission::receipts::SignedRecord,
+    },
+    KeyPackageInspect,
+    PermissionPrepareClaim {
+        request_id: String,
+        validity_secs: Option<u16>,
+    },
     IdentityTrustObserve {
         identity: crate::identity_trust::DeviceIdentity,
     },
@@ -93,8 +140,8 @@ pub(super) enum Operation {
     },
     ConsistencyObserveFork {
         predecessor: crate::permission::PermissionCheckpoint,
-        left: crate::permission::receipts::RecoveryRecord,
-        right: crate::permission::receipts::RecoveryRecord,
+        left: super::consistency_state::ForkRecord,
+        right: super::consistency_state::ForkRecord,
     },
     ConsistencyResume {
         head: crate::permission::receipts::SignedRecord,

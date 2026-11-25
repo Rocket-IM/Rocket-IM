@@ -20,7 +20,7 @@ OPERATIONS = frozenset({
     "submit_history_transfer", "get_history_transfer", "get_consistency_head",
     "register_rebuild_stream", "pull_rebuild_events",
     "confirm_reclaim", "finish_reclaim",
-    "begin_device_registration", "complete_device_registration",
+    "begin_device_registration", "complete_device_registration", "key_package_lifecycle", "join_recovery", "identity_source",
 })
 
 
@@ -183,9 +183,18 @@ def _replacement(value):
 
 
 def validate_request(operation, value):
-    """验证操作形状，不改变数据或建立尝试终态；身份以 Bearer 主体为准。"""
+    """验证操作形状，不改变数据或建立尝试终态；身份按各入口凭证验证。"""
+    if operation == "identity_source":
+        fields(value, ("kind",), tuple(k for k in value if k != "kind"))
+        return value
     if operation not in OPERATIONS:
         raise ProtocolError("unsupported_operation", "不支持此操作", status=404)
+    if operation == "join_recovery":
+        from join_recovery_contract import validate_request as recovery_request
+        return recovery_request(value)
+    if operation == "key_package_lifecycle":
+        from key_package_contract import validate_request as lifecycle_request
+        return lifecycle_request(value)
     if operation in {"begin_device_registration", "complete_device_registration"}:
         from registration_contract import validate_request as validate_registration_request
         return validate_registration_request(operation, value)

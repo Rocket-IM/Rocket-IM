@@ -1,6 +1,9 @@
 # 本机产物和历史验证材料；保留本地文件，按文档另行归档。
 /dist/
 
+# 桌面 TypeScript 的本机编译输出；真实开发包由发布流程在 /dist/ 中生成。
+/src/sdk/typescript/desktop/dist/
+
 # 依赖、构建与运行缓存（同时覆盖 SDK 和独立消费工程）。
 node_modules/
 target/

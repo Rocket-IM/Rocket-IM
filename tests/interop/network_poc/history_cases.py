@@ -17,6 +17,14 @@ def publish(lab, name, device="a1"):
     return packet, lab.submit(packet, device=device)
 
 
+def publish_accepted(lab, name, device="a1"):
+    """正常发送保留真实接受事实；未确认发送负例仍使用 publish。"""
+    packet, accepted = publish(lab, name, device)
+    lab.rust(device, "wire_accept", logical_message_id=name, attempt_id="P1",
+             acceptance_receipt=accepted["acceptance_receipt"])
+    return packet, accepted
+
+
 def receive_record(lab, device, record, **options):
     packet, accepted = record
     return lab.rust(device, "wire_receive", **packet["envelope"],
@@ -97,11 +105,11 @@ def queued_atomic_receive(lab):
 
 
 def two_epochs_out_of_order(lab):
-    oldest = [publish(lab, "oldest_" + str(i)) for i in range(2)]
+    oldest = [publish_accepted(lab, "oldest_" + str(i)) for i in range(2)]
     advance(lab, "first_history_step")
-    middle = publish(lab, "middle_epoch")
+    middle = publish_accepted(lab, "middle_epoch")
     advance(lab, "second_history_step", REVOKE_A2, devices=("a1", "b1"))
-    current = publish(lab, "current_epoch")
+    current = publish_accepted(lab, "current_epoch")
     before = checkpoint(lab)
     for record in (current, middle, oldest[1], oldest[0]):
         check(not receive_record(lab, "b1", record)["duplicate"], "不同历史消息错误去重")
@@ -133,8 +141,8 @@ def removed_sender(lab):
 
 
 def receipt_binding(lab):
-    first, second = publish(lab, "receipt_first"), publish(lab, "receipt_second")
-    unbound = publish(lab, "received_without_acceptance_id")
+    first, second = publish_accepted(lab, "receipt_first"), publish_accepted(lab, "receipt_second")
+    unbound = publish_accepted(lab, "received_without_acceptance_id")
     lab.receive("b1", unbound[0])
     reject_unchanged(lab, "b1", "wire_receive", **unbound[0]["envelope"],
                      acceptance_id="unsigned_id_must_not_bind")
@@ -165,7 +173,7 @@ def receipt_binding(lab):
 
 
 def unknown_and_wrong_state(lab):
-    record = publish(lab, "original_history_binding")
+    record = publish_accepted(lab, "original_history_binding")
     advance(lab, "change_for_history_binding")
     packet, accepted = record
     variants = [dict(service_id="another_service"), dict(conversation_id="another_group"),

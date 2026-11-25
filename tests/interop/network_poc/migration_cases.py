@@ -8,7 +8,7 @@ import sqlite3
 
 from .device_join_cases import join_device, no_old_history, prepare_device, setup
 from .fixture import ACCOUNTS, CONVERSATION, SERVICE, check, identity
-from .history_cases import publish, receive_record
+from .history_cases import publish, publish_accepted, receive_record
 from .join_cases import accept_add, mutate_bytes
 from .permission_cases import reject_unchanged
 from .permission_recovery_cases import recover
@@ -25,7 +25,7 @@ def selection(records):
 
 
 def joined(lab, count=1, receive=True):
-    old = [publish(lab, "migration_old_" + str(i)) for i in range(count)]
+    old = [publish_accepted(lab, "migration_old_" + str(i)) for i in range(count)]
     if receive:
         for record in old:
             receive_record(lab, "b1", record)

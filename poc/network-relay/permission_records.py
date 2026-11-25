@@ -36,7 +36,8 @@ def existing_resolution(store, db, device, change, statement):
 
 def check_record_capacity(db):
     count = db.execute("SELECT (SELECT COUNT(*) FROM permission_changes)+(SELECT COUNT(*) FROM permission_resolutions WHERE outcome='closed')").fetchone()[0]
-    if count >= MAX_PERMISSION_RECORDS:
+    reserved = db.execute("SELECT count(*) FROM recovery_attempts WHERE state!='accepted'").fetchone()[0]
+    if count + reserved >= MAX_PERMISSION_RECORDS:
         raise ProtocolError("resource_exhausted", "权限候选终态总量已达实验上限", status=429, retry_after_ms="1000")
 
 
@@ -54,6 +55,8 @@ def close_permission_change(store, db, device, req):
     _, checkpoint = checkpoint_record(db)
     require_receipts(store)
     statement = validate_proof(req["change"])
+    from join_recovery_storage import namespace
+    namespace(db, statement["change_id"])
     close = validate_close(req["close"])
     expected = {"protocol_version": "rim-permission-close-1", "service_id": req["service_id"],
                 "conversation_id": req["conversation_id"], "actor": statement["actor"], "change_id": statement["change_id"],
@@ -74,4 +77,6 @@ def close_permission_change(store, db, device, req):
         raise ProtocolError("permission_version", "不能在候选前驱版本之前签发恢复封口凭证", status=409)
     check_record_capacity(db)
     receipt = save_resolution(store, db, req["change"], statement, checkpoint, "closed")
+    from key_package_admission import close as close_allocation
+    close_allocation(db, statement)
     return {"change": json.loads(proof_json(req["change"])), "receipt": receipt}
